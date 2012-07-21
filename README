@@ -1,5 +1,10 @@
-% Image Data processing and experiment evaluation of data measured at TU Bergakademi Freiberg
+% Image Data processing and experiment evaluation of data measured at TU
+% Bergakademie Freiberg
 %
-% Programs require MATLAB 2009b or later and Image Processing Toolbox installed
+% Programs require MATLAB R2009b or later and Image Processing Toolbox 
+% installed
+%
+% Current testing is done on MATLAB R2010a on GNU/Linux machine (Ubuntu
+% 12.04, amd64)
 %
 % It is very much work in progress, so don't expect full functionality
