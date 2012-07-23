@@ -206,8 +206,6 @@ for i=1:numel(YProfilPlatte) %#ok<*FORPF>
         end
     end    
 end
-cd(rootDir);                                                                %back to the rootDir
-return
 
 %% Read the individual profiles over the length of the plate -> rivulet
 %% area
