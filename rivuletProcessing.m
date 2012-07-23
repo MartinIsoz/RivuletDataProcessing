@@ -150,22 +150,22 @@ parfor i=1:numel(YProfilPlatte)
         fspecial('disk',FilterSensitivity));
 end
 
-%% Saving smoothed images and obtaining contour visualizations of the riv.
+%% Saving smoothed images and obtaining visualizations of the riv.
 % store and plot smoothed images
 cd([storDir '/Substracted/Smoothed']);
 for i=1:numel(YProfilPlatte) %#ok<*FORPF>
 % 	dlmwrite(strcat('Smoothing_',files{i}(1:end-4),'.txt'),...              %extremely time consuming
 %         YProfilPlatte{i},'delimiter','\t','precision','%5.4f')            %write as text files
     imwrite(YProfilPlatte{i},strcat('Smoothing_',files{i}))                 %write as images
-    if GR.contour == 1
+    if GR.contour == 1                                                      %contour visualization
         % graphical output, look on the rivulets from top
         figure;figSet_size(gcf,[400 700])
         XProfilPlatte = linspace(0,plateSize(1),...
-            size(YProfilPlatte{i},1));
+            size(YProfilPlatte{i},2));                                      %width coord, number of columns in YProfilPlatte
         ZProfilPlatte = linspace(0,plateSize(2),...
-            size(YProfilPlatte{i},2));
+            size(YProfilPlatte{i},1));                                      %length coord, number of rows in YProfilPlatte
         [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
-        contour(ZZ',XX',YProfilPlatte{i});                                  %here I keep rivulet height in mm because it looks better
+        contour(XX,ZZ,YProfilPlatte{i});                                  %here I keep rivulet height in mm because it looks better
         title(['\bf Look on the rivulet ' mat2str(i) ' from top'],...
             'FontSize',13)
         xlabel('width coordinate, [m]');
@@ -183,23 +183,14 @@ for i=1:numel(YProfilPlatte) %#ok<*FORPF>
             cd([storDir '/Substracted/Smoothed']);                          %back to the directory for saving images
         end
     end
-end
-cd(rootDir);                                                                %back to the rootDir
-
-%% Plate profile
-%Determination of all profiles over the plate length for obtaining rivulet
-%Just transforms YProfilPlatte and, if wanted, plots it
-for i = 1:numel(YProfilPlatte)
-    %Y-Profile over entire plate width - just transposed Smoothing
-    YProfilPlatte{i}=YProfilPlatte{i}';
-    if GR.profcompl == 1
+    if GR.profcompl == 1                                                    %Y-Profile over entire plate width
         figure;figSet_size(gcf,[1100 600])
         XProfilPlatte = linspace(0,plateSize(1),...
-            size(YProfilPlatte{i},1));
-        ZProfilPlatte = linspace(0,plateSize(2),...
             size(YProfilPlatte{i},2));
+        ZProfilPlatte = linspace(0,plateSize(2),...
+            size(YProfilPlatte{i},1));
         [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
-        mesh(XX',ZZ',YProfilPlatte{i}*1e-3)                                 %I need to convert the liquid height into mm
+        mesh(XX,ZZ,YProfilPlatte{i}*1e-3)                                   %I need to convert the liquid height into mm
         axis tight
         xlabel('width of the plate, [m]')
         ylabel('length of the plate, [m]')
@@ -215,6 +206,8 @@ for i = 1:numel(YProfilPlatte)
         end
     end    
 end
+cd(rootDir);                                                                %back to the rootDir
+return
 
 %% Read the individual profiles over the length of the plate -> rivulet
 %% area

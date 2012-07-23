@@ -132,28 +132,29 @@ EdgCoord = zeros(numel(ImDataCell),10);                                     %OUT
 % Position of the plate differs one measurement to another, so I have to
 % ask the user to specify approximate position of the plate on the
 % precessed images
-% options.Interpreter = 'tex';
-% options.WindowStyle = 'modal';
-% msgbox({['Please specify approximate position of the'...
-%     ' plate on processed images']...
-%     ['Click little bit outside of {\bf upper left} '...
-%     'and {\bf lower right corner}']},options);uiwait(gcf);
-% se      = strel('disk',12);                                                 %morphological structuring element
-% tmpIM   = imtophat(ImDataCell{1},se);
-% tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                    %enhance contrasts
-% tmpIM   = im2bw(tmpIM,0.16);                                                %conversion to black and white
-% figure;imshow(tmpIM);                                                       %show image to work with
-% cutMat  = round(ginput(2));close(gcf);                                      %let the user specify approximate position of the plate
-% cutLeft = cutMat(1,1);cutRight = cutMat(2,1);
-% cutTop  = cutMat(1,2);cutBottom= cutMat(2,2);                               %cut out \pm the plate (less sensitive than exact borders)
-% epsX    = 15; epsY     = 15;                                                %maximal non-verticality/non-horizontality of found lines
-% edgXL   = round((cutRight - cutLeft)*0.10);                                 %max. distance from left edge of the picture
-% edgXR   = cutRight - cutLeft - edgXL;                                       %max. distance from right edge of the picture
-% edgYT   = round((cutBottom - cutTop)*0.02);                                 %....          from top ....
-% edgYB   = cutBottom - cutTop - edgYT;                                       %....          from bottom....
-%preallocation of variables
-ind     = cell(1,2);                                                        %indexes of "jumps" in x/y coordinate of lines
-
+options.Interpreter = 'tex';
+options.WindowStyle = 'modal';
+msgbox({['Please specify approximate position of the'...
+    ' plate on processed images']...
+    ['Click little bit outside of {\bf upper left} '...
+    'and {\bf lower right corner}']},options);uiwait(gcf);
+se      = strel('disk',12);                                                 %morphological structuring element
+tmpIM   = imtophat(ImDataCell{1},se);
+tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                    %enhance contrasts
+tmpIM   = im2bw(tmpIM,0.16);                                                %conversion to black and white
+figure;imshow(tmpIM);                                                       %show image to work with
+cutMat  = round(ginput(2));close(gcf);                                      %let the user specify approximate position of the plate
+cutLeft = cutMat(1,1);cutRight = cutMat(2,1);
+cutTop  = cutMat(1,2);cutBottom= cutMat(2,2);                               %cut out \pm the plate (less sensitive than exact borders)
+trnVec  = [cutLeft cutTop cutLeft cutTop];                                  %translation vector for moving the found coordinates
+epsX    = 15; epsY     = 15;                                                %maximal non-verticality/non-horizontality of found lines
+edgXL   = round((cutRight - cutLeft)*0.10);                                 %max. distance from left edge of the picture
+edgXR   = cutRight - cutLeft - edgXL;                                       %max. distance from right edge of the picture
+edgYT   = round((cutBottom - cutTop)*0.02);                                 %....          from top ....
+edgYB   = cutBottom - cutTop - edgYT;                                       %....          from bottom....
+% preallocation of variables
+strCell = {'left vertical' 'top horizontal'...                              %names of the plate edges
+                   'right vertical' 'bottom horizontal'};
 %% Main cycle of the program
 for i = 1:numel(ImDataCell)                                                 %for each image
 % Find cuvettes on the image
@@ -267,8 +268,6 @@ for i = 1:numel(ImDataCell)                                                 %for
                 'Color','Black','LineWidth',3);
         end
     end
-end
-return;
 % Find edges of the plate
     tmpIM = ImDataCell{i}(cutTop:cutBottom,cutLeft:cutRight);               %cut out the plate from the image
     tmpIM = imtophat(tmpIM,se);
@@ -300,7 +299,7 @@ if AUTO ~= 0                                                                %if 
     % and close to zero information about the last one (on the first set of
     % testing images) -> i must use the information about side length ratio
     % of the plate to calculate position of the remaining edge
-    xyVer   = zeros(numel(lines),2);xyHor = xyVer;                          %arrays for storing vertical and horizontal lines
+    xyVer   = zeros(numel(lines),2);xyHor = xyVer;indVec = xyVer;           %arrays for storing vertical and horizontal lines
     lV = 1; lH = 1;                                                         %aditional indexing variables
     for k = 1:numel(lines)
         xy          = [lines(k).point1 lines(k).point2];                    %save coordinates into a matrix
@@ -325,8 +324,11 @@ if AUTO ~= 0                                                                %if 
                 xyHor(lH,:) = xy([2 4]);                                    %in horizontal....                  ....in y-coords
                 lH = lH + 1;
             end
+            indVec(k) = k;                                                  %save position of stored line
         end
     end
+    indVec = indVec(indVec~=0);                                             %reduce to non-zero elements
+    lines  = lines(indVec);                                                 %cut of non-wanted lines
     % plotting
     if GR(2) == 1
        tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];
@@ -339,109 +341,108 @@ if AUTO ~= 0                                                                %if 
     l     = find(xyHor(:,1) ~= 0,1,'last');                                 %find the last non-zero value in first column of xyMat
     xyHor = xyHor(1:l,:);xyHor = reshape(xyHor,[],1);
     clear l
-    % sort vectors in ascending order
-    xyVer = sort(xyVer);xyHor = sort(xyHor);
-    % find "jumps" in pixel numbers (coordinates)
-    ind{1}  = find(diff(xyVer) > epsY);                                     %find indexes, where xyVer(i) - xyVer(i-1) > epsY
-    ind{2}  = find(diff(xyHor) > epsX);
-    xyCell  = {xyVer xyHor};clear xyVer xyHor                               %create cell for use in for loops and clear unnecessary variables
-    % control results
-    dataC = 0;                                                              %variable for data control
-    meanC = cell(1,numel(ind));                                             %preallocate variable
-    for k = 1:numel(ind)
-        if isempty(ind{k}) == 1
-            dataC = dataC+1;
-            meanC{k} = round(mean(xyCell{k}));                              %calculate mean x/y coordinate of ver/hor line
-        elseif numel(ind{k}) == 1
-            Ind = [0 ind{k}' numel(xyCell{k})];                             %temporary indexing vector
-            for l = 1:numel(Ind)-1
-                meanC{k}(l) = round(mean(xyCell{k}(Ind(l)+1:...
-                    Ind(l+1))));
+    % sorting variables in dependence of appartenity to the edge
+    coordsCell = {xyVer(xyVer<edgXL)...                                     %hor. coordinates on the left side of the plate
+                  xyHor(xyHor<edgYT)...                                     %ver. ....               top....
+                  xyVer(xyVer>edgXR)...                                     %hor. ....               right...
+                  xyHor(xyHor>edgYB)};                                      %ver. ....               bottom....
+    nDNF       = cellfun(@isempty,coordsCell);                              %number of not found edges
+    indDNF     = [];                                                        %index of not specified edge to be used later
+    % edge estimation
+    if nDNF < 2                                                             %found all 4 or at least 3 edges
+        coordVec   = zeros(1,4);                                            %vector of edge coordinates
+        for k = 1:4                                                         %for each cell
+            if isempty(coordsCell{k}) == 0 && mod(k,2) == 1                 %impair cells - vertical edges
+                difVec = diff(coordsCell{k});
+                nEdg   = numel(difVec(difVec>epsX));                        %number of differences bigger than tolerance - n of the found edges
+            elseif isempty(coordsCell{k}) == 0 && mod(k,2) == 0             %pair cells - horizontal edges
+                difVec = diff(coordsCell{k});
+                nEdg   = numel(difVec(difVec>epsY));                        %number of differences bigger than tolerance
             end
-        else                                                                %more than 1 jump means to many lines found
-            if AUTO == 1                                                    %if i dont want completely automatic run
+            if nEdg > 0 && AUTO == 1                                        %there was more than 1 edge found and mode is Semi-automatic
                 % Construct a questdlg with 2 options
                 options.Interpreter = 'tex';                                %choose interpreter of the texts in dialog window
                 options.Default     = 'Automatically';                      %default options to choose
                 strLine1 = ['{\bf Image ' mat2str(i) ':}'];                 %number of image
-                strLine2 = ['There was found more than 1 ('...              %what happened
-                    mat2str(numel(ind{k})) ...
-                    ') distinct lines on 1 of the plate edges'];
+                strLine2 = ['There were found more than 1 ('...             %what happened
+                    mat2str(numel(nEdg+1)) ...
+                    ') distinct lines on the ' strCell{k}  'plate edge'];
                 strLine3 = 'Do you want to choose edges manually?';         %question
                 strLine4 = ['Rq: Automatical estimation of the edge '...    %remarque on the solution method
                     'position uses weighted mean values of coordinates '...
                     'of similar lines'];
-                save_to_base(1);
                 choice = questdlg(sprintf('%s\n\n%s\n%s\n\n',...            %create question dialog
                     strLine1,strLine2,strLine3,strLine4), ...
                     'Choose edges of the plate', ...
                     'Manually','Automatically',options);
                 switch choice                                               %handle responses
                     case 'Manually'
-                        tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];    %contruct vector of parameters for plotLines
-                        meanC{k} = plotLines(tmpIM,lines,tmpPars,k);        %call plotLines with fourth parameter (viz function comments)
-                        clear tmpPars
+                        estEdg = 0;                                         %manual edge estimation
                     case 'Automatically'
-                        meanC{k} = autEdgEst(ind{k},xyCell{k});             %automatic edge position estimation
+                        estEdg = 1;                                         %automatic edge estimation
                 end
-            else                                                            %case i want completely automated image processing
-                warning('Pers:TMDatPl',['There was found more than 2 ('...  %write out warning
-                    mat2str(numel(ind{k})+1)...                             %number of found lines
-                    ') distinct lines - edges of the plate, taking the '...
-                    'weighted mean values of similar lines']);              %!! check this later !!
-                meanC{k} = autEdgEst(ind{k},xyCell{k});                     %automatic edge position estimation
+            elseif nEdg > 0 && AUTO == 2                                    %find more edges but user wants completely automatic run
+                warning('Pers:TMDatPl',['There were found more than 1 ('... %write out warning
+                    mat2str(nEdg+1)...                                      %number of found lines
+                    ') distinct lines on the ' ...
+                    strCell{k} ' plate edge, taking the '...
+                    'weighted mean values of similar lines']);
+            else
+                estEdg = 1;                                                 %automatic edge estimation (only 1 edge found)
+            end
+            if estEdg == 1  && isempty(coordsCell{k}) == 0                  %i want to specify DEFINED edge automatically
+                weightVec = zeros(numel(coordsCell{k}),1);                  %preallocation of weights vector
+                for j = 1:numel(coordsCell{k})
+                    weightVec(j) = numel(coordsCell{k}(coordsCell{k}...     %construction of the weight vector element
+                        == coordsCell{k}(j)))/numel(coordsCell{k});
+                end
+                coordVec(k) = round(sum(weightVec.*coordsCell{k})/...
+                    sum(weightVec));                                        %weighted mean value coordinate
+            elseif estEdg == 1 && isempty(coordsCell{k}) == 1               %i want to automatically specify non-found edge
+                indDNF = k;
+                coordVec(k) = 0;                                            %formerly specify not-defined edge coordinate (2B rewritten)
+            else                                                            %if manually, call outside function with appropriate parameters
+                tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];            %contruct vector of parameters for plotLines
+                coordVec(k) = plotLines(tmpIM,lines,tmpPars,k);             %call plotLines with fourth parameter (viz function comments)
+                clear tmpPars
             end
         end
-        if dataC == 2                                                       %I need to find at least 3 edges => 1 jump
-            warndlg({['There is not enough found edges to'...               %if there is not enough edges, user must specify them manually
+        if isempty(indDNF) == 0                                             %if there is non-specified edge (this is not an exemple of elegance)
+            if indDNF == 1                                                  %left vertical edge is not specified
+                coordVec(indDNF) = coordVec(3)...
+                    - round((coordVec(4)-coordVec(2))/2);
+            elseif indDNF == 2                                              %top horizontal edge is not specified
+                coordVec(indDNF) = coordVec(4)...
+                    - round((coordVec(3)-coordVec(1))*2);
+            elseif indDNF == 3                                              %right vertical edge is not specified
+                coordVec(indDNF) = coordVec(1)...
+                    + round((coordVec(4)-coordVec(2))/2);
+            else                                                            %bottom horizontal edge is not specified
+                coordVec(indDNF) = coordVec(2)...
+                    + round((coordVec(3)-coordVec(1))*2);
+            end
+        end
+    else
+        warndlg({['There is not enough found edges to'...                   %if there is not enough edges, user must specify them manually
             ' estimate the plate position']...
             'You must specify edges manually'},'modal');uiwait(gcf);
-            found = 0;                                                      %ith plate edges werent specified
-        else
-            found = 1;
-        end
-        clear Ind Weights
-    end
-    if dataC == 0  && found ~= 0                                            %there were found all 4 edges
-        xL = meanC{1}(1);xH = meanC{1}(2);                                  %lower and higher x-coordinates
-        yL = meanC{2}(1);yH = meanC{2}(2);                                  %....             y-coordinates
-    elseif numel(ind{1}) == 0 && found ~= 0                                 %found only 1 x-coordinate
-        yL = meanC{2}(1);yH = meanC{2}(2);                                  %....             y-coordinates
-        if meanC{1} < edgXL                                                 %found left edge of the plate
-            xL = meanC{1}(1);xH = xL + round((yH-yL)/2);                    %side ratio of the plate is width x length = 1x2
-        else
-            xH = meanC{1}(1);xL = xH - round((yH-yL)/2);
-        end
-    elseif numel(ind{2}) == 0 && found ~= 0                                 %found only 1 y-coordinate
-        xL = meanC{1}(1);xH(i) = meanC{1}(2);                               %....             x-coordinates
-        if meanC{2} < edgYT                                                 %found top edge of the plate
-            yL = meanC{2}(1);yH = yL + round((xH-xL)*2);                    %plate is side ratio of the plate is width x length = 1x2
-        else
-            yH = meanC{2}(1);yL = yH - round((xH-xL)*2);
-        end
-    else                                                                    %did not find enough edges - must find manually
-        tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];                    %contruct vector of parameters for plotLines 
-        ManEdg  = plotLines(tmpIM,lines,tmpPars);                           %call the function for manual edge selection
-        clear tmpPars
-        xL = ManEdg(1);yL = ManEdg(2);xH = ManEdg(3);yH = ManEdg(4);        %unify output with the rest of the program
+        tmpPars   = [edgXL edgXR edgYT edgYB epsX epsY i];                  %contruct vector of parameters for plotLines 
+        coordVec  = plotLines(tmpIM,lines,tmpPars);                         %call the function for manual edge selection
     end
 else                                                                        %case of completely manual edges choosing
     tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];                        %contruct vector of parameters for plotLines 
-    ManEdg  = plotLines(tmpIM,lines,tmpPars);                               %call the function for manual edge selection
+    coordVec  = plotLines(tmpIM,lines,tmpPars);                             %call the function for manual edge selection
     clear tmpPars
-    xL = ManEdg(1);yL = ManEdg(2);xH = ManEdg(3);yH = ManEdg(4);            %unify output with the rest of the program
-    found = 1;                                                              %ith plate edges were specified
 end
     % saving data into OUTPUT variable
-    EdgCoord(i,7) = xL + cutLeft;EdgCoord(i,9) = xH + cutLeft;              %i need to add back previously cuted out coordinates
-    EdgCoord(i,8) = yL + cutTop; EdgCoord(i,10)= yH + cutTop;
+    EdgCoord(i,7:end) = coordVec + trnVec;                                  %need to add the cutted values
 end
-% end
+end
 
 %% Auxiliary functions
-function ManEdg = plotLines(tmpIM,lines,pars,cellInd)
+function ManEdg = plotLines(tmpIM,lines,pars,prVarInd)
 %
-%  function ManEdg = plotLines(tmpIM,lines,pars)
+%  function ManEdg = plotLines(tmpIM,lines,pars,[prVarInd])
 %
 % function for plotting found lines on the images and for manually choosing
 % edge position
@@ -451,9 +452,9 @@ function ManEdg = plotLines(tmpIM,lines,pars,cellInd)
 % lines     ... lines coordinates obtained by the hough transform
 % pars      ... additional parameters for choosing only the lines on the
 %               plate edges
-% cellInd   ... variable to distinguish between horizontal and vertical
-%               coordinate. to be used when the function is called to
-%               manually chose "problematic edge"
+% prVarInd  ... index of "problematic" edge - if there is more then 1 group
+%               of lines found on one of the plate edges and user chooses
+%               to specify this edge automatically
 %
 % OUTPUT variables
 % ManEdg    ... manually chosen coordinates
@@ -555,11 +556,12 @@ if nargout == 1
             end
         end
     else
-        strCell = {'vertical' 'horizontal'};
-        msgbox(['Specify ' strCell{cellInd}...
+        strCell = {'left vertical' 'top horizontal'...
+                   'right vertical' 'bottom horizontal'};
+        msgbox(['Specify ' strCell{prVarInd}...
             ' edges of the plate'],'modal');uiwait(gcf);
-        tmpEdg  = round(ginput(2));                                         %need to specify 2 edges
-        if cellInd == 1                                                     %choosing between vertical lines
+        tmpEdg  = round(ginput(1));                                         %need to specify only 1 edge
+        if mod(prVarInd,2) == 1                                             %choosing between vertical and horizontal lines
             ManEdg = tmpEdg(:,1);                                           %save vertical coordinates
         else
             ManEdg = tmpEdg(:,2);                                           %save horizontal coordinates
@@ -567,37 +569,4 @@ if nargout == 1
     end
     close(gcf);                                                             %close current graphiquw window
 end
-end
-
-function meanC = autEdgEst(ind,xyCell)
-%
-%  function meanC = autEdgEst(ind,xyCell)
-%
-% function for automatic estimation of problematic edge position, computes
-% with weighted mean values of the coordinates of similar lines
-%
-% INPUT variables
-% ind       ... indexes of "jumps" into coords values, vector, length>1
-% xyCell    ... vector with hor/ver coordinates of the edges, name is kept
-%               because of the coherence
-%
-% OUTPUT variables
-% meanC     ... meand vert/hor coordinates of the edges, vector of length 2
-
-Ind = [0 ind' numel(xyCell)];
-Vec = zeros(numel(Ind)-1,1);
-for l  = 1:numel(Ind)-1                                                     %create mean values for all segments
-    Vec(l) = round(mean(xyCell(Ind(l)+1:Ind(l+1))));
-end
-while numel(Vec) > 2                                                        %I need 2 edges
-    DiffVec= diff(Vec);                                                     %differences in mean values
-    PosVec = [find(DiffVec == min(DiffVec))...
-        find(DiffVec == min(DiffVec))+1];                                   %position of values with minimal difference
-    Weights = diff(Ind);
-    Weights = Weights(PosVec)/sum(Weights(PosVec));                         %weights
-    wVal   = round(Weights*Vec(PosVec));
-    Vec = [Vec(1:PosVec(1)-1);wVal;...
-        Vec(PosVec(2)+1:end)];                                              %construct the vector of appropriate mean coordinates
-end
-meanC= Vec;                                                                 %construct the vector of appropriate mean coordinates
 end

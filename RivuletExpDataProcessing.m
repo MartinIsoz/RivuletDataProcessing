@@ -351,7 +351,11 @@ mL          = handles.metricdata.mL;
 % call function findEdges
 EdgCoord = findEdges(daten,GR,AUTO,hpTr,numPeaks,fG,mL);
 
-msgbox('Edges of plate were found','modal');uiwait(gcf);
+% call control function
+[state prbMsg sumMsg] = controlFunction(EdgCoord);
+
+msgbox(sumMsg.string,'modal');uiwait(gcf);
+
 
 % save output into handles
 handles.metricdata.EdgCoord = EdgCoord;
@@ -1190,9 +1194,9 @@ prgmcontrol= handles.prgmcontrol;
 % Update handles structure
 guidata(handles.figure1, handles);
 
-function [state problemIndexes] = controlFunction(EdgCoord)
+function [state prbMsg sumMsg] = controlFunction(EdgCoord)
 %
-%   [state problemIndexes] = controlFunction(EdgCoord)
+%   [state prbMsg sumMsg] = controlFunction(EdgCoord)
 %
 % function for controling the output of findEdges function. The algorithm
 % walks through the EdgCoord matrix and saves positions of the wrongly
@@ -1205,10 +1209,93 @@ function [state problemIndexes] = controlFunction(EdgCoord)
 %
 % OUTPUT variables
 % state     ... how well are defined the edges
-%               0   ... everything is OK
-%               1   ... wrongly defined small cuvette
-%               2   ... wrongly defined big cuvette
-%               3   ... NaN vaules in plate edges coordinates
-%               4   ... wrongly defined plate edges
+%               [nSC oSC nBC oBC nPl oPl], where
+%               nSc     ... number of NaN in small cuvettes
+%               oSc     ... number of outerliers in small cuvettes
+%               and so on...
 %           ... the length of state variable can vary in dependence of
 %               found problem from 1(scalar) up to 4 [1 2 3 4];
+% prbMsg    ... structure containing indexes of rows (images)
+%               where was found something odd
+% sumMsg    ... summary message for the found problems
+
+nCol = size(EdgCoord,2);                                                    %number of columns in the input matrix (10)
+k    = 1;                                                                   %auxiliary indexing variable for prbMsg
+% problem counters
+nSC  = 0; oSC = 0;                                                          %n* counts NaN and o* outliers
+nBC  = 0; oBC = 0;
+nPl  = 0; oPl = 0;
+for i = 1:nCol                                                              %better to do for each column separately (remove only parts of NaN row)
+    tmpVar = EdgCoord(:,i);                                                 %reduce input matrix only to i-th column
+    % find NaN values in the EdgCoord matrix
+    INaN = find(isnan(EdgCoord) == 1);
+    tmpVar(any(isnan(tmpVar)'),:) = [];                                     %remove rows with NaN in them
+    % calculate standard deviation of each column of EdgCoord
+    coordSTD= std(tmpVar);
+    coordMU = mean(tmpVar);                                                 %mean value in each column
+    nRow    = numel(tmpVar);                                                %number of elements in tmpVar after removing the NaNs
+
+    % find outliers - values more different than 3 * std. deviation
+    outliers= abs(tmpVar-coordMU(ones(nRow,1),:))>...
+        3*coordSTD(ones(nRow,1),:);                                         %matrix of indexes of values more different than 3 * std. dev.
+    Iout    = find(outliers == 1);                                          %find position of outliers
+    % translate the Iout for each found NaN
+    if isempty(INaN) == 0
+        for j = INaN
+            Iout(Iout>=INaN(j)) = Iout(Iout>=INaN(j))+1;                    %must add 1 for every left out row
+        end
+    end
+    % write out messages for the column
+    Iwr = [Iout INaN];
+    for j = 1:length(Iwr)                                                   %for all problems
+        prbMsg(k).coords = [Iwr(j) i];                                      %coordinates of the problem in the EdgCoord matrix
+        prbMsg(k).nImg   = Iwr(j);                                          %number of problematic image
+        if isempty(find(Iwr(j) == Iout, 1)) == 1
+            prbMsg(k).type   = 'NaN';
+        else
+            prbMsg(k).type   = 'outliers';
+        end
+        if i < 4
+            prbMsg(k).device = 'small cuvette';                             %write the device type to the structure
+            if isempty(find(Iwr(j) == Iout, 1)) == 1                        %set counter for the device
+                nSC = nSC + 1;
+            else
+                oSC = oSC + 1;
+            end
+        elseif i >= 4 && i < 7
+            prbMsg(k).device = 'big cuvette';
+            if isempty(find(Iwr(j) == Iout, 1)) == 1
+                oBC = nBC + 1;
+            else
+                oBC = oBC + 1;
+            end
+        else
+            prbMsg(k).device = 'plate';
+            if isempty(find(Iwr(j) == Iout, 1)) == 1
+                nPl = nPl + 1;
+            else
+                oPl = oPl + 1;
+            end
+        end
+        k = k+1;
+    end
+end
+
+% setting up summary report
+sumMsg.totalPrb = nSC + nBC + nPl + oSC + oBC + oPl;                        %total number of "warnings"
+sumMsg.oSC      = oSC;
+sumMsg.nSc      = nSC;
+sumMsg.oBC      = oBC;
+sumMsg.nBC      = nBC;
+sumMsg.oPl      = oPl;
+sumMsg.nPl      = nPl;
+sumMsg.string   = {['In EdgCoord matrix, there were found at total '...
+    mat2str(sumMsg.totalPrb) ' problems. Namely there were found:']...
+    [mat2str(oSC) ' outer values and ' mat2str(nSC)...
+    ' NaN in Small cuvettes edges estimation,']...
+    [mat2str(oBC) ' outer values and ' mat2str(nBC)...
+    ' NaN in Big cuvettes edges estimation and']...
+    [mat2str(oPl) ' outer values and ' mat2str(nPl)...
+    ' NaN in plate edges estimation,']};
+% setting up state variable
+state = [nSC oSC nBC oBC nPl oPl];
