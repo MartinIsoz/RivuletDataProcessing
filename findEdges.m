@@ -168,7 +168,6 @@ for i = 1:numel(ImDataCell)                                                 %for
     Vec    = zeros(1,numel(B));                                             %temporary indexing vector
     trueA  = Vec;
     rectG  = Vec;
-%     i
     for j = 1:numel(B)
         nB= size(B{j},1);                                                   %nB is the number of elements on the region boundary
         stmt1 = nB >= 1000 && nB < 2000;                                    %get rid of too big and too small regions (hardcoded, 2B polished)
@@ -283,15 +282,6 @@ for i = 1:numel(ImDataCell)                                                 %for
     % testing images) -> i must use the information about side length ratio
     % of the plate to calculate position of the remaining edge
     lines = houghlines(tmpIM,theta,rho,P,'FillGap',fG,'MinLength',mL);      %Find lines in the image using the houghlines function
-%     figure;imshow(tmpIM);hold on;
-%     for k = 1:length(lines)
-%         xy = [lines(k).point1; lines(k).point2];
-%         plot(xy(:,1),xy(:,2),'LineWidth',2,'Color','green');
-%         
-%         % Plot beginnings and ends of lines
-%         plot(xy(1,1),xy(1,2),'x','LineWidth',2,'Color','yellow');
-%         plot(xy(2,1),xy(2,2),'x','LineWidth',2,'Color','red');
-%     end
 % here a do a bit wrong indenation, but otherwise, the code would be to
 % wide
 if AUTO ~= 0                                                                %if some automatic processing is wanted
@@ -346,7 +336,7 @@ if AUTO ~= 0                                                                %if 
                   xyHor(xyHor<edgYT)...                                     %ver. ....               top....
                   xyVer(xyVer>edgXR)...                                     %hor. ....               right...
                   xyHor(xyHor>edgYB)};                                      %ver. ....               bottom....
-    nDNF       = cellfun(@isempty,coordsCell);                              %number of not found edges
+    nDNF       = sum(cellfun(@isempty,coordsCell));                         %number of not found edges
     indDNF     = [];                                                        %index of not specified edge to be used later
     % edge estimation
     if nDNF < 2                                                             %found all 4 or at least 3 edges
@@ -358,6 +348,8 @@ if AUTO ~= 0                                                                %if 
             elseif isempty(coordsCell{k}) == 0 && mod(k,2) == 0             %pair cells - horizontal edges
                 difVec = diff(coordsCell{k});
                 nEdg   = numel(difVec(difVec>epsY));                        %number of differences bigger than tolerance
+            else                                                            %not specified edge -> i will continue with next iteration of for l.
+                nEdg   = 0;                                                 %formality, 0 lines ~ 1 line
             end
             if nEdg > 0 && AUTO == 1                                        %there was more than 1 edge found and mode is Semi-automatic
                 % Construct a questdlg with 2 options
@@ -400,7 +392,6 @@ if AUTO ~= 0                                                                %if 
                     sum(weightVec));                                        %weighted mean value coordinate
             elseif estEdg == 1 && isempty(coordsCell{k}) == 1               %i want to automatically specify non-found edge
                 indDNF = k;
-                coordVec(k) = 0;                                            %formerly specify not-defined edge coordinate (2B rewritten)
             else                                                            %if manually, call outside function with appropriate parameters
                 tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];            %contruct vector of parameters for plotLines
                 coordVec(k) = plotLines(tmpIM,lines,tmpPars,k);             %call plotLines with fourth parameter (viz function comments)
@@ -427,7 +418,7 @@ if AUTO ~= 0                                                                %if 
             ' estimate the plate position']...
             'You must specify edges manually'},'modal');uiwait(gcf);
         tmpPars   = [edgXL edgXR edgYT edgYB epsX epsY i];                  %contruct vector of parameters for plotLines 
-        coordVec  = plotLines(tmpIM,lines,tmpPars);                         %call the function for manual edge selection
+        coordVec  = plotLines(tmpIM,lines,tmpPars);coordVec = coordVec';    %call the function for manual edge selection
     end
 else                                                                        %case of completely manual edges choosing
     tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];                        %contruct vector of parameters for plotLines 

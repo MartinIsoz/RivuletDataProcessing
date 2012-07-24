@@ -352,10 +352,10 @@ mL          = handles.metricdata.mL;
 EdgCoord = findEdges(daten,GR,AUTO,hpTr,numPeaks,fG,mL);
 
 % call control function
-[state prbMsg sumMsg] = controlFunction(EdgCoord);
+[state,prbMsg,sumMsg] = controlFunction(EdgCoord);
 
-msgbox(sumMsg.string,'modal');uiwait(gcf);
-
+% modify potential mistakes
+EdgCoord = modifyFunction(EdgCoord,IMdataCell,state,prbMsg,sumMsg);
 
 % save output into handles
 handles.metricdata.EdgCoord = EdgCoord;
@@ -1225,7 +1225,7 @@ k    = 1;                                                                   %aux
 nSC  = 0; oSC = 0;                                                          %n* counts NaN and o* outliers
 nBC  = 0; oBC = 0;
 nPl  = 0; oPl = 0;
-for i = 1:nCol                                                              %better to do for each column separately (remove only parts of NaN row)
+for i = 1:nCol                                                              %better to do for each column sep. (remove only parts of NaN row)
     tmpVar = EdgCoord(:,i);                                                 %reduce input matrix only to i-th column
     % find NaN values in the EdgCoord matrix
     INaN = find(isnan(EdgCoord) == 1);
@@ -1237,7 +1237,7 @@ for i = 1:nCol                                                              %bet
 
     % find outliers - values more different than 3 * std. deviation
     outliers= abs(tmpVar-coordMU(ones(nRow,1),:))>...
-        3*coordSTD(ones(nRow,1),:);                                         %matrix of indexes of values more different than 3 * std. dev.
+        2.5*coordSTD(ones(nRow,1),:);                                         %matrix of indexes of values more different than 3 * std. dev.
     Iout    = find(outliers == 1);                                          %find position of outliers
     % translate the Iout for each found NaN
     if isempty(INaN) == 0
@@ -1281,6 +1281,9 @@ for i = 1:nCol                                                              %bet
     end
 end
 
+% setting up state variable
+state = [nSC oSC nBC oBC nPl oPl];
+
 % setting up summary report
 sumMsg.totalPrb = nSC + nBC + nPl + oSC + oBC + oPl;                        %total number of "warnings"
 sumMsg.oSC      = oSC;
@@ -1289,13 +1292,155 @@ sumMsg.oBC      = oBC;
 sumMsg.nBC      = nBC;
 sumMsg.oPl      = oPl;
 sumMsg.nPl      = nPl;
-sumMsg.string   = {['In EdgCoord matrix, there were found at total '...
-    mat2str(sumMsg.totalPrb) ' problems. Namely there were found:']...
-    [mat2str(oSC) ' outer values and ' mat2str(nSC)...
-    ' NaN in Small cuvettes edges estimation,']...
-    [mat2str(oBC) ' outer values and ' mat2str(nBC)...
-    ' NaN in Big cuvettes edges estimation and']...
-    [mat2str(oPl) ' outer values and ' mat2str(nPl)...
-    ' NaN in plate edges estimation,']};
-% setting up state variable
-state = [nSC oSC nBC oBC nPl oPl];
+if sum(state) ~= 0                                                          %write out human readable string string for user
+    sumMsg.string   = {['In EdgCoord matrix from '...
+        mat2str(numel(EdgCoord(:,1))) ' images, there were found at total '...
+        mat2str(sumMsg.totalPrb) ' problems. Namely there were found:']...
+        [mat2str(oSC) ' outer values and ' mat2str(nSC)...
+        ' NaN in Small cuvettes edges estimation,']...
+        [mat2str(oBC) ' outer values and ' mat2str(nBC)...
+        ' NaN in Big cuvettes edges estimation and']...
+        [mat2str(oPl) ' outer values and ' mat2str(nPl)...
+        ' NaN in plate edges estimation.']};
+else
+    sumMsg.string = 'There were no problems found.';
+end
+
+function EdgCoord = modifyFunction(EdgCoord,IMdataCell,state,prbMsg,sumMsg)
+%
+%   EdgCoord = modifyFunction(EdgCoord,daten,state,prbMsg,sumMsg)
+%
+% Function that takes found coordinates and messages about rate of finding
+% succes and returns modified coordinates base on user interaction
+%
+% For prefered automatic estimation, the outliers and NaN are replaced by
+% mean values of found coordinates. Otherwise, the user can choose to find
+% the problematic edges manually and then, is asked to specify 3 different
+% points on each border from which is estimated the mean coordinate
+%
+% INPUT variables
+% EdgCoord  ... matrix with estimated edge coordinates
+% IMdataCell... cell with image data
+% state
+% prbMsg    ... outputs from controlFunction
+% sumMsg
+
+% write out results of edge finding and ask user what to do
+if sum(state) ~= 0                                                          %there are some problems
+    options.Default = 'From mean values';
+    options.Interpreter = 'tex';
+    stringCell= [sumMsg.string{:} {'Do you want to modify these edges:'}];
+    choice = questdlg(stringCell,...                                        %questdlg is modal by default
+        'Edge estimation correction',...
+        'From mean values', 'Manually','Don`t modify',options);
+else
+    msgbox('Edges of the plate and cuvettes were found','modal');
+    uiwait(gcf);
+    choice = 'Don`t modify';
+end
+
+% switch in dependence on user choice
+% manual specification of the cuvettes edges shoud be fun :-/ (let's leave
+% it out for now - cuvettes edge finding is quite solid, the mean values
+% shoud be enough)
+
+% prbMsg.coords -> [row column] of the problem
+prbCoord = zeros(numel(prbMsg),2);                                          %preallocate variable for problems coordinates
+parfor i = 1:numel(prbMsg)
+    prbCoord(i,:) = prbMsg(i).coords;
+end
+switch choice
+    case 'From mean values'
+        tmpVec= unique(prbCoord(:,2));
+        for j = 1:numel(tmpVec)                                             %for every column with problem
+            i = tmpVec(j);
+            EdgCoord(prbCoord(prbCoord(:,2) == i),i) =...                   %all values with specified column index
+                round(mean(EdgCoord(EdgCoord(:,i)~=prbCoord(prbCoord(:,2)==i),i)));%replace all outliers and NaN with mean values of the rest
+        end
+    case 'Manually'
+        se      = strel('disk',12);                                         %morphological structuring element
+        strEl2  = {'edge' 'edges'};
+        strEl3  = {'small cuvette' 'big cuvette' 'plate'};
+        strEl4  = {'left' 'top' 'right' 'bottom' 'both'};
+        options.WindowStyle = 'modal';
+        options.Interpreter = 'tex';
+        for k = 1:length(prbCoord(:,2));                                    %for all problemes
+            i = prbCoord(k,1);j = prbCoord(k,2);                            %save row and column indexes for k-th problem
+            if j < 4                                                        %!! TRY TO REWRITE THIS !!
+                tmpIM = IMdataCell{i}(1:round(2*end/3),round(end/2):end);   %for small cuvette I need only top right side of the image
+                trVec = [0 round(size(IMdataCell{i},2)/2)-1];
+                if j == 1
+                    str = ['Specify ' strEl4{5} ' ' strEl3{1} ' '...
+                        strEl2{2} '{\bf 3} times.'];
+                    msgbox(str,options);uiwait(gcf);
+                    nInputs = 6;
+                elseif j == 2
+                    str = ['Specify ' strEl4{2} ' ' strEl3{1} ' '...
+                        strEl2{1} '{\bf 3} times.'];
+                    msgbox(str,options);uiwait(gcf);
+                    nInputs = 3;
+                else
+                    str = ['Specify ' strEl4{4} ' ' strEl3{1} ' '...
+                        strEl2{1} '{\bf 3} times.'];
+                    msgbox(str,options);uiwait(gcf);
+                    nInputs = 3;
+                end
+            elseif j >= 4 && j < 7
+                tmpIM = IMdataCell{i}(round(end/3):end,round(end/2):end);   %for big cuvette I need only bottom right side of the imagee
+                trVec = [round(size(IMdataCell{i},1)) round(size(IMdataCell{i},2)/2)-1];
+                if j == 4
+                    str = ['Specify ' strEl4{5} ' ' strEl3{2} ' '...
+                        strEl2{2} '{\bf 3} times.'];
+                    msgbox(str,options);uiwait(gcf);
+                    nInputs = 6;
+                elseif j == 5
+                    str = ['Specify ' strEl4{2} ' ' strEl3{2} ' '...
+                        strEl2{1} '{\bf 3} times.'];
+                    msgbox(str,options);uiwait(gcf);
+                    nInputs = 3;
+                else
+                    str = ['Specify ' strEl4{4} ' ' strEl3{2} ' '...
+                        strEl2{1} '{\bf 3} times.'];
+                    msgbox(str,options);uiwait(gcf);
+                    nInputs = 3;
+                end
+            else
+                tmpIM = IMdataCell{i}(:,1:round(end/2));                    %for the plate I need only left side of the image
+                trVec = [0 0];
+                if j == 7
+                    str = ['Specify ' strEl4{1} ' ' strEl3{3} ' '...
+                        strEl2{1} '{\bf 3} times.'];
+                    msgbox(str,options);uiwait(gcf);
+                    nInputs = 3;
+                elseif j == 8
+                    str = ['Specify ' strEl4{2} ' ' strEl3{3} ' '...
+                        strEl2{1} '{\bf 3} times.'];
+                    msgbox(str,options);uiwait(gcf);
+                    nInputs = 3;
+                elseif j == 9
+                    str = ['Specify ' strEl4{3} ' ' strEl3{3} ' '...
+                        strEl2{1} '{\bf 3} times.'];
+                    msgbox(str,options);uiwait(gcf);
+                    nInputs = 3;
+                else
+                    str = ['Specify ' strEl4{4} ' ' strEl3{3} ' '...
+                        strEl2{1} '{\bf 3} times.'];
+                    msgbox(str,options);uiwait(gcf);
+                    nInputs = 3;
+                end
+            end
+            % some image processing
+            tmpIM   = imtophat(tmpIM,se);
+            tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);        %enhance contrasts
+            tmpIM   = im2bw(tmpIM,0.16);                                    %conversion to black and white
+            figure;imshow(tmpIM);                                           %show image to work with
+            tmpMat  = ginput(nInputs);close(gcf);
+            save_to_base(1);
+            if j == 1 || j == 4 || j == 9                                   %vertical edges
+                EdgCoord(i,j) = round(mean(tmpMat(:,1))) + trVec(2);        %vert. edg -> need x-coordinate     
+            else
+                EdgCoord(i,j) = round(mean(tmpMat(:,1))) + trVec(1);        %hor. edg -> need y-coordinate
+            end
+        end
+    case 'Don`t modify'
+end

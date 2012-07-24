@@ -165,7 +165,7 @@ for i=1:numel(YProfilPlatte) %#ok<*FORPF>
         ZProfilPlatte = linspace(0,plateSize(2),...
             size(YProfilPlatte{i},1));                                      %length coord, number of rows in YProfilPlatte
         [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
-        contour(XX,ZZ,YProfilPlatte{i});                                  %here I keep rivulet height in mm because it looks better
+        contour(XX,ZZ,YProfilPlatte{i});                                    %here I keep rivulet height in mm because it looks better
         title(['\bf Look on the rivulet ' mat2str(i) ' from top'],...
             'FontSize',13)
         xlabel('width coordinate, [m]');
@@ -190,11 +190,11 @@ for i=1:numel(YProfilPlatte) %#ok<*FORPF>
         ZProfilPlatte = linspace(0,plateSize(2),...
             size(YProfilPlatte{i},1));
         [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
-        mesh(XX,ZZ,YProfilPlatte{i}*1e-3)                                   %I need to convert the liquid height into mm
+        mesh(XX,ZZ,YProfilPlatte{i})                                        %I need to convert the liquid height into mm
         axis tight
         xlabel('width of the plate, [m]')
         ylabel('length of the plate, [m]')
-        zlabel('height of the rivulet, [m]')
+        zlabel('height of the rivulet, [mm]')
         title(['\bf Profile of the rivulet ' mat2str(i)],'FontSize',13);
         if GR.regime ~= 0                                                   %if I want to save the images
             cd([storDir '/Plots']);
@@ -202,10 +202,12 @@ for i=1:numel(YProfilPlatte) %#ok<*FORPF>
             if GR.regime == 1                                               %I want images only to be saved
                 close(gcf)
             end
-            cd(rootDir);                                                    %back to the rootDir
+            cd([storDir '/Substracted/Smoothed']);                          %back to the directory for saving images
         end
-    end    
+    end
+    YProfilPlatte{i} = YProfilPlatte{i}';                                   %rest of Andres code, following function are working with transpose
 end
+cd(rootDir);                                                                %back to the rootDir
 
 %% Read the individual profiles over the length of the plate -> rivulet
 %% area
@@ -229,7 +231,6 @@ IFArea = RivSurf(YProfilPlatte,Treshold,plateSize);                         %thi
 [~,RivWidth2,RivHeight2,minLVec,minRVec] =...                               %calculates the mean widths of the rivulet and return indexes of
     RivSurf(YProfilPlatte,Treshold,plateSize);                              %the "edges" of the rivulet + calculates max height of each part of
                                                                             %the rivulet
-
 %% Mean speed determination from average profiles
 % - calculate area of the horizontal cut through the rivulet
 % - from known volumetric rate calculate local (mean) speed in the cut
@@ -557,16 +558,16 @@ for i = 1:numel(YProfilPlatte)
         if isempty(tmpIndL) == 1                                            %low treshold
             tmpIndL = 1;
             warning('Pers:HoPiR',['Treshold is lower than liquid heigh'...
-                ' for ale the left side of the rivulet'])
+                ' for all the left side of the rivulet'])
         elseif isempty(tmpIndR) == 1
             tmpIndR = numel(dummyR(:,j));
             warning('Pers:HoPiR',['Treshold is lower than liquid heigh'...
-                ' for ale the right side of the rivulet'])
+                ' for all the right side of the rivulet'])
         end
         minLVec(i,j) = tmpIndL;
         minRVec(i,j) = tmpIndR;
     end
-    minRVec(i,:) = minRVec(i,:)+(m-size(dummyR,1));                         %need to move right side of the rivulet by the length of skipped ind.
+    minRVec(i,:) = minRVec(i,:)+(mVec(i)-size(dummyR,1));                   %need to move right side of the rivulet by the length of skipped ind.
 
     % calculate local widths of i-th rivulet
     RivWidth(i,:) = (minRVec(i,:) - minLVec(i,:))*deltaX;                   %number of elements in rivulet x width of element
@@ -582,7 +583,7 @@ for i = 1:numel(YProfilPlatte)
         % walking through the arc and adding the approximate length of the
         % element
         lArc  = 0;                                                          %restart the length counter
-        for k = minLVec(i,j):minRVec(i,j)-1                                     %from left to right side of the rivulet
+        for k = minLVec(i,j):minRVec(i,j)-1                                 %from left to right side of the rivulet
             deltaY = YProfilPlatte{i}(k+1,j) - YProfilPlatte{i}(k,j);
             lArc = lArc + sqrt(deltaY.^2 + deltaX.^2);                      %total length of arc + aproximate length of an element
         end
