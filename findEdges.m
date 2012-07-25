@@ -1,7 +1,8 @@
-function EdgCoord = findEdges(ImDataCell,GR,AUTO,varargin)
+function [EdgCoord nMan] = findEdges(ImDataCell,GR,AUTO,varargin)
 %
 %  EdgCoord = findEdges(ImDataCell,GR,AUTO)
 %  EdgCoord = findEdges(ImDataCell,GR,AUTO,hpTr,numPeaks,fG,mL)
+%  [EdgCoord nMan] = findEdges(...);
 %
 % Measurement of the rivulet flow on an inclined plate
 %
@@ -48,6 +49,11 @@ function EdgCoord = findEdges(ImDataCell,GR,AUTO,varargin)
 % xH   ... right edge of the plate
 % yH   ... bottom edge of the plate
 %
+% nMan          ... number of manually selected edges. If the completely
+%                   manual mode is selected (AUTO == 0), this value is Inf.
+%                   Otherwise, it is number of forced manual inputs due to
+%                   algorithm failure
+%
 % Author:       Martin Isoz
 % Organisation: ICT Prague / TU Bergakademie Freiberg
 % Date:         11. 07. 2012
@@ -90,6 +96,12 @@ function EdgCoord = findEdges(ImDataCell,GR,AUTO,varargin)
 %
 % finds cuvettes and plate edges ... . For image processing are used
 % default values of hpTr and numPeaks. fG and mL are specified by user
+%
+% 3.
+%  [EdgCoord nMan] = findEdges(...)
+%
+% find cuvettes and plate edges for specified parameters and returns also
+% the count of forced manual entries
 %
 % See also IM2BW IMADJUST STRETCHLIM BWBOUNDARIES EDGE HOUGH
 % RIVULETPROCESSING RIVULETEXPDATAPROCESSING
@@ -155,6 +167,8 @@ edgYB   = cutBottom - cutTop - edgYT;                                       %...
 % preallocation of variables
 strCell = {'left vertical' 'top horizontal'...                              %names of the plate edges
                    'right vertical' 'bottom horizontal'};
+% forced manual entries counter iniciation
+nMan    = 0;
 %% Main cycle of the program
 for i = 1:numel(ImDataCell)                                                 %for each image
 % Find cuvettes on the image
@@ -379,6 +393,7 @@ if AUTO ~= 0                                                                %if 
                     ') distinct lines on the ' ...
                     strCell{k} ' plate edge, taking the '...
                     'weighted mean values of similar lines']);
+                estEdg = 1;                                                 %automatic edge estimation (more than 1 edge found)
             else
                 estEdg = 1;                                                 %automatic edge estimation (only 1 edge found)
             end
@@ -414,16 +429,19 @@ if AUTO ~= 0                                                                %if 
             end
         end
     else
-        warndlg({['There is not enough found edges to'...                   %if there is not enough edges, user must specify them manually
+        warndlg({['On image ' mat2str(i)...
+            ' there is not enough found edges to'...                        %if there is not enough edges, user must specify them manually
             ' estimate the plate position']...
             'You must specify edges manually'},'modal');uiwait(gcf);
         tmpPars   = [edgXL edgXR edgYT edgYB epsX epsY i];                  %contruct vector of parameters for plotLines 
         coordVec  = plotLines(tmpIM,lines,tmpPars);coordVec = coordVec';    %call the function for manual edge selection
+        nMan      = nMan + 1;                                               %increase force manual entries counter
     end
 else                                                                        %case of completely manual edges choosing
     tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];                        %contruct vector of parameters for plotLines 
-    coordVec  = plotLines(tmpIM,lines,tmpPars);                             %call the function for manual edge selection
+    coordVec= plotLines(tmpIM,lines,tmpPars);                               %call the function for manual edge selection
     clear tmpPars
+    nMan    = Inf;                                                          %if manual mode is selected, return Inf as forced man. entr. counter
 end
     % saving data into OUTPUT variable
     EdgCoord(i,7:end) = coordVec + trnVec;                                  %need to add the cutted values
