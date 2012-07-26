@@ -87,7 +87,7 @@ set(hObject, 'Units', OldUnits);
 % Make the GUI modal
 set(handles.figure1,'WindowStyle','modal')
 
-% UIWAIT makes junk wait for user response (see UIRESUME)
+% UIWAIT makes myQst wait for user response (see UIRESUME)
 uiwait(handles.figure1);
 
 

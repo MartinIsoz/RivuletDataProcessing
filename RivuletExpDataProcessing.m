@@ -86,7 +86,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 % Edit the above text to modify the response to help
 % RivuletExpDataProcessing
 
-% Last Modified by GUIDE v2.5 17-Jul-2012 16:51:26
+% Last Modified by GUIDE v2.5 26-Jul-2012 16:18:37
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -94,7 +94,7 @@ gui_State = struct('gui_Name',       mfilename, ...
                    'gui_Singleton',  gui_Singleton, ...
                    'gui_OpeningFcn', @progGUI_OpeningFcn, ...
                    'gui_OutputFcn',  @progGUI_OutputFcn, ...
-                   'gui_LayoutFcn',  [] , ...
+                   'gui_LayoutFcn',  [], ...
                    'gui_Callback',   []);
 if nargin && ischar(varargin{1})
     gui_State.gui_Callback = str2func(varargin{1});
@@ -116,32 +116,23 @@ function progGUI_OpeningFcn(hObject, eventdata, handles, varargin)
 % handles    structure with handles and user data (see GUIDATA)
 % varargin   command line arguments to progGUI (see VARARGIN)
 
-% initialize metricdata and prgmcotrol fields
-% handles.metricdata = struct([]);
-% handles.prgmcontrol= struct([]);
 % fill gui with defaults values
 [handles.metricdata handles.prgmcontrol] =...
     initializeGUI(hObject, eventdata, handles);
 
 % Choose default command line output for progGUI
 handles.output = hObject;
-
-%Rq: creation of the field handles.metricdata at the begining of the
-%program execution also simplifies checking for all the needed fields in
-%different parts of the program
-
-handles.output = hObject;
 set(hObject,'CloseRequestFcn',@my_closereq)
-
 
 % Update handles structure
 guidata(hObject, handles);
+
 
 % My own closereq fcn -> to avoid closing with close command
 function my_closereq(src,evnt)
 % User-defined close request function 
 % to display a question dialog box 
-   selection = questdlg('Close This Figure?',...
+   selection = questdlg('Close Rivulet data processing program?',...
       'Close Request Function',...
       'Yes','No','Yes'); 
    switch selection, 
@@ -152,7 +143,7 @@ function my_closereq(src,evnt)
    end
 
 % UIWAIT makes progGUI wait for user response (see UIRESUME)
-% uiwait(handles.figure1);
+% uiwait(handles.MainWindow);
 
 
 % --- Outputs from this function are returned to the command line.
@@ -188,16 +179,21 @@ mkdir(storDir,'Width');                                                     %wid
 mkdir(storDir,'Correlation');                                               %directory for saving data necessary for correlations
 mkdir(storDir,'Plots');                                                     %directory for saving plots
 
-% display output
-msgbox(['Directory for storing outputs was chosen and subdirectories'...
-    ' was created'],'modal');uiwait(gcf);
+%modify string to display in statusbar
+statusStr = ['Data storage directory ' storDir...
+    ' loaded. Subdirectories are ready.'];
 
 % saving outputs
 handles.metricdata.storDir = storDir;
+handles.statusbar = statusbar(handles.MainWindow,statusStr);
+else
+%modify string to display in statusbar
+statusStr = 'Choosing of data storage directory cancelled.'; 
+handles.statusbar = statusbar(handles.MainWindow,statusStr);
 end
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in PushLoadBg.
 function PushLoadBg_Callback(hObject, eventdata, handles)
@@ -213,14 +209,22 @@ start_path  = '~/Documents/Freiberg/Experiments/';
 msgbox('Choose background image','modal');uiwait(gcf);
 [bgName bgDir] = uigetfile(FilterSpec,DlgTitle1,start_path);
 if bgDir ~= 0                                                               %basic input control
-bgImage        = imread([bgDir '/' bgName]);
-msgbox('Bacground image was succesfully loaded','modal');uiwait(gcf);
+bgImage        = imread([bgDir bgName]);
+
+% updating statusbar
+statusStr = ['Background image ' bgDir bgName...
+    ' was succesfuly loaded.'];
+handles.statusbar = statusbar(handles.MainWindow,statusStr);
 
 % save variable into handle
 handles.metricdata.bgImage = bgImage;
+else
+%modify string to display in statusbar
+statusStr = 'Choosing of Background image cancelled.'; 
+handles.statusbar = statusbar(handles.MainWindow,statusStr);
 end
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushLoadIM.
@@ -270,18 +274,30 @@ msgbox({'Background is loaded,'...
             = uigetfile(FilterSpec,DlgTitle2,'Multiselect',selectmode,...
             start_path);
 if imDir ~= 0                                                               %basic input control
-parfor i = 1:numel(imNames)
-    daten{i} = imread([imDir '/' imNames{i}]);                              %load images from selected directory
+for i = 1:numel(imNames)
+    daten{i} = imread([imDir imNames{i}]);                                  %load images from selected directory
+    handles.statusbar = statusbar(handles.MainWindow,...
+        'Loading image %d of %d (%.1f%%)',...                               %updating statusbar
+        i,numel(imNames),100*i/numel(imNames));
+    set(handles.statusbar.ProgressBar,...
+        'Visible','on', 'Minimum',0, 'Maximum',numel(imNames), 'Value',i);
 end
 % substract background from images
 cd([storDir '/Substracted'])                                                %go to the folder for saving substracted images
-parfor i = 1:numel(imNames)
+for i = 1:numel(imNames)
     daten{i} = imsubtract(daten{i},bgImage);                                %substract bacground from picture
     imwrite(daten{i},imNames{i});                                           %save new images into subfolder
+    handles.statusbar = statusbar(handles.MainWindow,...
+        'Substracting image %d of %d (%.1f%%)',...                          %updating statusbar
+        i,numel(imNames),100*i/numel(imNames));
+    set(handles.statusbar.ProgressBar,...
+        'Visible','on', 'Minimum',0, 'Maximum',numel(imNames), 'Value',i);
 end
 cd(rootDir)                                                                 %return to rootdir
 
-msgbox('Images was succesfully loaded','modal');uiwait(gcf);
+set(handles.statusbar.ProgressBar,'Visible','off');                         %made progresbar invisible again
+set(handles.statusbar,...                                                   %update statusbar
+    'Text','Images were succesfully loaded and substratced');
 
 % save variables into handles
 handles.metricdata.daten   = daten;                                         %images
@@ -290,9 +306,13 @@ handles.metricdata.bgImage = bgImage;                                       %bac
 handles.metricdata.storDir = storDir;                                       %need to resave also the location for storing outputs
 % save information about succesfull ending of the function
 handles.prgmcontrol.loadIM = 0;                                             %0 ... OK, 1 ... warnings, 2 ... errors (for now without use)
+else
+%modify string to display in statusbar
+statusStr = 'Loading images cancelled.'; 
+handles.statusbar = statusbar(handles.MainWindow,statusStr);
 end
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushClearIM.
@@ -304,13 +324,13 @@ function PushClearIM_Callback(hObject, eventdata, handles)
 if isfield(handles.metricdata,'daten') == 1                                 %field metricdata.daten exists
     clear('handles.metricdata.daten');
     % Update handles structure
-    guidata(handles.figure1, handles);
-    msgbox('Images were cleared')
+    guidata(handles.MainWindow, handles);
+    set(handles.statusbar,'Text','Images were cleared');                    %notify user
 else
-    msgbox('No images were loaded');
+    msgbox('No images were loaded','modal');uiwait(gcf);
 end
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 %% Pushbuttons - Image Processing
 
@@ -330,17 +350,6 @@ if stmt1 == 0                                                               %if 
 else
     daten = handles.metricdata.daten;
 end
-stmt2 = isfield(handles.prgmcontrol,'autoEdges');                           %is there selected method for edges finding
-if stmt2 == 1
-    AUTO = handles.prgmcontrol.autoEdges;                                   %if there is selected method, save it
-else
-    msgbox('Select level of automaticallity for the program','modal');      %if not, ask for it
-    uiwait(gcf);
-end
-stmt3 = isfield(handles.metricdata,'GREdges');                              %is selected graphical output
-if stmt3 == 1
-    GR = handles.metricdata.GREdges;
-end
 
 % create varargin optional input from editable textfields
 hpTr        = handles.metricdata.hpTr;
@@ -349,20 +358,20 @@ fG          = handles.metricdata.fG;
 mL          = handles.metricdata.mL;
 
 % call function findEdges
-EdgCoord = findEdges(daten,GR,AUTO,hpTr,numPeaks,fG,mL);
+EdgCoord = findEdges(handles,hpTr,numPeaks,fG,mL);
 
 % call control function
 [state,prbMsg,sumMsg] = controlFunction(EdgCoord);
 
-save_to_base(1)
 % modify potential mistakes
 EdgCoord = modifyFunction(EdgCoord,daten,state,prbMsg,sumMsg);
+set(handles.statusbar,'Text','EdgCoord is prepared for rivulet processing');%update statusbar
 
 % save output into handles
 handles.metricdata.EdgCoord = EdgCoord;
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushClearEdg.
@@ -376,7 +385,7 @@ handles.metricdata = rmfield(handles.metricdata,'EdgCoord');
 msgbox('Edges coordinates were cleared','modal');uiwait(gcf);
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushDefEdg.
@@ -401,7 +410,7 @@ handles.metricdata.fG       = [];
 handles.metricdata.mL       = [];
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 %% Editable fields - Image Processing
 
@@ -415,7 +424,7 @@ function EdithpTr_Callback(hObject, eventdata, handles)
 
 handles.metricdata.hpTr = str2double(get(hObject,'String'));                %get value from editable textfield
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -442,7 +451,7 @@ function EditnumPeaks_Callback(hObject, eventdata, handles)
 
 handles.metricdata.numPeaks = str2double(get(hObject,'String'));            %get value from editable textfield
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -469,7 +478,7 @@ function EditfG_Callback(hObject, eventdata, handles)
 
 handles.metricdata.fG = str2double(get(hObject,'String'));                  %get value from editable textfield
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -496,7 +505,7 @@ function EditmL_Callback(hObject, eventdata, handles)
 
 handles.metricdata.mL = str2double(get(hObject,'String'));                  %get value from editable textfield
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -524,7 +533,7 @@ function CheckCuvettes_Callback(hObject, eventdata, handles)
 handles.metricdata.GREdges(1) = get(hObject,'Value');                       %see if checkbox is checked
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 
@@ -539,7 +548,7 @@ function CheckPlate_Callback(hObject, eventdata, handles)
 handles.metricdata.GREdges(2) = get(hObject,'Value');                       %see if checkbox is checked
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 %% Popupmenu - Image Processing
 
@@ -566,7 +575,7 @@ switch selected
 end
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -594,7 +603,7 @@ function EditpltSX_Callback(hObject, eventdata, handles)
 handles.metricdata.plateSize(1) = str2double(get(hObject,'String'));        %save width of the plate
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 
@@ -623,7 +632,7 @@ function EditpltSY_Callback(hObject, eventdata, handles)
 handles.metricdata.plateSize(2) = str2double(get(hObject,'String'));        %save length of the plate
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -651,7 +660,7 @@ function EditnCuts_Callback(hObject, eventdata, handles)
 handles.metricdata.nCuts = str2double(get(hObject,'String'));               %save number of horizontal cuts
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -679,7 +688,7 @@ function EditScuvHW_Callback(hObject, eventdata, handles)
 handles.metricdata.filmTh(1) = str2double(get(hObject,'String'));           %highest film thickness in small cuvette
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -707,7 +716,7 @@ function EditScuvLW_Callback(hObject, eventdata, handles)
 handles.metricdata.filmTh(2) = str2double(get(hObject,'String'));           %lowest film thickness in small cuvette
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -735,7 +744,7 @@ function EditBcuvHW_Callback(hObject, eventdata, handles)
 handles.metricdata.filmTh(3) = str2double(get(hObject,'String'));           %highest film thickness in big cuvette
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -763,7 +772,7 @@ function EditBcuvLW_Callback(hObject, eventdata, handles)
 handles.metricdata.filmTh(4) = str2double(get(hObject,'String'));           %lowest film thickness in big cuvette
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -791,7 +800,7 @@ function EditCuvWidth_Callback(hObject, eventdata, handles)
 handles.metricdata.filmTh(5) = str2double(get(hObject,'String'));           %width of cuvettes, in pixels
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -818,7 +827,7 @@ function EditPolDeg_Callback(hObject, eventdata, handles)
 handles.metricdata.PolDeg = str2double(get(hObject,'String'));              %degree of polynomial for cuvette regression
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -846,7 +855,7 @@ function EditTreshold_Callback(hObject, eventdata, handles)
 handles.metricdata.Treshold = str2double(get(hObject,'String'));            %treshold for distinguish between the rivulet and resto of the plate
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -874,7 +883,7 @@ function EditFSensitivity_Callback(hObject, eventdata, handles)
 handles.metricdata.FSensitivity = str2double(get(hObject,'String'));        %filter sensitivity for noise cancelation
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -907,7 +916,7 @@ selected = contents{get(hObject,'Value')};                                  %get
 handles.metricdata.fluidData = fluidDataFcn(selected);                      %call database function
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -936,7 +945,7 @@ function CheckCuvRegrGR_Callback(hObject, eventdata, handles)
 handles.prgmcontrol.GR.regr = get(hObject,'Value');
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in CheckRivTopGR.
 function CheckRivTopGR_Callback(hObject, eventdata, handles)
@@ -949,7 +958,7 @@ function CheckRivTopGR_Callback(hObject, eventdata, handles)
 handles.prgmcontrol.GR.contour = get(hObject,'Value');
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in CheckCompProfGR.
 function CheckCompProfGR_Callback(hObject, eventdata, handles)
@@ -962,7 +971,7 @@ function CheckCompProfGR_Callback(hObject, eventdata, handles)
 handles.prgmcontrol.GR.profcompl = get(hObject,'Value');
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in CheckMeanCutsGR.
 function CheckMeanCutsGR_Callback(hObject, eventdata, handles)
@@ -975,7 +984,7 @@ function CheckMeanCutsGR_Callback(hObject, eventdata, handles)
 handles.prgmcontrol.GR.profcut = get(hObject,'Value');
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 %% Radiobuttons - Rivulets processing (uibuttongroup)
 % --- Executes when selected object is changed in PlotSetts.
@@ -998,7 +1007,7 @@ switch get(eventdata.NewValue,'Tag') % Get Tag of selected object.
 end
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 %% Pushbuttons - Rivulet processing
@@ -1086,7 +1095,7 @@ set(handles.PopupLiqType,'Value',1);                                        %sel
 
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushSaveToBase.
@@ -1114,7 +1123,7 @@ msgbox({'All user defined variables were cleared.'...
     'Start by loading images again'},'modal');uiwait(gcf);
 
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushClosePlots.
@@ -1123,9 +1132,9 @@ function PushClosePlots_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-set(handles.figure1,'HandleVisibility','off');                              %dont want to close the main program
+set(handles.MainWindow,'HandleVisibility','off');                              %dont want to close the main program
 close all                                                                   %close every other figure
-set(handles.figure1,'HandleVisibility','on');
+set(handles.MainWindow,'HandleVisibility','on');
 
 %% Auxiliary functions
 function [metricdata prgmcontrol] = ...
@@ -1193,7 +1202,7 @@ handles.metricdata.rootDir = pwd;
 metricdata = handles.metricdata;
 prgmcontrol= handles.prgmcontrol;
 % Update handles structure
-guidata(handles.figure1, handles);
+guidata(handles.MainWindow, handles);
 
 function [state prbMsg sumMsg] = controlFunction(EdgCoord)
 %
@@ -1203,6 +1212,13 @@ function [state prbMsg sumMsg] = controlFunction(EdgCoord)
 % walks through the EdgCoord matrix and saves positions of the wrongly
 % guessed coordinates into problemIndexes matrix. If the control is passed
 % without any problems, the state variable is set to 0.
+%
+% Algorithm:
+% - at first, the NaN values are removed.
+% - than the mean value and kurtosis of each column are calculated
+% - from kurtosis is defined coefficient for search for outliers in each
+%   column
+% - outliers are found
 %
 % INPUT variables
 % EdgCoord  ... matrix of guessed edge coordinates, output of function
@@ -1226,7 +1242,7 @@ k    = 1;                                                                   %aux
 nSC  = 0; oSC = 0;                                                          %n* counts NaN and o* outliers
 nBC  = 0; oBC = 0;
 nPl  = 0; oPl = 0;
-for i = 1:nCol                                                              %better to do for each column sep. (remove only parts of NaN row)
+for i = 1:nCol                                                              %better to do for each column separately(remove only parts of NaN row)
     tmpVar = EdgCoord(:,i);                                                 %reduce input matrix only to i-th column
     % find NaN values in the EdgCoord matrix
     INaN = find(isnan(EdgCoord) == 1);
@@ -1234,13 +1250,17 @@ for i = 1:nCol                                                              %bet
     % calculate standard deviation of each column of EdgCoord
     coordSTD= std(tmpVar);
     coordMU = mean(tmpVar);                                                 %mean value in each column
+    coordKUR= kurtosis(tmpVar);                                             %curtosis of each column (should be 3 for normally distr. data)
     nRow    = numel(tmpVar);                                                %number of elements in tmpVar after removing the NaNs
+    
+    % calculating the coeficient for identifying outliers, for std. data
+    % distr, it should be 3 and I will decrease it for more outlier-prone
+    % datasets
+    coef    = 7/coordKUR;                                                   %should be 9/.. but I am expecting very narrow data
 
-    % find outliers - values more different than 2 * std. deviation
-    % Rq: usually it is used 3 * std. deviation, but here the values should
-    % be very similar (if the camera was not tempered with)
+    % find outliers - values more different than coef * std. deviation
     outliers= abs(tmpVar-coordMU(ones(nRow,1),:))>...
-        2*coordSTD(ones(nRow,1),:);                                         %matrix of indexes of values more different than 2 * std. dev.
+        coef*coordSTD(ones(nRow,1),:);                                      %matrix of indexes of values more different than coef * std. dev.
     Iout    = find(outliers == 1);                                          %find position of outliers
     % translate the Iout for each found NaN
     if isempty(INaN) == 0
@@ -1309,6 +1329,11 @@ else
     sumMsg.string = 'There were no problems found.';
 end
 
+% check prbMsg variable existence
+if exist('prbMsg','var') == 0
+    prbMsg = struct([]);
+end
+
 function EdgCoord = modifyFunction(EdgCoord,IMdataCell,state,prbMsg,sumMsg)
 %
 %   EdgCoord = modifyFunction(EdgCoord,daten,state,prbMsg,sumMsg)
@@ -1331,6 +1356,11 @@ function EdgCoord = modifyFunction(EdgCoord,IMdataCell,state,prbMsg,sumMsg)
 % prbMsg    ... outputs from controlFunction
 % sumMsg
 
+%check if it is necessary to run the function
+if isempty(prbMsg) == 1                                                     %no problem, than return
+    return
+end
+
 % extract variables auxiliary variables from structures
 % prbMsg.coords -> [row column] of the problem
 prbCoord = zeros(numel(prbMsg),2);                                          %preallocate variable for problems coordinates
@@ -1345,7 +1375,9 @@ if sum(state) ~= 0                                                          %the
     stringCell= [sumMsg.string{:} {'Do you want to modify these edges:'}];
     choice = myQst('autstr',stringCell);
     if strcmp(choice,'Show EdgCoord') == 1                                  %user wants to show the EdgeCoord matrix
-        tmpMat = EdgCoord;                                                  %introduce temporary matrix
+        coefVec= 7./kurtosis(EdgCoord);
+        tmpMat = [EdgCoord;round(mean(EdgCoord));kurtosis(EdgCoord);...     %tmpMat with mean value, kurtosis and used coefficient for finding
+            coefVec];                                                       %outliers in each column
         tmpMat = reshape(strtrim(cellstr(num2str(tmpMat(:)))), size(tmpMat));
         for i = 1:numel(prbCoord(:,1))
             tmpMat(prbCoord(i,1),prbCoord(i,2)) = strcat(...                %modify format of the problematic value
@@ -1353,21 +1385,45 @@ if sum(state) ~= 0                                                          %the
                 tmpMat(prbCoord(i,1),prbCoord(i,2)), ...
                 '</span></html>');
         end
+        tmpMat(end-2,:) = strcat(...                                        %modify format of the mean value
+                '<html><span style="color: #FF00FF; font-weight: bold;">', ...
+                tmpMat(end-2,:), ...
+                '</span></html>');
+        tmpMat(end-1,:) = strcat(...                                        %modify format of the kurtosis
+                '<html><span style="color: #0000FF; font-weight: bold;">', ...
+                tmpMat(end-1,:), ...
+                '</span></html>');
+        tmpMat(end,:) = strcat(...                                          %modify format of the used coeficient
+                '<html><span style="color: #FFFF00; font-weight: bold;">', ...
+                tmpMat(end,:), ...
+                '</span></html>');
         colNames = {'Small cuv. xMean',...                                  %set column names
             'Small cuv. yTop', 'Small cuv. yBottom',...
             'Big cuv. xMean',...
             'Big cuv. yTop', 'Big cuv. yBottom',...
             'Plate xLeft','Plate yTop',...
             'Plate xRight','Plate yBottom'};
+        rowNames = 1:numel(EdgCoord(:,1));                                  %set row names
+        rowNames = reshape(strtrim(cellstr(num2str(rowNames(:)))), size(rowNames));
+        rowNames = [rowNames {'Mean Value' 'Kurtosis' 'Used coef.'}];
         hFig = figure;                                                      %open figure window
-        set(hFig,'Units','Pixels','Position',[0 0 950 750]);                %set window size +- matching the EdgeCoord needs
+        set(hFig,'Units','Pixels','Position',[0 0 1000 750],...
+            'Name','EdgCoord');               %set window size +- matching the EdgeCoord needs
         uitable(hFig,'Data',tmpMat,'ColumnName',colNames,...                %open uitable
+            'RowName',rowNames,...
             'ColumnEditable',false,...
             'ColumnWidth','auto', ...
             'Units','Normal', 'Position',[0 0 1 1]);                        %open EdgeCoord in uitable
-        choice = questdlg(stringCell,...                                    %ask user again what he wants to do
-        'Edge estimation correction',...
-        'From mean values', 'Manually','Don`t modify',options);
+        choice = menu('Modify selected values',...                          %questdlg is prettier, but menu is not modal
+            'From mean values','Manually','Don`t modify');
+        switch choice
+            case 1
+                choice = 'From mean values';
+            case 2
+                choice = 'Manually';
+            case 3
+                choice = 'Don`t modify';
+        end
     end
 else
     msgbox('Edges of the plate and cuvettes were found','modal');
@@ -1454,7 +1510,7 @@ end
 
 % see if hFig is opened and if it is, actualize it
 if exist('hFig','var') == 1
-    tmpMat = EdgCoord;                                                      %introduce temporary matrix
+    tmpMat = [EdgCoord;round(mean(EdgCoord));kurtosis(EdgCoord);coefVec];
     tmpMat = reshape(strtrim(cellstr(num2str(tmpMat(:)))), size(tmpMat));
     for i = 1:numel(prbCoord(:,1))
         tmpMat(prbCoord(i,1),prbCoord(i,2)) = strcat(...                    %modify format of the problematic value
@@ -1462,18 +1518,439 @@ if exist('hFig','var') == 1
             tmpMat(prbCoord(i,1),prbCoord(i,2)), ...
             '</span></html>');
     end
+    tmpMat(end-2,:) = strcat(...                                            %modify format of the mean value
+        '<html><span style="color: #FF00FF; font-weight: bold;">', ...
+        tmpMat(end-2,:), ...
+        '</span></html>');
+    tmpMat(end-1,:) = strcat(...                                            %modify format of the kurtosis
+        '<html><span style="color: #0000FF; font-weight: bold;">', ...
+        tmpMat(end-1,:), ...
+        '</span></html>');
+    tmpMat(end,:) = strcat(...                                              %modify format of the used coeficient
+        '<html><span style="color: #FFFF00; font-weight: bold;">', ...
+        tmpMat(end,:), ...
+        '</span></html>');
     colNames = {'Small cuv. xMean',...                                      %set column names
         'Small cuv. yTop', 'Small cuv. yBottom',...
         'Big cuv. xMean',...
         'Big cuv. yTop', 'Big cuv. yBottom',...
         'Plate xLeft','Plate yTop',...
         'Plate xRight','Plate yBottom'};
-    uitable(hFig,'Data',tmpMat,'ColumnName',colNames,...                    %rewrite values into table
+    rowNames = 1:numel(EdgCoord(:,1));                                      %set row names
+    rowNames = reshape(strtrim(cellstr(num2str(rowNames(:)))), size(rowNames));
+    rowNames = [rowNames {'Mean Value' 'Kurtosis' 'Used coef.'}];
+    save_to_base(1);
+    uitable(hFig,'Data',tmpMat,'ColumnName',colNames,...                    %open uitable
+        'RowName',rowNames,...
         'ColumnEditable',false,...
         'ColumnWidth','auto', ...
         'Units','Normal', 'Position',[0 0 1 1]);                            %open EdgeCoord in uitable
 end
-hMBox = msgbox('Values were modified','modal');uiwait(hMBox);               %notify user about end of the program
+hMBox = msgbox('Press Enter to continue','modal');uiwait(hMBox);            %notify user about end of the program
 if exist('hFig','var')                                                      %if exists, close uitable
     close(hFig)
 end
+
+%% Copied functions, not my own
+function statusbarHandles = statusbar(varargin)
+%statusbar set/get the status-bar of Matlab desktop or a figure
+%
+%   statusbar sets the status-bar text of the Matlab desktop or a figure.
+%   statusbar accepts arguments in the format accepted by the <a href="matlab:doc sprintf">sprintf</a>
+%   function and returns the statusbar handle(s), if available.
+%
+%   Syntax:
+%      statusbarHandle = statusbar(handle, text, sprintf_args...)
+%
+%   statusbar(text, sprintf_args...) sets the status bar text for the
+%   current figure. If no figure is selected, then one will be created.
+%   Note that figures with 'HandleVisibility' turned off will be skipped
+%   (compare <a href="matlab:doc findobj">findobj</a> & <a href="matlab:doc findall">findall</a>).
+%   In these cases, simply pass their figure handle as first argument.
+%   text may be a single string argument, or anything accepted by sprintf.
+%
+%   statusbar(handle, ...) sets the status bar text of the figure
+%   handle (or the figure which contains handle). If the status bar was
+%   not yet displayed for this figure, it will be created and displayed.
+%   If text is not supplied, then any existing status bar is erased,
+%   unlike statusbar(handle, '') which just clears the text.
+%
+%   statusbar(0, ...) sets the Matlab desktop's status bar text. If text is
+%   not supplied, then any existing text is erased, like statusbar(0, '').
+%
+%   statusbar([handles], ...) sets the status bar text of all the
+%   requested handles.
+%
+%   statusbarHandle = statusbar(...) returns the status bar handle
+%   for the selected figure. The Matlab desktop does not expose its
+%   statusbar object, so statusbar(0, ...) always returns [].
+%   If multiple unique figure handles were requested, then
+%   statusbarHandle is an array of all non-empty status bar handles.
+%
+%   Notes:
+%      1) The format statusbarHandle = statusbar(handle) does NOT erase
+%         any existing statusbar, but just returns the handles.
+%      2) The status bar is 20 pixels high across the entire bottom of
+%         the figure. It hides everything between pixel heights 0-20,
+%         even parts of uicontrols, regardless of who was created first!
+%      3) Three internal handles are exposed to the user (Figures only):
+%         - CornerGrip: a small square resizing grip on bottom-right corner
+%         - TextPanel: main panel area, containing the status text
+%         - ProgressBar: a progress bar within TextPanel (default: invisible)
+%
+%   Examples:
+%      statusbar;  % delete status bar from current figure
+%      statusbar(0, 'Desktop status: processing...');
+%      statusbar([hFig1,hFig2], 'Please wait while processing...');
+%      statusbar('Processing %d of %d (%.1f%%)...',idx,total,100*idx/total);
+%      statusbar('Running... [%s%s]',repmat('*',1,fix(N*idx/total)),repmat('.',1,N-fix(N*idx/total)));
+%      existingText = get(statusbar(myHandle),'Text');
+%
+%   Examples customizing the status-bar appearance:
+%      sb = statusbar('text');
+%      set(sb.CornerGrip, 'visible','off');
+%      set(sb.TextPanel, 'Foreground',[1,0,0], 'Background','cyan', 'ToolTipText','tool tip...')
+%      set(sb, 'Background',java.awt.Color.cyan);
+%
+%      % sb.ProgressBar is by default invisible, determinite, non-continuous fill, min=0, max=100, initial value=0
+%      set(sb.ProgressBar, 'Visible','on', 'Minimum',0, 'Maximum',500, 'Value',234);
+%      set(sb.ProgressBar, 'Visible','on', 'Indeterminate','off'); % indeterminate (annimated)
+%      set(sb.ProgressBar, 'Visible','on', 'StringPainted','on');  % continuous fill
+%      set(sb.ProgressBar, 'Visible','on', 'StringPainted','on', 'string',''); % continuous fill, no percentage text
+%
+%      % Adding a checkbox
+%      jCheckBox = javax.swing.JCheckBox('cb label');
+%      sb.add(jCheckBox,'West');  % Beware: East also works but doesn't resize automatically
+%
+%   Technical description:
+%      http://UndocumentedMatlab.com/blog/setting-status-bar-text
+%      http://UndocumentedMatlab.com/blog/setting-status-bar-components
+%
+%   Notes:
+%     Statusbar will probably NOT work on Matlab versions earlier than 6.0 (R12)
+%     In Matlab 6.0 (R12), figure statusbars are not supported (only desktop statusbar)
+%
+%   Warning:
+%     This code heavily relies on undocumented and unsupported Matlab
+%     functionality. It works on Matlab 7+, but use at your own risk!
+%
+%   Bugs and suggestions:
+%     Please send to Yair Altman (altmany at gmail dot com)
+%
+%   Change log:
+%     2007-04-25: First version posted on MathWorks file exchange: <a href="http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=14773">http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=14773</a>
+%     2007-04-29: Added internal ProgressBar; clarified main comment
+%     2007-05-04: Added partial support for Matlab 6
+%     2011-10-14: Fix for R2011b
+%
+%   See also:
+%     ishghandle, sprintf, findjobj (on the <a href="http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=14317">file exchange</a>)
+
+% License to use and modify this code is granted freely without warranty to all, as long as the original author is
+% referenced and attributed as such. The original author maintains the right to be solely associated with this work.
+
+% Programmed and Copyright by Yair M. Altman: altmany(at)gmail.com
+% $Revision: 1.5 $  $Date: 2011/10/14 04:10:04 $
+
+    % Check for available Java/AWT (not sure if Swing is really needed so let's just check AWT)
+    if ~usejava('awt')
+        error('YMA:statusbar:noJava','statusbar only works on Matlab envs that run on java');
+    end
+
+    % Args check
+    if nargin < 1 | ischar(varargin{1})  %#ok for Matlab 6 compatibility
+        handles = gcf;  % note: this skips over figures with 'HandleVisibility'='off'
+    else
+        handles = varargin{1};
+        varargin(1) = [];
+    end
+
+    % Ensure that all supplied handles are valid HG GUI handles (Note: 0 is a valid HG handle)
+    if isempty(handles) | ~all(ishandle(handles))  %#ok for Matlab 6 compatibility
+        error('YMA:statusbar:invalidHandle','invalid GUI handle passed to statusbar');
+    end
+
+    % Retrieve the requested text string (only process once, for all handles)
+    if isempty(varargin)
+        deleteFlag = (nargout==0);
+        updateFlag = 0;
+        statusText = '';
+    else
+        deleteFlag = 0;
+        updateFlag = 1;
+        statusText = sprintf(varargin{:});
+    end
+
+    % Loop over all unique root handles (figures/desktop) of the supplied handles
+    rootHandles = [];
+    if any(handles)  % non-0, i.e. non-desktop
+        try
+            rootHandles = ancestor(handles,'figure');
+            if iscell(rootHandles),  rootHandles = cell2mat(rootHandles);  end
+        catch
+            errMsg = 'Matlab version is too old to support figure statusbars';
+            % Note: old Matlab version didn't have the ID optional arg in warning/error, so I can't use it here
+            if any(handles==0)
+                warning([errMsg, '. Updating the desktop statusbar only.']);  %#ok for Matlab 6 compatibility
+            else
+                error(errMsg);
+            end
+        end
+    end
+    rootHandles = unique(rootHandles);
+    if any(handles==0), rootHandles(end+1)=0; end
+    statusbarObjs = handle([]);
+    for rootIdx = 1 : length(rootHandles)
+        if rootHandles(rootIdx) == 0
+            setDesktopStatus(statusText);
+        else
+            thisStatusbarObj = setFigureStatus(rootHandles(rootIdx), deleteFlag, updateFlag, statusText);
+            if ~isempty(thisStatusbarObj)
+                statusbarObjs(end+1) = thisStatusbarObj;
+            end
+        end
+    end
+
+    % If statusbarHandles requested
+    if nargout
+        % Return the list of all valid (non-empty) statusbarHandles
+        statusbarHandles = statusbarObjs;
+    end
+
+%end  % statusbar  %#ok for Matlab 6 compatibility
+
+% Set the status bar text of the Matlab desktop
+function setDesktopStatus(statusText)
+    try
+        % First, get the desktop reference
+        try
+            desktop = com.mathworks.mde.desk.MLDesktop.getInstance;      % Matlab 7+
+        catch
+            desktop = com.mathworks.ide.desktop.MLDesktop.getMLDesktop;  % Matlab 6
+        end
+
+        % Schedule a timer to update the status text
+        % Note: can't update immediately, since it will be overridden by Matlab's 'busy' message...
+        try
+            t = timer('Name','statusbarTimer', 'TimerFcn',{@setText,desktop,statusText}, 'StartDelay',0.05, 'ExecutionMode','singleShot');
+            start(t);
+        catch
+            % Probably an old Matlab version that still doesn't have timer
+            desktop.setStatusText(statusText);
+        end
+    catch
+        %if any(ishandle(hFig)),  delete(hFig);  end
+        error('YMA:statusbar:desktopError',['error updating desktop status text: ' lasterr]);
+    end
+%end  %#ok for Matlab 6 compatibility
+
+% Utility function used as setDesktopStatus's internal timer's callback
+function setText(varargin)
+    if nargin == 4  % just in case...
+        targetObj  = varargin{3};
+        statusText = varargin{4};
+        targetObj.setStatusText(statusText);
+    else
+        % should never happen...
+    end
+%end  %#ok for Matlab 6 compatibility
+
+% Set the status bar text for a figure
+function statusbarObj = setFigureStatus(hFig, deleteFlag, updateFlag, statusText)
+    try
+        jFrame = get(handle(hFig),'JavaFrame');
+        jFigPanel = get(jFrame,'FigurePanelContainer');
+        jRootPane = jFigPanel.getComponent(0).getRootPane;
+
+        % If invalid RootPane, retry up to N times
+        tries = 10;
+        while isempty(jRootPane) & tries>0  %#ok for Matlab 6 compatibility - might happen if figure is still undergoing rendering...
+            drawnow; pause(0.001);
+            tries = tries - 1;
+            jRootPane = jFigPanel.getComponent(0).getRootPane;
+        end
+        jRootPane = jRootPane.getTopLevelAncestor;
+
+        % Get the existing statusbarObj
+        statusbarObj = jRootPane.getStatusBar;
+
+        % If status-bar deletion was requested
+        if deleteFlag
+            % Non-empty statusbarObj - delete it
+            if ~isempty(statusbarObj)
+                jRootPane.setStatusBarVisible(0);
+            end
+        elseif updateFlag  % status-bar update was requested
+            % If no statusbarObj yet, create it
+            if isempty(statusbarObj)
+               statusbarObj = com.mathworks.mwswing.MJStatusBar;
+               jProgressBar = javax.swing.JProgressBar;
+               jProgressBar.setVisible(false);
+               statusbarObj.add(jProgressBar,'West');  % Beware: East also works but doesn't resize automatically
+               jRootPane.setStatusBar(statusbarObj);
+            end
+            statusbarObj.setText(statusText);
+            jRootPane.setStatusBarVisible(1);
+        end
+        statusbarObj = handle(statusbarObj);
+
+        % Add quick references to the corner grip and status-bar panel area
+        if ~isempty(statusbarObj)
+            addOrUpdateProp(statusbarObj,'CornerGrip',  statusbarObj.getParent.getComponent(0));
+            addOrUpdateProp(statusbarObj,'TextPanel',   statusbarObj.getComponent(0));
+            addOrUpdateProp(statusbarObj,'ProgressBar', statusbarObj.getComponent(1).getComponent(0));
+        end
+    catch
+        try
+            try
+                title = jFrame.fFigureClient.getWindow.getTitle;
+            catch
+                title = jFrame.fHG1Client.getWindow.getTitle;
+            end
+        catch
+            title = get(hFig,'Name');
+        end
+        error('YMA:statusbar:figureError',['error updating status text for figure ' title ': ' lasterr]);
+    end
+%end  %#ok for Matlab 6 compatibility
+
+% Utility function: add a new property to a handle and update its value
+function addOrUpdateProp(handle,propName,propValue)
+    try
+        if ~isprop(handle,propName)
+            schema.prop(handle,propName,'mxArray');
+        end
+        set(handle,propName,propValue);
+    catch
+        % never mind... - maybe propName is already in use
+        %lasterr
+    end
+%end  %#ok for Matlab 6 compatibility
+
+%% Menus
+% --------------------------------------------------------------------
+function FileMenu_Callback(hObject, eventdata, handles)
+% hObject    handle to FileMenu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% --------------------------------------------------------------------
+function SaveBase_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveBase (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+save_to_base(1);                                                            %save all variables into base workspace
+set(handles.statusbar,'Text','All variables were saved into base workspace');
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+% --------------------------------------------------------------------
+function SaveFile_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveFile (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+metricdata = handles.metricdata;
+prgmcontrol= handles.prgmcontrol;
+
+strCell = {'metricdata' 'prgmcontrol'};
+
+uisave(strCell,'RivProc_UsrDefVar');
+
+set(handles.statusbar,'Text',...
+    'User defined variables were saved into file.');
+
+
+% --------------------------------------------------------------------
+function LoadFile_Callback(hObject, eventdata, handles)
+% hObject    handle to LoadFile (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+uiopen('load');                                                             %open dialog for loading variable
+if exist('metricdata','var') == 0 || exist('prgmcontrol','var') == 0
+    msgbox(['You can use this option only to load variables saved by'...
+        '"save variables into .mat file" option from program menu.'],...
+        'modal');uiwait(gcf);
+    set(handles.statusbar,'Text',...
+        'Loading variables from file failed.');
+else
+    handles.metricdata = metricdata;
+    handles.prgmcontrol= prgmcontrol;
+    set(handles.statusbar,'Text',...
+        'User defined variables were loaded from file.');
+end
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+% --------------------------------------------------------------------
+function findEdgesMenu_Callback(hObject, eventdata, handles)
+% hObject    handle to findEdgesMenu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function SaveEdgCoord_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveEdgCoord (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+EdgCoord = handles.metricdata.EdgCoord;
+uisave('EdgCoord','EdgCoord')
+
+set(handles.statusbar,'Text',...
+    'Edges of plate and cuvettes were saved into .mat file');
+
+
+% --------------------------------------------------------------------
+function LoadEdgCoord_Callback(hObject, eventdata, handles)
+% hObject    handle to LoadEdgCoord (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+uiopen('load');                                                             %open dialog for loading variable
+if exist('EdgCoord','var') == 0
+    msgbox(['You can use this option only to load EdgCoord saved by'...
+        '"save EdgCoord into .mat file" option from program menu.'],...
+        'modal');uiwait(gcf);
+    set(handles.statusbar,'Text',...
+        'Loading EdgCoord from file failed.');
+else
+    handles.metricdata.EdgCoord = EdgCoord;
+    handles.prgmcontrol= prgmcontrol;
+    set(handles.statusbar,'Text',...
+        ['User defined variables were loaded from file.'...
+        ' EdgCoord is prepared for rivulet processing.']);
+end
+
+
+% --------------------------------------------------------------------
+function ModHough_Callback(hObject, eventdata, handles)
+% hObject    handle to ModHough (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+handles.metricdata.IMProcPars = changeIMPars;                               %call gui for changing parameters
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+% --------------------------------------------------------------------
+function BestMethod_Callback(hObject, eventdata, handles)
+% hObject    handle to BestMethod (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function QuitPrgm_Callback(hObject, eventdata, handles)
+% hObject    handle to QuitPrgm (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+close(handles.MainWindow);                                                  %call closing function

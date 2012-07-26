@@ -1,7 +1,7 @@
-function [EdgCoord nMan] = findEdges(ImDataCell,GR,AUTO,varargin)
+function [EdgCoord nMan] = findEdges(handles,varargin)
 %
-%  EdgCoord = findEdges(ImDataCell,GR,AUTO)
-%  EdgCoord = findEdges(ImDataCell,GR,AUTO,hpTr,numPeaks,fG,mL)
+%  EdgCoord = findEdges(handles)
+%  EdgCoord = findEdges(handles,hpTr,numPeaks,fG,mL)
 %  [EdgCoord nMan] = findEdges(...);
 %
 % Measurement of the rivulet flow on an inclined plate
@@ -10,9 +10,12 @@ function [EdgCoord nMan] = findEdges(ImDataCell,GR,AUTO,varargin)
 % images from measurement.
 %
 % INPUT variables
-% necessary variables
+% handles must have followin fields:
+% handles.metricdata.date - to be resaved as ImDataCell
 % ImDataCell    ... cell of the imread images
+% handles.metricdata.GREdges - to be resaved as GR
 % GR            ... variable for handling graphics
+% handles.prgmcontrol.autoEdges - to be resaved as AUTO
 % AUTO          ... variable that enables enforcing of completely automated
 %                   image processing (if there is problem with line
 %                   finding, processing throught weighted mean values is
@@ -22,7 +25,12 @@ function [EdgCoord nMan] = findEdges(ImDataCell,GR,AUTO,varargin)
 %               ... 1 -> semi-manual, if there is a problem, option to
 %                   chose concerning edges manually is presented
 %               ... 2 -> completely automatic (in fact, its "not 0 or 1")
+% handles.statusbar, handles.MainWindow - for handling the statusbar
+%
 % optional variables (varargin)
+% (these variables are also present in handles.metricdata, it would be
+% usefull to modify the code, but this is only cosmetic problem not
+% limiting the functionality)
 % hpTr  ... treshold parameter for the hough peaks function
 % numPeaks. number of peaks to identify by houghpeaks
 % fG    ... maximal gap between two lines that will be filled by houghlines
@@ -59,6 +67,9 @@ function [EdgCoord nMan] = findEdges(ImDataCell,GR,AUTO,varargin)
 % Date:         11. 07. 2012
 %
 % Remarques on the code:
+%
+% The simplest way to call findEdges is with input variable handles,
+% because of the statusbar
 %
 %
 % CUVETTES
@@ -136,6 +147,11 @@ else
     mL        = IMProcPars(4);
 end
 
+% extract handles
+ImDataCell = handles.metricdata.daten;                                      %images
+GR         = handles.metricdata.GREdges;                                    %graphical output
+AUTO       = handles.prgmcontrol.autoEdges;                                 %measure of automaticallity
+
 %% Variable preallocation and main auxiliary variebles iniciation
 % preallocation of variables for findig of the edges of the cuvettes
 EdgCoord = zeros(numel(ImDataCell),10);                                     %OUTPUT variable
@@ -171,6 +187,12 @@ strCell = {'left vertical' 'top horizontal'...                              %nam
 nMan    = 0;
 %% Main cycle of the program
 for i = 1:numel(ImDataCell)                                                 %for each image
+% Update statusbar
+handles.statusbar = statusbar(handles.MainWindow,...
+    'Finding elements edges on image %d of %d (%.1f%%)',...                          %updating statusbar
+    i,numel(ImDataCell),100*i/numel(ImDataCell));
+set(handles.statusbar.ProgressBar,...
+    'Visible','on', 'Minimum',0, 'Maximum',numel(ImDataCell), 'Value',i);
 % Find cuvettes on the image
     trLeft = round(size(ImDataCell{i},2)/2);                                %i dont care about the left side of the image (with the plate)
     tmpIM  = ImDataCell{i}(:,trLeft:end);                                   %cut of unwanted part of the image and save temp. image var.
@@ -286,7 +308,7 @@ for i = 1:numel(ImDataCell)                                                 %for
     tmpIM = imtophat(tmpIM,se);
     tmpIM = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                  %enhance contrasts
     tmpIM = im2bw(tmpIM,0.40);                                              %simple conversion to black and white
-    tmpIM = edge(tmpIM,'prewitt');                                            %find edges in the image
+    tmpIM = edge(tmpIM,'prewitt');                                          %find edges in the image
     tmpIM(edgYT:edgYB,edgXL:edgXR) = ...                                    %replace values in the image center with 0 - dont care about rivulet
         zeros(numel(edgYT:edgYB),numel(edgXL:edgXR));                       %convert center of the image to black
     [H,theta,rho] = hough(tmpIM);                                           %use hough transform on the image
@@ -408,6 +430,7 @@ if AUTO ~= 0                                                                %if 
             elseif estEdg == 1 && isempty(coordsCell{k}) == 1               %i want to automatically specify non-found edge
                 indDNF = k;
             else                                                            %if manually, call outside function with appropriate parameters
+                set(handles.statusbar,'Waiting for user response')          %update statusbar
                 tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];            %contruct vector of parameters for plotLines
                 coordVec(k) = plotLines(tmpIM,lines,tmpPars,k);             %call plotLines with fourth parameter (viz function comments)
                 clear tmpPars
@@ -433,6 +456,7 @@ if AUTO ~= 0                                                                %if 
             ' there is not enough found edges to'...                        %if there is not enough edges, user must specify them manually
             ' estimate the plate position']...
             'You must specify edges manually'},'modal');uiwait(gcf);
+        set(handles.statusbar,'Waiting for user response')                  %update statusbar
         tmpPars   = [edgXL edgXR edgYT edgYB epsX epsY i];                  %contruct vector of parameters for plotLines 
         coordVec  = plotLines(tmpIM,lines,tmpPars);coordVec = coordVec';    %call the function for manual edge selection
         nMan      = nMan + 1;                                               %increase force manual entries counter
@@ -446,6 +470,8 @@ end
     % saving data into OUTPUT variable
     EdgCoord(i,7:end) = coordVec + trnVec;                                  %need to add the cutted values
 end
+set(handles.statusbar.ProgressBar,'Visible','off');                         %made progresbar invisible again
+set(handles.statusbar,'Text','Edges were found.')                           %update statusbar
 end
 
 %% Auxiliary functions
