@@ -86,7 +86,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 % Edit the above text to modify the response to help
 % RivuletExpDataProcessing
 
-% Last Modified by GUIDE v2.5 26-Jul-2012 16:18:37
+% Last Modified by GUIDE v2.5 27-Jul-2012 10:13:22
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -170,8 +170,8 @@ storDir = uigetdir(start_path,'Select folder to store outputs');            %let
 
 if storDir ~= 0                                                             %here i dont care about indent, its just basic input control
 % create subdirectories
-mkdir(storDir,'Substracted');                                               %directory for substracted images
-mkdir(storDir,'Substracted/Smoothed');                                      %smoothed images -> appears not to be *.tiff ?!
+mkdir(storDir,'Subtracted');                                                %directory for subtracted images
+mkdir(storDir,'Subtracted/Smoothed');                                       %smoothed images -> appears not to be *.tiff ?!
 mkdir(storDir,'Height');                                                    %height of the rivulet
 mkdir(storDir,'Profile');                                                   %vertical profiles of the rivulet
 mkdir(storDir,'Speed');                                                     %mean velocity
@@ -182,9 +182,17 @@ mkdir(storDir,'Plots');                                                     %dir
 %modify string to display in statusbar
 statusStr = ['Data storage directory ' storDir...
     ' loaded. Subdirectories are ready.'];
+% set gui visible output
+if numel(storDir) <= 45
+    str   = storDir;
+else
+    str   = ['...' storDir(end-45:end)];
+end
+set(handles.EditStorDir,'String',str);                                      %display only 45 last characters or the whole string;
 
 % saving outputs
 handles.metricdata.storDir = storDir;
+handles.metricdata.subsImDir = [storDir '/Subtracted'];                     %directory with subtracted images
 handles.statusbar = statusbar(handles.MainWindow,statusStr);
 else
 %modify string to display in statusbar
@@ -215,6 +223,13 @@ bgImage        = imread([bgDir bgName]);
 statusStr = ['Background image ' bgDir bgName...
     ' was succesfuly loaded.'];
 handles.statusbar = statusbar(handles.MainWindow,statusStr);
+% set gui visible output
+if numel(bgDir) <= 45
+    str   = bgDir;
+else
+    str   = ['...' bgDir(end-45:end)];
+end
+set(handles.EditBcgLoc,'String',str);                                       %display only 45 last characters or the whole string;
 
 % save variable into handle
 handles.metricdata.bgImage = bgImage;
@@ -236,13 +251,18 @@ function daten = PushLoadIM_Callback(hObject, eventdata, handles)
 % imNames   ... cell of strings, selected filenames
 % imDir     ... string, path to the directory with images
 
-% extract used variables from handles.metricdata
-rootDir = handles.metricdata.rootDir;
 % check if the directory for storing outputs is chosen
 if isfield(handles.metricdata,'storDir') == 0                               %if not, force user to choose it
     msgbox('You must choose storDir before loading images','modal');
     uiwait(gcf);
     storDir = PushChooseDir_Callback(hObject, eventdata, handles);
+    % set gui visible output
+    if numel(storDir) <= 45
+        str   = storDir;
+    else
+        str   = ['...' storDir(end-45:end)];
+    end
+    set(handles.EditStorDir,'String',str);                                  %display only 45 last characters or the whole string;
 else
     storDir = handles.metricdata.storDir;
 end
@@ -264,6 +284,13 @@ if isfield(handles.metricdata,'bgImage') == 0                               %che
     msgbox('Choose background image','modal');uiwait(gcf);
     [bgName bgDir] = uigetfile(FilterSpec,DlgTitle1,start_path);
     bgImage        = imread([bgDir '/' bgName]);
+    % set gui visible output
+    if numel(bgDir) <= 45
+        str   = storDir;
+    else
+        str   = ['...' bgDir(end-45:end)];
+    end
+    set(handles.EditBcgLoc,'String',str);                                   %display only 45 last characters or the whole string;
 else
     bgImage        = handles.metricdata.bgImage;
 end
@@ -274,36 +301,40 @@ msgbox({'Background is loaded,'...
             = uigetfile(FilterSpec,DlgTitle2,'Multiselect',selectmode,...
             start_path);
 if imDir ~= 0                                                               %basic input control
+    subsImDir = [storDir '/Subtracted'];                                    %directory with subtracted images
 for i = 1:numel(imNames)
-    daten{i} = imread([imDir imNames{i}]);                                  %load images from selected directory
+    tmpIM = imread([imDir imNames{i}]);                                     %load images from selected directory
+    tmpIM = imsubtract(tmpIM,bgImage);                                      %subtract background from image
+    imwrite(tmpIM,[subsImDir imNames{i}]);                                  %save new images into subfolder
+    if handles.prgmcontrol.DNTLoadIM == 0                                   %if i dont want to have stored images in handles.metricdata
+        daten{i} = tmpIM;                                                   %if i want the images to be saved into handles
+    end
     handles.statusbar = statusbar(handles.MainWindow,...
-        'Loading image %d of %d (%.1f%%)',...                               %updating statusbar
+        'Loading and subtracting background from image %d of %d (%.1f%%)',...%updating statusbar
         i,numel(imNames),100*i/numel(imNames));
     set(handles.statusbar.ProgressBar,...
         'Visible','on', 'Minimum',0, 'Maximum',numel(imNames), 'Value',i);
 end
-% substract background from images
-cd([storDir '/Substracted'])                                                %go to the folder for saving substracted images
-for i = 1:numel(imNames)
-    daten{i} = imsubtract(daten{i},bgImage);                                %substract bacground from picture
-    imwrite(daten{i},imNames{i});                                           %save new images into subfolder
-    handles.statusbar = statusbar(handles.MainWindow,...
-        'Substracting image %d of %d (%.1f%%)',...                          %updating statusbar
-        i,numel(imNames),100*i/numel(imNames));
-    set(handles.statusbar.ProgressBar,...
-        'Visible','on', 'Minimum',0, 'Maximum',numel(imNames), 'Value',i);
-end
-cd(rootDir)                                                                 %return to rootdir
 
+% modify gui visible outputs
 set(handles.statusbar.ProgressBar,'Visible','off');                         %made progresbar invisible again
 set(handles.statusbar,...                                                   %update statusbar
     'Text','Images were succesfully loaded and substratced');
+if numel(imDir) <= 45
+    str   = imDir;
+else
+    str   = ['...' imDir(end-45:end)];
+end
+set(handles.EditIMLoc,'String',str);                                        %display only 45 last characters or the whole string;
 
 % save variables into handles
-handles.metricdata.daten   = daten;                                         %images
+if handles.prgmcontrol.DNTLoadIM == 0
+    handles.metricdata.daten   = daten;                                     %save images only if user wants to
+end
 handles.metricdata.imNames = imNames;                                       %names of the images (~ var. "files" in R..._A...MOD)
 handles.metricdata.bgImage = bgImage;                                       %background image (dont want to load it repetedly)
 handles.metricdata.storDir = storDir;                                       %need to resave also the location for storing outputs
+handles.metricdata.subsImDir   = subsImDir;                                 %location with subtracted images (for later image loading)
 % save information about succesfull ending of the function
 handles.prgmcontrol.loadIM = 0;                                             %0 ... OK, 1 ... warnings, 2 ... errors (for now without use)
 else
@@ -321,16 +352,122 @@ function PushClearIM_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-if isfield(handles.metricdata,'daten') == 1                                 %field metricdata.daten exists
-    clear('handles.metricdata.daten');
+if isfield(handles.metricdata,'bgImage') == 1                               %field metricdata.bgImage exists
+    handles.metricdata = rmfield(handles.metricdata,'bgImage');
+    if isfield(handles.metricdata,'daten') == 1
+        handles.metricdata = rmfield(handles.metricdata,'daten');           %remove data saved into handles
+    end
+    if isfield(handles.metricdata,'imNames') == 1
+        handles.metricdata = rmfield(handles.metricdata,'imNames');         %remove names of the loaded images
+    end
     % Update handles structure
     guidata(handles.MainWindow, handles);
     set(handles.statusbar,'Text','Images were cleared');                    %notify user
+    % restart the fields with texts
+    set(handles.EditBcgLoc,'String','No background is loaded.');
+    set(handles.EditIMLoc,'String','No images are loaded.');
 else
     msgbox('No images were loaded','modal');uiwait(gcf);
 end
 % Update handles structure
 guidata(handles.MainWindow, handles);
+
+%% Editable fields - Preprocessing
+
+
+function EditStorDir_Callback(hObject, eventdata, handles)
+% hObject    handle to EditStorDir (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of EditStorDir as text
+%        str2double(get(hObject,'String')) returns contents of EditStorDir as a double
+
+handles.metricdata.storDir = str2double(get(hObject,'String'));             %get value from editable textfield
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+% --- Executes during object creation, after setting all properties.
+function EditStorDir_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to EditStorDir (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function EditBcgLoc_Callback(hObject, eventdata, handles)
+% hObject    handle to EditBcgLoc (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of EditBcgLoc as text
+%        str2double(get(hObject,'String')) returns contents of EditBcgLoc as a double
+
+%!! this textfield is not editable !!
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+% --- Executes during object creation, after setting all properties.
+function EditBcgLoc_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to EditBcgLoc (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function EditIMLoc_Callback(hObject, eventdata, handles)
+% hObject    handle to EditIMLoc (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of EditIMLoc as text
+%        str2double(get(hObject,'String')) returns contents of EditIMLoc as a double
+
+%!! this textfield is not editable !!
+
+
+% --- Executes during object creation, after setting all properties.
+function EditIMLoc_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to EditIMLoc (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+%% Checkboxes - Preprocessing
+
+% --- Executes on button press in CheckDNL.
+function CheckDNL_Callback(hObject, eventdata, handles)
+% hObject    handle to CheckDNL (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of CheckDNL
+
+handles.prgmcontrol.DNTLoadIM = get(hObject,'Value');                          %get the checkbox value
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
 
 %% Pushbuttons - Image Processing
 
@@ -343,32 +480,26 @@ function [EdgCoord daten] =...
 % handles    structure with handles and user data (see GUIDATA)
 
 % check if there all required data are present
-stmt1 = isfield(handles.metricdata,'daten');                                %are there loaded images?
+stmt1 = isfield(handles.metricdata,'imNames');                              %are there loaded images?
 if stmt1 == 0                                                               %if not, force user to load them
     msgbox('First, you must load images','modal');uiwait(gcf);
-    daten = PushLoadIM_Callback(hObject, eventdata, handles);
-else
-    daten = handles.metricdata.daten;
+    return
 end
 
-% create varargin optional input from editable textfields
-hpTr        = handles.metricdata.hpTr;
-numPeaks    = handles.metricdata.numPeaks;
-fG          = handles.metricdata.fG;
-mL          = handles.metricdata.mL;
-
-% call function findEdges
-EdgCoord = findEdges(handles,hpTr,numPeaks,fG,mL);
+% call function findEdges and save output into handles
+handles.metricdata.EdgCoord = findEdges(handles);
 
 % call control function
-[state,prbMsg,sumMsg] = controlFunction(EdgCoord);
+[state,prbMsg,sumMsg] = controlFunction(handles.metricdata.EdgCoord);
+
+% save output parameters into handles
+handles.metricdata.state = state;
+handles.metricdata.prbMsg= prbMsg;
+handles.metricdata.sumMsg= sumMsg;
 
 % modify potential mistakes
-EdgCoord = modifyFunction(EdgCoord,daten,state,prbMsg,sumMsg);
+EdgCoord = modifyFunction(handles.metricdata);                              %call modifyFunction with handles.metricdata input
 set(handles.statusbar,'Text','EdgCoord is prepared for rivulet processing');%update statusbar
-
-% save output into handles
-handles.metricdata.EdgCoord = EdgCoord;
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -1143,6 +1274,15 @@ function [metricdata prgmcontrol] = ...
 % function for gui inicialization, to be executed just before progGui is
 % made visible
 
+% set default values for Preprocessing
+set(handles.EditStorDir,'String',['No outputs storage directory is'...      %field the edit boxes
+    ' selected.']);
+set(handles.EditBcgLoc,'String','No background is loaded.');
+set(handles.EditIMLoc,'String','No images are loaded.');
+minVal = get(handles.CheckDNL,'Min');                                       %uncheck checkbox
+set(handles.CheckDNL,'Value',minVal);
+handles.prgmcontrol.DNTLoadIM = minVal;                                        %by default, i dont want to store all iamge data in handles
+
 % set default values for fields in Image Processing
 handles.prgmcontrol.autoEdges = 2;                                          %default - completely automatic program execution
 minVal = get(handles.CheckCuvettes,'Min');                                  %default - no graphic output
@@ -1150,11 +1290,8 @@ set(handles.CheckCuvettes,'Value',minVal);
 minVal = get(handles.CheckPlate,'Min'); 
 set(handles.CheckPlate,'Value',minVal);
 handles.metricdata.GREdges    = [0 0];                                      %default - dont want any graphics
-% default values for hough transform
-handles.metricdata.hpTr     = [];                                           %do not need to set up default values - they are present in the prgm
-handles.metricdata.numPeaks = [];
-handles.metricdata.fG       = [];
-handles.metricdata.mL       = [];
+% default values for image processing
+handles.metricdata.IMProcPars = [];                                         %empty field -> use default built-in parameters
 
 % set defaults values for fields in rivutel processing
 % program controls
@@ -1334,9 +1471,9 @@ if exist('prbMsg','var') == 0
     prbMsg = struct([]);
 end
 
-function EdgCoord = modifyFunction(EdgCoord,IMdataCell,state,prbMsg,sumMsg)
+function EdgCoord = modifyFunction(metricdata)
 %
-%   EdgCoord = modifyFunction(EdgCoord,daten,state,prbMsg,sumMsg)
+%   EdgCoord = modifyFunction(metricdata)
 %
 % Function that takes found coordinates and messages about rate of finding
 % succes and returns modified coordinates base on user interaction
@@ -1350,15 +1487,39 @@ function EdgCoord = modifyFunction(EdgCoord,IMdataCell,state,prbMsg,sumMsg)
 % what it is suppose to do...
 %
 % INPUT variables
+% metricdata... structure obtained by previous run of the program,
+%               must contain following fields:
 % EdgCoord  ... matrix with estimated edge coordinates
-% IMdataCell... cell with image data
 % state
 % prbMsg    ... outputs from controlFunction
 % sumMsg
+%
+%               there also must be present specific combination of
+%               following fields:
+% daten     ... cell with image data
+% imNames   ... if daten is not present this list of processed images
+%               names is used for loading images from subsImDir
+% subsImDir ... if daten is not present, images specified by imNames are
+%               loaded from this directory
 
-%check if it is necessary to run the function
-if isempty(prbMsg) == 1                                                     %no problem, than return
+% check if it is necessary to run the function
+if isempty(metricdata.prbMsg) == 1                                          %no problem, than return
+    EdgeCoord = handles.metricdata.EdgCoord;                                %#ok<NASGU> %assign output variable
     return
+end
+
+% process input:
+EdgCoord = metricdata.EdgCoord;
+state    = metricdata.state;
+prbMsg   = metricdata.prbMsg;
+sumMsg   = metricdata.sumMsg;
+if isfield(metricdata,'daten') == 1                                         %there are present image data into metricdata
+    IMDataCell = metricdata.daten;
+    DNTLoadIM  = 0;
+else
+    imNames    = metricdata.imNames;
+    subsImDir  = metricdata.subsImDir;
+    DNTLoadIM  = 1;
 end
 
 % extract variables auxiliary variables from structures
@@ -1376,46 +1537,12 @@ if sum(state) ~= 0                                                          %the
     choice = myQst('autstr',stringCell);
     if strcmp(choice,'Show EdgCoord') == 1                                  %user wants to show the EdgeCoord matrix
         coefVec= 7./kurtosis(EdgCoord);
-        tmpMat = [EdgCoord;round(mean(EdgCoord));kurtosis(EdgCoord);...     %tmpMat with mean value, kurtosis and used coefficient for finding
-            coefVec];                                                       %outliers in each column
-        tmpMat = reshape(strtrim(cellstr(num2str(tmpMat(:)))), size(tmpMat));
-        for i = 1:numel(prbCoord(:,1))
-            tmpMat(prbCoord(i,1),prbCoord(i,2)) = strcat(...                %modify format of the problematic value
-                '<html><span style="color: #FF0000; font-weight: bold;">', ...
-                tmpMat(prbCoord(i,1),prbCoord(i,2)), ...
-                '</span></html>');
-        end
-        tmpMat(end-2,:) = strcat(...                                        %modify format of the mean value
-                '<html><span style="color: #FF00FF; font-weight: bold;">', ...
-                tmpMat(end-2,:), ...
-                '</span></html>');
-        tmpMat(end-1,:) = strcat(...                                        %modify format of the kurtosis
-                '<html><span style="color: #0000FF; font-weight: bold;">', ...
-                tmpMat(end-1,:), ...
-                '</span></html>');
-        tmpMat(end,:) = strcat(...                                          %modify format of the used coeficient
-                '<html><span style="color: #FFFF00; font-weight: bold;">', ...
-                tmpMat(end,:), ...
-                '</span></html>');
-        colNames = {'Small cuv. xMean',...                                  %set column names
-            'Small cuv. yTop', 'Small cuv. yBottom',...
-            'Big cuv. xMean',...
-            'Big cuv. yTop', 'Big cuv. yBottom',...
-            'Plate xLeft','Plate yTop',...
-            'Plate xRight','Plate yBottom'};
-        rowNames = 1:numel(EdgCoord(:,1));                                  %set row names
-        rowNames = reshape(strtrim(cellstr(num2str(rowNames(:)))), size(rowNames));
-        rowNames = [rowNames {'Mean Value' 'Kurtosis' 'Used coef.'}];
         hFig = figure;                                                      %open figure window
         set(hFig,'Units','Pixels','Position',[0 0 1000 750],...
-            'Name','EdgCoord');               %set window size +- matching the EdgeCoord needs
-        uitable(hFig,'Data',tmpMat,'ColumnName',colNames,...                %open uitable
-            'RowName',rowNames,...
-            'ColumnEditable',false,...
-            'ColumnWidth','auto', ...
-            'Units','Normal', 'Position',[0 0 1 1]);                        %open EdgeCoord in uitable
-        choice = menu('Modify selected values',...                          %questdlg is prettier, but menu is not modal
-            'From mean values','Manually','Don`t modify');
+            'Name','EdgCoord');                                             %set window size +- matching the EdgeCoord needs
+        openUITable(hFig,EdgCoord,prbCoord,coefVec,0);
+        choice = menu('Modify selected values',...
+            'From mean values','Manually','Don`t modify');                  %questdlg is prettier, but menu is not modal
         switch choice
             case 1
                 choice = 'From mean values';
@@ -1440,61 +1567,70 @@ switch choice
         tmpVec= unique(prbCoord(:,2));
         for j = 1:numel(tmpVec)                                             %for every column with problem
             i = tmpVec(j);
-            save_to_base(1);
             EdgCoord(prbCoord(prbCoord(:,2) == i),i) =...                   %all values with specified column index
                 round(mean(removerows(EdgCoord(:,i),prbCoord(prbCoord(:,2) == i))));%replace all outliers and NaN with mean values of the rest
         end
     case 'Manually'
-        se      = strel('disk',12);                                         %morphological structuring element
-        strVerL = 'Specify {\bf 3} times left vertical edge of the ';       %string preparation
-        strVerR = 'Specify {\bf 3} times right vertical edge of the ';
-        strHorT = 'Specify {\bf 3} times top horizontal edge of the ';
-        strHorB = 'Specify {\bf 3} times bottom horizontal edge of the ';
-        options.WindowStyle = 'modal';
-        options.Interpreter = 'tex';
-        for k = 1:numel(prbCoord(:,2));                                     %for all problems
-            i = prbCoord(k,1);j = prbCoord(k,2);                            %save indexes into temporary variables
-            switch prbMsg(k).device                                         %check the device, extreme SWITCH...
-                case 'plate'
-                    tmpIM = IMdataCell{i}(:,1:2*round(end/3));              %for the plate I need only left side of the image
-                    trVec = [0 0];
-                    if mod(j,7) == 0                                        %left vertical edge
-                        str = [strVerL prbMsg(k).device];
-                        chInd   = 1;
-                    elseif mod(j,7) == 1                                    %top horizontal edge
-                        str = [strHorT prbMsg(k).device];
-                        chInd   = 2;
-                    elseif mod(j,7) == 2                                    %right vertical edge
-                        str = [strVerR prbMsg(k).device];
-                        chInd   = 1;
-                    else                                                    %bottom horizontal edge
-                        str = [strHorB prbMsg(k).device];
-                        chInd   = 2;
-                    end
-                    nInput  = 3;
-                otherwise
-                    if strcmp(prbMsg(k).device,'small cuvette') == 1        %choose which part of the image I want to show
-                        tmpIM = IMdataCell{i}(1:round(2*end/3),round(end/2):end);%for small cuvette I need only top right side of the image
-                        trVec = [round(size(IMdataCell{i},2)/2)-1 0];
-                    else
-                        tmpIM = IMdataCell{i}(round(end/3):end,round(end/2):end);%for big cuvette I need only bottom right side of the imagee
-                        trVec = [round(size(IMdataCell{i},2)/2)-1 round(size(IMdataCell{i},1))];
-                    end
-                    if mod(j,3) == 1                                        %indexes 1 or 4, mean x values of cuvettes
-                        str = ['Specify both vertical edges of the '...
-                            prbMsg(k).device ', both of them {\bf 3} times.'];
-                        nInput = 6;                                         %need to take 6 inputs from ginput
-                        chInd   = 1;                                        %I am interested in first ginput coordinate
-                    elseif mod(j,3) == 2                                    %top horizontal edge
-                        str = [strHorT prbMsg(k).device];
-                        nInput  = 3;                                        %need to take 3 inputs from ginput
-                        chInd   = 2;                                        %I am interested second ginput coordinate
-                    else                                                    %bottom horiznotal edge
-                        str = [strHorB prbMsg(k).device];
-                        nInput  = 3;                                        %need to take 3 inputs from ginput
-                        chInd   = 2;                                        %I am interested in second ginput coordinate
-                    end
-            end
+        choice  = menu('Do you want to:',...                                %open new menu, and let user choose between graphical and text input
+            'Specify new values graphically',...
+            'Directly modify values in table');
+        if choice == 1                                                      %user wants to specify new values from images
+            se      = strel('disk',12);                                     %morphological structuring element
+            strVerL = 'Specify {\bf 3} times left vertical edge of the ';   %string preparation
+            strVerR = 'Specify {\bf 3} times right vertical edge of the ';
+            strHorT = 'Specify {\bf 3} times top horizontal edge of the ';
+            strHorB = 'Specify {\bf 3} times bottom horizontal edge of the ';
+            options.WindowStyle = 'modal';
+            options.Interpreter = 'tex';
+            for k = 1:numel(prbCoord(:,2));                                 %for all problems
+                i = prbCoord(k,1);j = prbCoord(k,2);                        %save indexes into temporary variables
+                if DNTLoadIM == 1                                           %if the images are not loaded, i need to get the image from directory
+                    tmpIM = imread([subsImDir imNames{1}]);                 %load image from directory with substracted images
+                else
+                    tmpIM = IMDataCell{i};                                  %else i can get it from handles
+                end
+                switch prbMsg(k).device                                     %check the device, extreme SWITCH...
+                    case 'plate'
+                        tmpIM = tmpIM(:,1:2*round(end/3));                  %for the plate I need only left side of the image
+                        trVec = [0 0];
+                        if mod(j,7) == 0                                    %left vertical edge
+                            str = [strVerL prbMsg(k).device];
+                            chInd   = 1;
+                        elseif mod(j,7) == 1                                %top horizontal edge
+                            str = [strHorT prbMsg(k).device];
+                            chInd   = 2;
+                        elseif mod(j,7) == 2                                %right vertical edge
+                            str = [strVerR prbMsg(k).device];
+                            chInd   = 1;
+                        else                                                %bottom horizontal edge
+                            str = [strHorB prbMsg(k).device];
+                            chInd   = 2;
+                        end
+                        nInput  = 3;
+                    otherwise
+                        if strcmp(prbMsg(k).device,'small cuvette') == 1        %choose which part of the image I want to show
+                            tmpIM = tmpIM(1:round(2*end/3),round(end/2):end);   %for small cuvette I need only top right side of the image
+                            trVec = [round(size(tmpIM,2)/2)-1 0];
+                        else
+                            tmpIM = tmpIM(round(end/3):end,round(end/2):end);   %for big cuvette I need only bottom right side of the imagee
+                            trVec = [round(size(tmpIM,2)/2)-1 round(size(tmpIM,1))];
+                        end
+                        if mod(j,3) == 1                                        %indexes 1 or 4, mean x values of cuvettes
+                            str = ['Specify both vertical edges of the '...
+                                prbMsg(k).device...
+                                ', both of them {\bf 3} times.'];
+                            nInput = 6;                                         %need to take 6 inputs from ginput
+                            chInd   = 1;                                        %I am interested in first ginput coordinate
+                        elseif mod(j,3) == 2                                    %top horizontal edge
+                            str = [strHorT prbMsg(k).device];
+                            nInput  = 3;                                        %need to take 3 inputs from ginput
+                            chInd   = 2;                                        %I am interested second ginput coordinate
+                        else                                                    %bottom horiznotal edge
+                            str = [strHorB prbMsg(k).device];
+                            nInput  = 3;                                        %need to take 3 inputs from ginput
+                            chInd   = 2;                                        %I am interested in second ginput coordinate
+                        end
+                end                
             % write out info about what should be specified
             msgbox(str,options);uiwait(gcf);
             % some image processing
@@ -1504,51 +1640,121 @@ switch choice
             figure;imshow(tmpIM);                                           %show image to work with
             tmpMat  = ginput(nInput);close(gcf);
             EdgCoord(i,j) = round(mean(tmpMat(:,chInd))) + trVec(chInd);
+            end
+        else                                                                %user wants directly modify values
+            if exist('coefVec','var') == 0                                  %if coefVec is not specified (no table was opened yet)
+                coefVec= 7./kurtosis(EdgCoord);
+                hFig = figure;                                              %open figure window
+                set(hFig,'Units','Pixels','Position',[0 0 1000 750],...
+                    'Name','EdgCoord');                                     %set window size +- matching the EdgeCoord needs
+            end
+            EdgCoord = openUITable(hFig,EdgCoord,prbCoord,coefVec,1);
         end
     case 'Don`t modify'
 end
 
 % see if hFig is opened and if it is, actualize it
 if exist('hFig','var') == 1
-    tmpMat = [EdgCoord;round(mean(EdgCoord));kurtosis(EdgCoord);coefVec];
-    tmpMat = reshape(strtrim(cellstr(num2str(tmpMat(:)))), size(tmpMat));
-    for i = 1:numel(prbCoord(:,1))
-        tmpMat(prbCoord(i,1),prbCoord(i,2)) = strcat(...                    %modify format of the problematic value
-            '<html><span style="color: #FF0000; font-weight: bold;">', ...
-            tmpMat(prbCoord(i,1),prbCoord(i,2)), ...
-            '</span></html>');
-    end
-    tmpMat(end-2,:) = strcat(...                                            %modify format of the mean value
-        '<html><span style="color: #FF00FF; font-weight: bold;">', ...
-        tmpMat(end-2,:), ...
-        '</span></html>');
-    tmpMat(end-1,:) = strcat(...                                            %modify format of the kurtosis
-        '<html><span style="color: #0000FF; font-weight: bold;">', ...
-        tmpMat(end-1,:), ...
-        '</span></html>');
-    tmpMat(end,:) = strcat(...                                              %modify format of the used coeficient
-        '<html><span style="color: #FFFF00; font-weight: bold;">', ...
-        tmpMat(end,:), ...
-        '</span></html>');
-    colNames = {'Small cuv. xMean',...                                      %set column names
-        'Small cuv. yTop', 'Small cuv. yBottom',...
-        'Big cuv. xMean',...
-        'Big cuv. yTop', 'Big cuv. yBottom',...
-        'Plate xLeft','Plate yTop',...
-        'Plate xRight','Plate yBottom'};
-    rowNames = 1:numel(EdgCoord(:,1));                                      %set row names
-    rowNames = reshape(strtrim(cellstr(num2str(rowNames(:)))), size(rowNames));
-    rowNames = [rowNames {'Mean Value' 'Kurtosis' 'Used coef.'}];
-    save_to_base(1);
-    uitable(hFig,'Data',tmpMat,'ColumnName',colNames,...                    %open uitable
-        'RowName',rowNames,...
-        'ColumnEditable',false,...
-        'ColumnWidth','auto', ...
-        'Units','Normal', 'Position',[0 0 1 1]);                            %open EdgeCoord in uitable
+    openUITable(hFig,EdgCoord,prbCoord,coefVec,0);
 end
 hMBox = msgbox('Press Enter to continue','modal');uiwait(hMBox);            %notify user about end of the program
 if exist('hFig','var')                                                      %if exists, close uitable
     close(hFig)
+end
+
+function modData = openUITable(hFig,EdgCoord,prbCoord,coefVec,allowEdit)
+%
+%   function openUITable(EdgCoord,prbCoord,coefVec,allowEdit)
+%
+% function for opening uitable with specified parameters and highlighted
+% outlietr and NaNs
+%
+% INPUT variables
+% hFig      ... handles to figure where uitable shoud be opened
+% EdgCoord  ... variable to be shown in uitable
+% prbCoord  ... coordinates of NaNs and outliers in the EdgCoord
+% coefVec   ... vector of coeficients used for identifying outliers
+% allowEdit ... 0/1 if I want allow user to edit fields in resulting
+%               uitable
+%
+% OUTPUT variables
+%
+
+tmpMat = [EdgCoord;round(mean(EdgCoord));kurtosis(EdgCoord);...             %tmpMat with mean value, kurtosis and used coefficient for finding
+    coefVec];                                                               %outliers in each column
+tmpMat = reshape(strtrim(cellstr(num2str(tmpMat(:)))), size(tmpMat));
+for i = 1:numel(prbCoord(:,1))
+    tmpMat(prbCoord(i,1),prbCoord(i,2)) = strcat(...                        %modify format of the problematic value
+        '<html><span style="color: #FF0000; font-weight: bold;">', ...
+        tmpMat(prbCoord(i,1),prbCoord(i,2)), ...
+        '</span></html>');
+end
+tmpMat(end-2,:) = strcat(...                                                %modify format of the mean value
+    '<html><span style="color: #FF00FF; font-weight: bold;">', ...
+    tmpMat(end-2,:), ...
+    '</span></html>');
+tmpMat(end-1,:) = strcat(...                                                %modify format of the kurtosis
+    '<html><span style="color: #0000FF; font-weight: bold;">', ...
+    tmpMat(end-1,:), ...
+    '</span></html>');
+tmpMat(end,:) = strcat(...                                                  %modify format of the used coeficient
+    '<html><span style="color: #FFFF00; font-weight: bold;">', ...
+    tmpMat(end,:), ...
+    '</span></html>');
+colNames = {'Small cuv. xMean',...                                          %set column names
+    'Small cuv. yTop', 'Small cuv. yBottom',...
+    'Big cuv. xMean',...
+    'Big cuv. yTop', 'Big cuv. yBottom',...
+    'Plate xLeft','Plate yTop',...
+    'Plate xRight','Plate yBottom'};
+rowNames = 1:numel(EdgCoord(:,1));                                          %set row names
+rowNames = reshape(strtrim(cellstr(num2str(rowNames(:)))), size(rowNames));
+rowNames = [rowNames {'Mean Value' 'Kurtosis' 'Used coef.'}];
+if allowEdit == 1                                                           %want I let user to change columns
+    ColumnEditable = zeros(1,numel(EdgCoord(1,:)));
+    ColumnEditable(unique(prbCoord(:,2))) = 1;                              %make columns with NaNs and outliers editable
+    ColumnEditable = logical(ColumnEditable);
+else
+    ColumnEditable = [];
+end
+hTable = uitable(hFig,'Data',tmpMat,'ColumnName',colNames,...               %open uitable
+    'RowName',rowNames,...
+    'ColumnEditable',ColumnEditable,...
+    'ColumnWidth','auto', ...
+    'Units','Normal', 'Position',[0 0 1 1]);
+if allowEdit == 1
+    set(hTable,'CellEditCallback', @hTableEditCallback);                    %set cell edit callback and DeleteFcn
+    choice = menu('Save values and stop editing','OK');
+    if choice == 1                                                          %if user is done editing values
+        modData = get(hTable,'Data');
+        modData = regexp(modData,'([1-9])[\d.]\d+','match');                %'unformat' these values
+        modData = cellfun(@str2double,modData);                             %convert them to double
+        modData = modData(1:end-2,:);                                       %strip off automatically generated values
+    end
+end
+
+function hTableEditCallback(o,e)
+tableData = get(o, 'Data');
+if (e.Indices(1) > numel(tableData(:,1))-3)                                 %check if the user is not trying to modify automatically gen. data
+    tableData{e.Indices(1), e.Indices(2)} = e.PreviousData;
+    set(o, 'data', tableData);
+    errordlg('Do not modify automatically generated values','modal')
+else
+    tmpData = regexp(tableData(:,e.Indices(2)),'([1-9])[\d.]\d+','match');  %unformat column of data with modified value
+    tmpData = cellfun(@str2double,tmpData);                                 %convert column into doubles
+    tmpData = [round(mean(tmpData(1:end-2)));                               %update automatically modified values
+               kurtosis(tmpData(1:end-2))];
+    tmpData = reshape(strtrim(cellstr(num2str(tmpData(:)))),size(tmpData)); %convert results into string
+    tmpData(1) = strcat(...                                                 %modify format of automatically modified data
+        '<html><span style="color: #FF00FF; font-weight: bold;">', ...
+        tmpData(1), ...
+        '</span></html>');
+    tmpData(2) = strcat(...
+        '<html><span style="color: #0000FF; font-weight: bold;">', ...
+        tmpData(2), ...
+        '</span></html>');
+    tableData(end-2:end-1,e.Indices(2)) = tmpData;                          %reconstruct data table
+    set(o,'data',tableData);                                                %push data back to uitable
 end
 
 %% Copied functions, not my own

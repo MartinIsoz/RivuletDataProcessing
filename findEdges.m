@@ -1,4 +1,4 @@
-function [EdgCoord nMan] = findEdges(handles,varargin)
+function [EdgCoord nMan] = findEdges(handles)
 %
 %  EdgCoord = findEdges(handles)
 %  EdgCoord = findEdges(handles,hpTr,numPeaks,fG,mL)
@@ -11,8 +11,15 @@ function [EdgCoord nMan] = findEdges(handles,varargin)
 %
 % INPUT variables
 % handles must have followin fields:
-% handles.metricdata.date - to be resaved as ImDataCell
+% handles.metricdata.daten - to be resaved as ImDataCell
+% !! if this field is not present, images are loaded separately from
+% Subtracted directory !!
 % ImDataCell    ... cell of the imread images
+% handles.metricdata.imNames - names of the loaded images, if there are no
+% data saved into handles (no field handles.metricdata.daten), this list
+% will be used to load images from /Subtracted directory, in this case,
+% this field is resaved as imNames
+% imNames       ... list of names of images to be processed
 % handles.metricdata.GREdges - to be resaved as GR
 % GR            ... variable for handling graphics
 % handles.prgmcontrol.autoEdges - to be resaved as AUTO
@@ -25,20 +32,31 @@ function [EdgCoord nMan] = findEdges(handles,varargin)
 %               ... 1 -> semi-manual, if there is a problem, option to
 %                   chose concerning edges manually is presented
 %               ... 2 -> completely automatic (in fact, its "not 0 or 1")
-% handles.statusbar, handles.MainWindow - for handling the statusbar
-%
-% optional variables (varargin)
-% (these variables are also present in handles.metricdata, it would be
-% usefull to modify the code, but this is only cosmetic problem not
-% limiting the functionality)
-% hpTr  ... treshold parameter for the hough peaks function
-% numPeaks. number of peaks to identify by houghpeaks
-% fG    ... maximal gap between two lines that will be filled by houghlines
-% mL    ... minimal length of the line recognized by houghlines
-% defalut values: hpTr      = 0.33;
+% handles.progmcontrol.DNTLoadIM - are all images loaded into
+% handles.metricdata.daten, or is there only list of filenames to be loaded
+% handles.metricdata.subsImDir - location of substracted images to be
+% processed to be used if DNTLoadIM == 1, resaved as subsImDir
+% subsImDir     ... directory with saved substracted images
+% 
+% handles.metricdata.IMProcPars - set of optional parameters for Image
+% processing, output of the changeIMPars.m
+% hpTr          ... treshold parameter for the hough peaks function
+% numPeaks      .... number of peaks to identify by houghpeaks
+% fG            ... maximal gap between two lines that will be filled by 
+%                   houghlines
+% mL            ... minimal length of the line recognized by houghlines
+% im2bwTr       ... treshold for im2bw transformation
+% DntUIm2Bw     ... don't use auxiliary im2bw transformation (before edge
+%                   finding)
+% EdgFMethod    ... method of the edge finding (input of EDGE)
+% defalut values: hpTr      =   0.33;
 %                 numPeaks  = 200;
-%                 fG        = 35;
-%                 mL        = 25;
+%                 fG        =  35;
+%                 mL        =  25;
+%                 im2bwTr   =   0.40;
+%                 DntUIm2Bw =   0;
+%                 EdgFMethod= 'Prewitt';
+% handles.statusbar, handles.MainWindow - for handling the statusbar
 %
 %
 % OUTPUT variables
@@ -96,19 +114,12 @@ function [EdgCoord nMan] = findEdges(handles,varargin)
 % EXEMPLES
 %
 % 1.
-%  EdgCoord = findEdges(ImDataCell,GR,AUTO)
+%  EdgCoord = findEdges(handles)
 %
-% Finds cuvettes and plate edges on photos specified in ImDataCell, shows
-% graphics depending on GR and behaves with automaticality specified in
-% AUTO. Predefined parameter for image processing are used.
+% Finds cuvettes and plate edges on photos with parameters specified in
+% handles
 %
 % 2.
-%  EdgCoord = findEdges(ImDataCell,GR,AUTO,[],[],30,25)
-%
-% finds cuvettes and plate edges ... . For image processing are used
-% default values of hpTr and numPeaks. fG and mL are specified by user
-%
-% 3.
 %  [EdgCoord nMan] = findEdges(...)
 %
 % find cuvettes and plate edges for specified parameters and returns also
@@ -120,7 +131,6 @@ function [EdgCoord nMan] = findEdges(handles,varargin)
 
 % tasks:
 % - clean up the code
-% - test the code on other images
 
 %% Turn of "image is too big" warning
 % Turn off this warning "Warning: Image is too big to fit on screen; displaying at 33% "
@@ -129,32 +139,44 @@ function [EdgCoord nMan] = findEdges(handles,varargin)
 warning('off', 'Images:initSize:adjustingMag');
 
 %% Processing function input
-IMProcPars  = [0.33 200 35 25];                                             %default parameters for image processing
-if nargin == 3                                                              %no IMProcPars are specified
-    hpTr      = IMProcPars(1);
-    numPeaks  = IMProcPars(2);
-    fG        = IMProcPars(3);
-    mL        = IMProcPars(4);
+if isempty(handles.metricdata.IMProcPars) == 1                              %check if optional arguments are defined
+    hpTr      =   0.33;                                                     %if not, load defaults
+    numPeaks  = 200;
+    fG        =  35;
+    mL        =  25;
+    im2bwTr   =   0.40;
+    DntUIm2Bw =   0;
+    EdgFMethod= 'Prewitt';
 else
-    parfor i = 1:numel(varargin)                                            %there are some IMProcPars specified
-        if isempty(varargin{i}) == 0                                        %check if i-th parameter exists
-            IMProcPars(i) = varargin{i};                                    %if yes, read his value
-        end
-    end
-    hpTr      = IMProcPars(1);
-    numPeaks  = IMProcPars(2);
-    fG        = IMProcPars(3);
-    mL        = IMProcPars(4);
+    hpTr      = handles.metricdata.IMProcPars{1};                           %otherwise load specified values
+    numPeaks  = handles.metricdata.IMProcPars{2};
+    fG        = handles.metricdata.IMProcPars{3};
+    mL        = handles.metricdata.IMProcPars{4};
+    im2bwTr   = handles.metricdata.IMProcPars{5};
+    DntUIm2Bw = handles.metricdata.IMProcPars{6};
+    EdgFMethod= handles.metricdata.IMProcPars{7};
 end
 
 % extract handles
-ImDataCell = handles.metricdata.daten;                                      %images
+if isfield(handles.metricdata,'daten') == 1                                 %there are saved images into handles
+    DNTLoadIM = 0;                                                          %set do not load images to 0
+    ImDataCell = handles.metricdata.daten;                                  %images
+else
+    DNTLoadIM = 1;
+end
 GR         = handles.metricdata.GREdges;                                    %graphical output
 AUTO       = handles.prgmcontrol.autoEdges;                                 %measure of automaticallity
+if DNTLoadIM == 1                                                           %if i dont have loaded images
+    subsImDir = handles.metricdata.subsImDir;                               %i need location of the directory from where to save them
+    imNames   = handles.metricdata.imNames;                                 %and list of names of images to be processed
+    nImages   = numel(imNames);                                             %save number of images to be processed
+else
+    nImages   = numel(ImDataCell);                                          %save number of images to be processed
+end
 
 %% Variable preallocation and main auxiliary variebles iniciation
 % preallocation of variables for findig of the edges of the cuvettes
-EdgCoord = zeros(numel(ImDataCell),10);                                     %OUTPUT variable
+EdgCoord = zeros(numel(nImages),10);                                        %OUTPUT variable
 % preallocation of variables and auxiliary variables for finding the edges
 % of the plate
 % Position of the plate differs one measurement to another, so I have to
@@ -167,9 +189,15 @@ msgbox({['Please specify approximate position of the'...
     ['Click little bit outside of {\bf upper left} '...
     'and {\bf lower right corner}']},options);uiwait(gcf);
 se      = strel('disk',12);                                                 %morphological structuring element
-tmpIM   = imtophat(ImDataCell{1},se);
+if DNTLoadIM == 1                                                           %if the images are not loaded, i need to get the image from directory
+    tmpIM = imread([subsImDir imNames{1}]);                                 %load image from directory with substracted images
+else
+    tmpIM = ImDataCell{1};                                                  %else i can get it from handles
+end
+tmpIM   = imtophat(tmpIM,se);
 tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                    %enhance contrasts
 tmpIM   = im2bw(tmpIM,0.16);                                                %conversion to black and white
+set(handles.statusbar,'Text','Waiting for user response');                  %update statusbar
 figure;imshow(tmpIM);                                                       %show image to work with
 cutMat  = round(ginput(2));close(gcf);                                      %let the user specify approximate position of the plate
 cutLeft = cutMat(1,1);cutRight = cutMat(2,1);
@@ -186,18 +214,23 @@ strCell = {'left vertical' 'top horizontal'...                              %nam
 % forced manual entries counter iniciation
 nMan    = 0;
 %% Main cycle of the program
-for i = 1:numel(ImDataCell)                                                 %for each image
+for i = 1:nImages                                                           %for each image
 % Update statusbar
 handles.statusbar = statusbar(handles.MainWindow,...
-    'Finding elements edges on image %d of %d (%.1f%%)',...                          %updating statusbar
-    i,numel(ImDataCell),100*i/numel(ImDataCell));
+    'Finding elements edges on image %d of %d (%.1f%%)',...                 %updating statusbar
+    i,nImages,100*i/nImages);
 set(handles.statusbar.ProgressBar,...
-    'Visible','on', 'Minimum',0, 'Maximum',numel(ImDataCell), 'Value',i);
-% Find cuvettes on the image
-    trLeft = round(size(ImDataCell{i},2)/2);                                %i dont care about the left side of the image (with the plate)
-    tmpIM  = ImDataCell{i}(:,trLeft:end);                                   %cut of unwanted part of the image and save temp. image var.
+    'Visible','on', 'Minimum',0, 'Maximum',numel(nImages), 'Value',i);
+    % Find cuvettes on the image
+    if DNTLoadIM == 1                                                       %if the images are not loaded, i need to get the image from directory
+        tmpIM = imread([subsImDir imNames{i}]);                             %load image from directory with substracted images
+    else
+        tmpIM = ImDataCell{i};                                              %else i can get it from handles
+    end
+    trLeft = round(size(tmpIM,2)/2);                                        %i dont care about the left side of the image (with the plate)
+    tmpIM  = tmpIM(:,trLeft:end);                                           %cut of unwanted part of the image and save temp. image var.
     tmpIM  = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                 %temporary image variable, enhance contrasts
-    tmpIM  = im2bw(tmpIM, 0.055);                                            %temporary black and white image, convert image to BW
+    tmpIM  = im2bw(tmpIM, 0.055);                                           %temporary black and white image, convert image to BW
     sizeIM = size(tmpIM);                                                   %save size of the image
     [B,L]  = bwboundaries(tmpIM,'noholes');clear tmpIM;                     %find boundaries of each element, clear tmpIM
     % preallocation of variables
@@ -304,11 +337,18 @@ set(handles.statusbar.ProgressBar,...
         end
     end
 % Find edges of the plate
-    tmpIM = ImDataCell{i}(cutTop:cutBottom,cutLeft:cutRight);               %cut out the plate from the image
+    if DNTLoadIM == 1                                                       %if the images are not loaded, i need to get the image from directory
+        tmpIM = imread([subsImDir imNames{i}]);                             %load image from directory with substracted images
+    else
+        tmpIM = ImDataCell{i};                                              %else i can get it from handles
+    end
+    tmpIM = tmpIM(cutTop:cutBottom,cutLeft:cutRight);                       %cut out the plate from the image
     tmpIM = imtophat(tmpIM,se);
     tmpIM = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                  %enhance contrasts
-    tmpIM = im2bw(tmpIM,0.40);                                              %simple conversion to black and white
-    tmpIM = edge(tmpIM,'prewitt');                                          %find edges in the image
+    if DntUIm2Bw == 0                                                       %if i want to use auxiliary im2bw transformation
+        tmpIM = im2bw(tmpIM,im2bwTr);                                       %simple conversion to black and white with specified treshold
+    end
+    tmpIM = edge(tmpIM,EdgFMethod);                                         %find edges in the image
     tmpIM(edgYT:edgYB,edgXL:edgXR) = ...                                    %replace values in the image center with 0 - dont care about rivulet
         zeros(numel(edgYT:edgYB),numel(edgXL:edgXR));                       %convert center of the image to black
     [H,theta,rho] = hough(tmpIM);                                           %use hough transform on the image
@@ -399,6 +439,7 @@ if AUTO ~= 0                                                                %if 
                 strLine4 = ['Rq: Automatical estimation of the edge '...    %remarque on the solution method
                     'position uses weighted mean values of coordinates '...
                     'of similar lines'];
+                set(handles.statusbar,'Waiting for user response')          %update statusbar
                 choice = questdlg(sprintf('%s\n\n%s\n%s\n\n',...            %create question dialog
                     strLine1,strLine2,strLine3,strLine4), ...
                     'Choose edges of the plate', ...
@@ -456,7 +497,7 @@ if AUTO ~= 0                                                                %if 
             ' there is not enough found edges to'...                        %if there is not enough edges, user must specify them manually
             ' estimate the plate position']...
             'You must specify edges manually'},'modal');uiwait(gcf);
-        set(handles.statusbar,'Waiting for user response')                  %update statusbar
+        set(handles.statusbar,'Text','Waiting for user response')           %update statusbar
         tmpPars   = [edgXL edgXR edgYT edgYB epsX epsY i];                  %contruct vector of parameters for plotLines 
         coordVec  = plotLines(tmpIM,lines,tmpPars);coordVec = coordVec';    %call the function for manual edge selection
         nMan      = nMan + 1;                                               %increase force manual entries counter
