@@ -1,5 +1,4 @@
-function OUT = rivuletProcessing(daten,Treshold,FilterSensitivity,...
-    EdgCoord,GR,files,fluidData,storDir,rootDir,varargin)
+function OUT = rivuletProcessing(handles)
 %
 %   function rivuletProcessing(daten,Treshold,FilterSensitivity,EdgCoord,...
 %       GR,files,fluidData,storDir,rootDir,[plateSize,nCuts,filmTh,RegrPlate])
@@ -11,40 +10,57 @@ function OUT = rivuletProcessing(daten,Treshold,FilterSensitivity,...
 % 2 Filter sensitivity for smoothing the image
 % Recommended Sensitivity: 10
 %
+% For better cohesion of the programs, the input parameters are directly
+% loaded from handles variable and outputs are stored in the same place.
+%
+% -handles structure must have fields metricdata and prgmcontrol.
+% - metricdata is structure with data created during the program evaluation
+% - prgmcontrol is structure with variebles for controlling program run
+%
 % INPUT variables
+% => in handles.metricdata:
 % mandatory:
+% ------------------
 % daten     ...     cell with substracted images data
+% OR
+% imNames   ...     cell with images names to be loaded from.!! this field
+%                   has to be present all the times because of the saving
+%                   outputs into files !!
+% subsImDir ...     location of the directory with subtracted images to be
+%                   processed
+% ------------------
 % Treshold  ...     treshold for distinguishing between the rivulet and the
 %                   noise on the plate
-% FilterSensitivity.filter sensitivity for image smoothing
+% FSensitivity.     filter sensitivity for image smoothing
 % EdgCoord  ...     coordinates of plate and cuvette edges on each image,
 %                   matrix nImages x 10
 %                   [xCMS yCLS yCHS xCMB yCLB yCHB xL yL xH yH]
-% GR        ...     structure with graphics output specifications
-%   required fields:
-%                   - GR.regr       = 0/1 - graphs from regression
-%                   - GR.contour    = 0/1 - view from top
-%                   - GR.profcompl  = 0/1 - complete profile
-%                   - GR.profcut    = 0/1 - mean profiles in cuts
-%                   - GR.regime     = 0/1/2 - show/save/show+save
-% files     ...     cell with strings - name of the processed images
 % fluidData ...     data concerning the liquid phase, regression
 %                   coeficients for rotameter calibration, surface tension,
 %                   density and dynamic viscosity of the liquid phase
 %                   (formerly stored in Konstanten_Fluid.txt)
 % storDir   ...     directory for storing outputs
 % rootDir   ...     root directory for program execution
-%
-% optionals
-% plateSize ...     size of the plate in metres
-%                   defalut: [0.15 0.30]
-% nCuts     ...     number of centered cuts to make along the rivulet
-%                   default: 5
-% filmTh    ...     thickness of the film in cuvettes, in mm + width of the
-%                   cuvettes in pixels
-%                   default: 1.93 0.33 6 2.25 80];
-% RegrPlate ...     degree of polynomial to be used in conversion of image
-%                   from grayscale values into distances
+% RivProcPars..     cell with optional parameters for rivulet
+%                   processing (changeables through menus in the main
+%                   program).
+%   required cells:
+%                   - empty [] => use default values
+%                   OR
+%                   - plateSize, size of the plate in metres
+%                     default: [0.15 0.30]
+%                   - nCuts, number of centered cuts to make along the
+%                     rivulet
+%                     default: 5
+%                   - filmTh, thickness of the fil in cuvettes in mm +
+%                     width of the cuvettes in pixels
+%                     default: [1.93 0.33 6 2.25 80]
+%                   - RegrPlate, degree of polynomial to be used in
+%                     conversion if image from grayscale values into
+%                     distances
+%                     default: 2
+%                   - InclAngle, inclination angle of the plate
+%                     default: 60 (in degrees)
 %
 % OUTPUTS - text files
 % a. text file for plotting profiles - cuts
@@ -75,47 +91,55 @@ function OUT = rivuletProcessing(daten,Treshold,FilterSensitivity,...
 % Notes on the code:
 % - cell 'liste' has 1.19 kB in memory, so why not to keep it there?
 % - import of images is pretty quick (\pm 0.6 s on C2D)
-% - are the coordinates of cuvettes seted right? see regression plot...
-%   !! repare regression !!
-% - why is used only small portion of the cuvette width? - enlarged to 80
-% - size of plate: 150 x 300 mm
-% - speed determination - why? for mass transfer i need to know velocity
-%   profile, this gives us only the mean value in each cut => put together
-%   function to calculate velocity profiles in the rivulet
 % - I'd prefere if all the code was written in basic SI units (mm -> m)
-% - the most of the values of the images are below calibration scope of the
-%   cuvette (but that should be ok, because on the major part of the plate,
-%   there is close to none liquid)
-% - why is for the extrapolation (values outside the calibration scope)
-%   used different type of regression - what is the reason for believing in
-%   the change of the trend
-% - does the regression line have to come through the point (0,0)?
-%   (especially for the big cuvette)
-% - in plotting "mean cuts", there is used only 50 pixels around each cut
 %
-% Tasks (from Friday 06 Jully 2012)
-% - complete lab. journal
+% To Do:
 % - plot, dependence of IFArea on break criterium
 
 %% Creating subdirectories
 % is taken care of in "Choose storDir"
 
 %% Processing function input
-plateSize   =[0.15 0.30];                                                   %size of the plate, [width length], in m
-nCuts       = 5;                                                            %every 50 mm 5/10/15/20/25 cm
-filmTh      = [1.93 0.33 6 2.25 80];                                        %max and min thickness of the film in cuvettes
-RegressionPlate = 2;                                                        %degree of polynomial for regression in converting gray val. to dist.
-
-Pars = {plateSize nCuts filmTh RegressionPlate};                            %cell of defaults parameters
-for i = 1:numel(varargin)                                                   %check if optional arguments is present
-    if isempty(varargin{i}) == 0
-        Pars{i} = varargin{i};                                              %if it is, take the new value
-    end
+if isempty(handles.metricdata.RivProcPars) == 1
+    plateSize   =[0.15 0.30];                                               %size of the plate, [width length], in m
+    InclAngle   = 60;                                                       %inclination angle of the plate, in degrees
+    filmTh      = [1.93 0.33 6 2.25 80];                                    %max and min thickness of the film in cuvettes
+    RegressionPlate = 2;                                                    %degree of polynomial for regression in converting gray val. to dist.
+    nCuts       = 5;                                                        %every 50 mm 5/10/15/20/25 cm
+else
+    plateSize   = handles.metricdata.RivProcPars{1};
+    InclAngle   = handles.metricdata.RivProcPars{2};
+    filmTh      = handles.metricdata.RivProcPars{3};
+    RegressionPlate = handles.metricdata.RivProcPars{4};
+    nCuts       = handles.metricdata.RivProcPars{5};
 end
-plateSize = Pars{1};
-nCuts     = Pars{2};
-filmTh    = Pars{3};
-RegressionPlate = Pars{4};
+
+% extracting programcontrol
+DNTLoadIM = handles.prgmcontrol.DNTLoadIM;
+GR        = handles.prgmcontrol.GR;
+
+% extracting metricdata
+% data
+files   = handles.metricdata.imNames;                                       %names of images to be processed
+if DNTLoadIM ~= 1                                                           %if images are loaded
+    daten = handles.metricdata.daten;                                       %save them into temporary function variable
+end
+% directories
+subsImDir = handles.metricdata.subsImDir;
+smImDir   = [subsImDir '/Smoothed'];                                        %directory with smoothed images
+storDir   = handles.metricdata.storDir;
+rootDir   = handles.metricdata.rootDir;
+plotDir   = [storDir '/Plots'];                                             %directory for saving plots
+tmpfDir   = [storDir '/tmp'];                                               %directory for saving temporary files
+% program execution parameters
+Treshold  = handles.metricdata.Treshold;
+FilterSensitivity = handles.metricdata.FSensitivity;
+EdgCoord  = handles.metricdata.EdgCoord;
+fluidData = handles.metricdata.fluidData;
+
+% auxiliary variable
+nImages = numel(files);                                                     %number of processed images
+
 %% Rotameter calibration
 % Pumpenkonstante und Stoffwerte
 [M,V_Pumpe]= rotameterCalib(files,fluidData);                               %rotameter calibration
@@ -135,79 +159,98 @@ clear fluidData
 
 %% Image conversion from grayscale values to distances
 % heights of the film in mm
-YProfilPlatte = ImConv(daten,EdgCoord,filmTh,RegressionPlate,...            %variables needed for calculation
-    GR.regr,GR.regime,storDir,rootDir);                                     %graphics and data manipulation variables
-
-%% Smoothing images
-% Rq:
-% B = imfilter(A,H)
-% A ... multidimensional matrix to be filtered
-% H ... multidimensional filter
-% h = fspecial(type)
-% Create predefined 2-D filter
-parfor i=1:numel(YProfilPlatte)
-    YProfilPlatte{i} = imfilter(YProfilPlatte{i},...                        %Here I use input argument FilterSensitivity
-        fspecial('disk',FilterSensitivity));
+if DNTLoadIM == 0                                                           %are all the data loaded?
+    handles.statusbar = statusbar(handles.MainWindow,...
+        ['Converting grayscale values into distances for all images ',...   %updating th statusbar
+        'loaded in memory']);
+    YProfilPlatte = ImConv(daten,EdgCoord,filmTh,RegressionPlate,...        %if the are, I can process them all at once
+        GR.regr,GR.regime,storDir,rootDir);
+    tmpCell = cell(size(YProfilPlatte));                                    %create empty cell
+    tmpCell(:) = {fspecial('disk',FilterSensitivity)};
+    YProfilPlatte = cellfun(@imfilter,YProfilPlatte,...                     %apply selected filter to YProfilPlatte
+        tmpCell,'UniformOutput',0);
+    parfor i = 1:nImages
+        tmpCell(i) = {[smImDir '/' files{i}]};                              %create second argument for cell function 
+    end
+    set(handles.statusbar.ProgressBar,'Visible','off');
+    set(handles.statusbar,'Text','Saving smoothed images');
+    cellfun(@imwrite,YProfilPlatte,tmpCell);                                %write images into smoothed folder (under original names)
+else                                                                        %otherwise, i need to do this image from image...
+    mkdir(tmpfDir);                                                         %I need to create directory for temporary files
+    for i = 1:nImages
+        handles.statusbar = statusbar(handles.MainWindow,...
+            ['Converting grayscale values into distaces ',...
+            'for image %d of %d (%.1f%%)'],...                              %updating statusbar
+            i,nImages,100*i/nImages);
+        set(handles.statusbar.ProgressBar,...
+            'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
+        tmpIM = {imread([subsImDir '/' files{i}])};                         %load image from substracted directory and save it as cell
+        tmpIM = ImConv(tmpIM,EdgCoord,filmTh,RegressionPlate,...            %convert it to distances
+            GR.regr,GR.regime,storDir,rootDir,i);
+        tmpIM = imfilter(tmpIM{:},...                                       %use selected filter
+            fspecial('disk',FilterSensitivity));
+        imwrite(tmpIM,[smImDir '/' files{i}]);                              %save it into 'Smoothed' folder (but under original name)
+        save([tmpfDir '/' files{i}(1:end-4)],'tmpIM');                      %save obtained data matrix into temporary directory
+    end
 end
 
 %% Saving smoothed images and obtaining visualizations of the riv.
 % store and plot smoothed images
-cd([storDir '/Substracted/Smoothed']);
-for i=1:numel(YProfilPlatte) %#ok<*FORPF>
-% 	dlmwrite(strcat('Smoothing_',files{i}(1:end-4),'.txt'),...              %extremely time consuming
-%         YProfilPlatte{i},'delimiter','\t','precision','%5.4f')            %write as text files
-    imwrite(YProfilPlatte{i},strcat('Smoothing_',files{i}))                 %write as images
-    if GR.contour == 1                                                      %contour visualization
-        % graphical output, look on the rivulets from top
-        figure;figSet_size(gcf,[400 700])
-        XProfilPlatte = linspace(0,plateSize(1),...
-            size(YProfilPlatte{i},2));                                      %width coord, number of columns in YProfilPlatte
-        ZProfilPlatte = linspace(0,plateSize(2),...
-            size(YProfilPlatte{i},1));                                      %length coord, number of rows in YProfilPlatte
-        [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
-        contour(XX,ZZ,YProfilPlatte{i});                                    %here I keep rivulet height in mm because it looks better
-        title(['\bf Look on the rivulet ' mat2str(i) ' from top'],...
-            'FontSize',13)
-        xlabel('width coordinate, [m]');
-        ylabel('length coordinate, [m]');
-        colbarh = colorbar('Location','East');                              %add the colorbar - scale
-        ylabel(colbarh,'rivulet height, [mm]')                              %set units to colorbar
-        axis ij                                                             %switch axis to match photos
-        if GR.regime ~= 0                                                   %if I want to save the images
-            cd([storDir '/Plots']);
-            saveas(gcf,['riv' mat2str(i) 'fromtop'],'png');
-            cd([storDir '/Substracted/Smoothed']);
-            if GR.regime == 1                                               %I want images only to be saved
-                close(gcf)
+if GR.contour == 1 || GR.regime == 1                                        %if any of the graphics are wanted, enter the cycle
+    set(handles.statusbar.ProgressBar,'Visible','off');                     %update statusbar
+    set(handles.statusbar,'Text','Creating graphic output')
+    for i=1:numel(files) %#ok<*FORPF>                                       %for each image
+        if DNTLoadIM == 1
+            load([tmpfDir '/' files{i}(1:end-4) '.mat']);                   %if images are not present in handles, load them from tmpfDir
+        else
+            tmpIM   = YProfilPlatte{i};                                     %if they are, just resave current image
+            YProfilPlatte{i} = YProfilPlatte{i}';                           %transpose image for next functions
+        end
+        if GR.contour == 1                                                  %contour visualization
+            % graphical output, look on the rivulets from top
+            figure;figSet_size(gcf,[400 700])
+            XProfilPlatte = linspace(0,plateSize(1),...
+                size(tmpIM,2));                                             %width coord, number of columns in YProfilPlatte
+            ZProfilPlatte = linspace(0,plateSize(2),...
+                size(tmpIM,1));                                             %length coord, number of rows in YProfilPlatte
+            [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
+            contour(XX,ZZ,tmpIM);                                           %here I keep rivulet height in mm because it looks better
+            title(['\bf Look on the rivulet ' mat2str(i) ' from top'],...
+                'FontSize',13)
+            xlabel('width coordinate, [m]');
+            ylabel('length coordinate, [m]');
+            colbarh = colorbar('Location','East');                          %add the colorbar - scale
+            ylabel(colbarh,'rivulet height, [mm]')                          %set units to colorbar
+            axis ij                                                         %switch axis to match photos
+            if GR.regime ~= 0                                               %if I want to save the images
+                saveas(gcf,[plotDir '/riv' mat2str(i) 'fromtop'],'png');
+                if GR.regime == 1                                           %I want images only to be saved
+                    close(gcf)
+                end
             end
-            cd([storDir '/Substracted/Smoothed']);                          %back to the directory for saving images
+        end
+        if GR.profcompl == 1                                                %Y-Profile over entire plate width
+            figure;figSet_size(gcf,[1100 600])
+            XProfilPlatte = linspace(0,plateSize(1),...
+                size(tmpIM,2));
+            ZProfilPlatte = linspace(0,plateSize(2),...
+                size(tmpIM,1));
+            [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
+            mesh(XX,ZZ,tmpIM)                                               %I need to convert the liquid height into mm
+            axis tight
+            xlabel('width of the plate, [m]')
+            ylabel('length of the plate, [m]')
+            zlabel('height of the rivulet, [mm]')
+            title(['\bf Profile of the rivulet ' mat2str(i)],'FontSize',13);
+            if GR.regime ~= 0                                               %if I want to save the images
+                saveas(gcf,[plotDir '/riv' mat2str(i) 'complprof'],'png');
+                if GR.regime == 1                                           %I want images only to be saved
+                    close(gcf)
+                end
+            end
         end
     end
-    if GR.profcompl == 1                                                    %Y-Profile over entire plate width
-        figure;figSet_size(gcf,[1100 600])
-        XProfilPlatte = linspace(0,plateSize(1),...
-            size(YProfilPlatte{i},2));
-        ZProfilPlatte = linspace(0,plateSize(2),...
-            size(YProfilPlatte{i},1));
-        [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
-        mesh(XX,ZZ,YProfilPlatte{i})                                        %I need to convert the liquid height into mm
-        axis tight
-        xlabel('width of the plate, [m]')
-        ylabel('length of the plate, [m]')
-        zlabel('height of the rivulet, [mm]')
-        title(['\bf Profile of the rivulet ' mat2str(i)],'FontSize',13);
-        if GR.regime ~= 0                                                   %if I want to save the images
-            cd([storDir '/Plots']);
-            saveas(gcf,['riv' mat2str(i) 'complprof'],'png');
-            if GR.regime == 1                                               %I want images only to be saved
-                close(gcf)
-            end
-            cd([storDir '/Substracted/Smoothed']);                          %back to the directory for saving images
-        end
-    end
-    YProfilPlatte{i} = YProfilPlatte{i}';                                   %rest of Andres code, following function are working with transpose
 end
-cd(rootDir);                                                                %back to the rootDir
 
 %% Read the individual profiles over the length of the plate -> rivulet
 %% area
@@ -216,18 +259,53 @@ cd(rootDir);                                                                %bac
 % fall under treshold thickness
 % lets draw the rivulet (from the maximum to the treshold, for each row)
 
-IFArea = RivSurf(YProfilPlatte,Treshold,plateSize);                         %this function does not need graphical output
+if DNTLoadIM == 1
+    IFArea = zeros(numel(files),1);                                         %images are not loaded, preallocat variable
+    for i = 1:nImages
+        handles.statusbar = statusbar(handles.MainWindow,...
+            'Calculating interfacial area of rivulet %d of %d (%.1f%%)',... %updating statusbar
+            i,nImages,100*i/nImages);
+        set(handles.statusbar.ProgressBar,...
+            'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
+        load([tmpfDir '/' files{i}(1:end-4) '.mat']);                       %if images are not present in handles, load them from tmpfDir
+        IFArea(i)= RivSurf({tmpIM'},Treshold,plateSize);                    %I need to transpose tmpIM -> coherence with YProfilPlatte
+    end
+else
+    set(handles.statusbar,'Text','Calculating interfacial area of rivulets');%update statusbar
+    IFArea = RivSurf(YProfilPlatte,Treshold,plateSize);                     %this function does not need graphical output
+end
 
 %% Calculate mean values of riv. heights over each rivLength/nCuts of the
 %% rivulet
-[YProfilPlatte,XProfilPlatte]=cutRiv(YProfilPlatte,nCuts,plateSize,...      %call with calculation variables
-    GR.profcut,GR.regime,storDir,rootDir);                                  %auxiliary variables for graphics and data manipulation
+% the number of cuts (nCuts) << number of rows of the photo, so I will load
+% all the cutted rivulets into memory (the memory consumption shouldn be
+% extremely high - if the user will not choose like 300 cuts...)
+if DNTLoadIM == 1
+    YProfilPlatte = cell(1,numel(files));                                   %preallocate variable for YProfilPlatte
+    for i = 1:numel(files)
+        handles.statusbar = statusbar(handles.MainWindow,...
+            'Calculating mean profiles for image %d of %d (%.1f%%)',...     %updating statusbar
+            i,nImages,100*i/nImages);
+        set(handles.statusbar.ProgressBar,...
+            'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
+        load([tmpfDir '/' files{i}(1:end-4) '.mat']);                       %if images are not present in handles, load them from tmpfDir
+        [YProfilPlatte(i),XProfilPlatte]=cutRiv({tmpIM'},nCuts,plateSize,...%call with calculation variables
+            GR.profcut,GR.regime,storDir,rootDir,i);                        %auxiliary variables for graphics and data manipulation
+    end
+    rmdir(tmpfDir,'s');                                                    %remove unnecessary temporary folder
+else
+    set(handles.statusbar,'Text','Calculating mean profiles along the rivulets');%update statusbar
+    [YProfilPlatte,XProfilPlatte]=cutRiv(YProfilPlatte,nCuts,plateSize,...  %call with calculation variables
+        GR.profcut,GR.regime,storDir,rootDir);                              %auxiliary variables for graphics and data manipulation
+end
 
 %% Calculate variables to be saved, mean values in each cut
 % - if I understand it correctly, it is the same calculation as before,
 % only for the mean profiles - these 2 calculations can be put together in
 % 1 function and called separately
 
+set(handles.statusbar.ProgressBar,'Visible','off');                         %update statusbar
+set(handles.statusbar,'Text','Calculating output data of the program');
 [~,RivWidth2,RivHeight2,minLVec,minRVec] =...                               %calculates the mean widths of the rivulet and return indexes of
     RivSurf(YProfilPlatte,Treshold,plateSize);                              %the "edges" of the rivulet + calculates max height of each part of
                                                                             %the rivulet
@@ -239,6 +317,11 @@ IFArea = RivSurf(YProfilPlatte,Treshold,plateSize);                         %thi
 % the curve of the profile
 mSpeed  = zeros(numel(YProfilPlatte),size(RivWidth2,2));                    %prealocation of var mSpeed
 for i = 1:numel(YProfilPlatte)
+    handles.statusbar = statusbar(handles.MainWindow,...
+        'Calculating mean speed in cuts for image %d of %d (%.1f%%)',...    %updating statusbar
+        i,nImages,100*i/nImages);
+    set(handles.statusbar.ProgressBar,...
+        'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
     for j = 1:size(RivWidth2,2)
         SurfMat = trapz(XProfilPlatte(minLVec(i,j):minRVec(i,j)),...        %rows - number of images, columns - number of cuts
             YProfilPlatte{i}(minLVec(i,j):minRVec(i,j),j)*1e-3);            %again, conversion mm -> m
@@ -247,6 +330,10 @@ for i = 1:numel(YProfilPlatte)
 end
 
 %% Saving results in text files
+
+set(handles.statusbar.ProgressBar,'Visible','off');
+set(handles.statusbar,'Text','Saving data into text files');
+
 % 1. Smoothed/averaged profiles
 cd([storDir '/Profile'])
 % in 1 file for each image, i will save:
@@ -274,25 +361,27 @@ cd(rootDir)
 
 % 5. Interfacial area of the rivulets
 cd([storDir '/Correlation'])
-varIN = {sigma rho eta M};                                                  %input variables for correlation
+varIN = {sigma rho eta M InclAngle};                                        %input variables for correlation
 varOUT= IFArea;                                                             %output variable for correlation
 saveCorrData(varOUT,varIN,'IFAreaCorr')
 cd(rootDir)
+
+set(handles.statusbar,'Text','Rivulet processing ended succesfully');
 
 OUT = 0;                                                                    %currently unused output variable
 end
 
 
 
-%% Function to convert gray values ​​in distances - extremely slow
+%% Function to convert gray values ​​in distances
 % Is required for the image and the regression coefficients of quadratic regression
-% 21/11/2011
+% 21/11/2011, rewritten July 2012, by Martin Isoz
 
 function ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
-    GR,GRregime,storDir,rootDir)
+    GR,GRregime,storDir,rootDir,imNumber)
 %
 %   ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
-%    GR,GRregime,storDir,rootDir)
+%    GR,GRregime,storDir,rootDir,[imNumber])
 %
 % function for conversion images from grayscale to distances using
 % polynomial regression with polynomial of degree specified in RegDegree
@@ -308,13 +397,18 @@ function ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
 % GRregime          ... variable for graphics (show/save/show+save)
 % storDir           ... directory for storing outputs
 % rootDir           ... main execution directory
+% imNumber  ... optional input parameter, if the images are processed 1 by
+%               1, this i the number of the currently processed image
 %
 % OUTPUT variebles
 % ImgConv   ... converted image, gray values -> local heights of the riv,
 %               in mm
 
 ImgConv     = cell(1,numel(ImData));                                        %preallocation of output variable
-for i = 1:numel(ImData)                                                     %#ok<FORPF> %for each file
+for i = 1:numel(ImData)                                                     %for each file
+    if nargin < 9
+        imNumber = i;
+    end
     % read coordinates of the cuvettes and plate on each image
     % small cuvette
     xoS = EdgCoord(i,1);                                                    %mean  x-Value
@@ -371,7 +465,7 @@ for i = 1:numel(ImData)                                                     %#ok
              CuvetteS(:,1),fitS,'g-',...                                    %fit
              CuvetteS(:,1),fitS+2*deltaS,'r:',...                           %95% confidence interval for large samples
              CuvetteS(:,1),fitS-2*deltaS,'r:');
-        title(['\bf Calibration, figure ' mat2str(i) ', small cuvette']...
+        title(['\bf Calibration, figure ' mat2str(imNumber) ', small cuvette']...
             ,'FontSize',13)
         xlabel('grayscale value')
         ylabel('height of the liquid, mm')
@@ -380,13 +474,13 @@ for i = 1:numel(ImData)                                                     %#ok
              CuvetteB(:,1),fitB,'g-',...                                    %fit
              CuvetteB(:,1),fitB+2*deltaB,'r:',...                           %95% confidence interval for large samples
              CuvetteB(:,1),fitB-2*deltaB,'r:');
-        title(['\bf Calibration, figure ' mat2str(i) ', big cuvette']...
+        title(['\bf Calibration, figure ' mat2str(imNumber) ', big cuvette']...
             ,'FontSize',13)
         xlabel('grayscale value')
         ylabel('height of the liquid, mm')
         if GRregime ~= 0                                                    %if I want to save the images
             cd([storDir '/Plots']);
-            saveas(gcf,['riv' mat2str(i) 'regrstate'],'png');
+            saveas(gcf,['riv' mat2str(imNumber) 'regrstate'],'png');
             if GRregime == 1                                                %I want images only to be saved
                 close(gcf)
             end
@@ -434,10 +528,10 @@ end
 %% Function for cutting rivulet into nCuts parts along the vertical
 %% coordinate (Z)
 function [YProfilPlatte XProfilPlatte] =...
-    cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,storDir,rootDir)
+    cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,storDir,rootDir,imNumber)
 %
 %   [YProfilPlatte XProfilPlatte] =...
-%       cutRiv(YProfilPlatte,nCuts,plateSize,GR)
+%       cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,storDir,rootDir,imNumber)
 %
 % INPUT variables
 % YProfilPlatte     ... variable with heights of the rivulet
@@ -447,6 +541,8 @@ function [YProfilPlatte XProfilPlatte] =...
 % GRregime          ... variable for graphics (show/save/show+save)
 % storDir           ... directory for storing outputs
 % rootDir           ... main execution directory
+% imNumber          ... optional arguments, if the images are processed 1
+%                       by 1, this is the number of current image
 %
 % OUTPUT variables
 % YProfilPlatte     ... heights of the rivulet, reduced to mean values
@@ -458,6 +554,9 @@ ZProfilPlatte= linspace(0,plateSize(2),nCuts)';                             %thi
 
 
 for i=1:numel(YProfilPlatte)
+    if nargin < 8
+        imNumber = i;
+    end
     Distance     = round(size(YProfilPlatte{i},2)/(nCuts+1));               %number of points in each mean profile
     if nCuts == 0 || Distance < 50                                          %if too much cuts is specified
         warning('Pers:ManCuts',['The number of cuts specified is bigger than'...
@@ -480,18 +579,18 @@ for i=1:numel(YProfilPlatte)
         xlabel('width of the plate, [m]')
         ylabel('height of the rivulet, [m]')
         if nCuts ~= 0
-            ttl=title(['\bf Mean profiles of riv. ' mat2str(i)...
+            ttl=title(['\bf Mean profiles of riv. ' mat2str(imNumber)...
                 ' over every ' mat2str(plateSize(2)/(nCuts+1)*1e3,3)...
                 ' mm of the plate']);
         else
-            ttl=title(['\bf Mean profiles of riv. ' mat2str(i)...
+            ttl=title(['\bf Mean profiles of riv. ' mat2str(imNumber)...
                 ' over every ' mat2str(plateSize(2)/numel(ZProfilPlatte)*1e3,3)...
                 ' mm of the plate']);
         end
         set(ttl,'FontSize',13,'Interpreter','tex')
         if GRregime ~= 0                                                    %if I want to save the images
             cd([storDir '/Plots']);
-            saveas(gcf,['riv' mat2str(i) 'cutprof'],'png');
+            saveas(gcf,['riv' mat2str(imNumber) 'cutprof'],'png');
             if GRregime == 1                                                %I want images only to be saved
                 close(gcf)
             end
@@ -551,7 +650,6 @@ for i = 1:numel(YProfilPlatte)
     [MaxVec,IndX] = max(YProfilPlatte{i});                                  %find maximum in every horizontal row and save its position
     dummyL        = YProfilPlatte{i}(1:max(IndX),:);                        %left side of the rivulet (in the middle, they are superposed)
     dummyR        = YProfilPlatte{i}(min(IndX):end,:);                      %right side of the rivulet
-
     for j = 1:numel(MaxVec)
         tmpIndL      = find(dummyL(:,j) >= Treshold,1,'first');             %find the first element bigger then Treshold (search from L->R)
         tmpIndR      = find(dummyR(:,j) <= Treshold,1,'first');             %find the first element lower then Treshold

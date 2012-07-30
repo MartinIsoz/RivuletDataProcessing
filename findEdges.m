@@ -1,13 +1,26 @@
-function [EdgCoord nMan] = findEdges(handles)
+function EdgCoord = findEdges(handles)
 %
 %  EdgCoord = findEdges(handles)
-%  EdgCoord = findEdges(handles,hpTr,numPeaks,fG,mL)
-%  [EdgCoord nMan] = findEdges(...);
 %
 % Measurement of the rivulet flow on an inclined plate
 %
 % Function to find coordinates of the plate and of the cuvette on the
 % images from measurement.
+%
+% There are 4 different modes of automaticallity availibles:
+% Manual    - all the plate edges are to be specified manually
+% Semi-automatic - the plate edges are found using image processing, but if
+%             there is any warning, user is asked to specify concerning
+%             edge manually
+% Automatic - Program is resolving soft warnings (more than 1 edge proposed
+%             for 1 side) automatically, but still asks for specification
+%             of not found edges
+% Force-automatic - Program runs completely automatically, not found edges
+%             are replaced by NaN
+%
+% Output of the program is to be checked by controlFunction, which finds
+% NaN and outliers in found edges coordinates and the user is asked to
+% repair these values using modifyFunction
 %
 % INPUT variables
 % handles must have followin fields:
@@ -119,14 +132,9 @@ function [EdgCoord nMan] = findEdges(handles)
 % Finds cuvettes and plate edges on photos with parameters specified in
 % handles
 %
-% 2.
-%  [EdgCoord nMan] = findEdges(...)
-%
-% find cuvettes and plate edges for specified parameters and returns also
-% the count of forced manual entries
 %
 % See also IM2BW IMADJUST STRETCHLIM BWBOUNDARIES EDGE HOUGH
-% RIVULETPROCESSING RIVULETEXPDATAPROCESSING
+% RIVULETPROCESSING RIVULETEXPDATAPROCESSING CONTROLFUNCTION MODIFYFUNCTION
 %
 
 % tasks:
@@ -176,7 +184,7 @@ end
 
 %% Variable preallocation and main auxiliary variebles iniciation
 % preallocation of variables for findig of the edges of the cuvettes
-EdgCoord = zeros(numel(nImages),10);                                        %OUTPUT variable
+EdgCoord = zeros(nImages,10);                                        %OUTPUT variable
 % preallocation of variables and auxiliary variables for finding the edges
 % of the plate
 % Position of the plate differs one measurement to another, so I have to
@@ -190,7 +198,7 @@ msgbox({['Please specify approximate position of the'...
     'and {\bf lower right corner}']},options);uiwait(gcf);
 se      = strel('disk',12);                                                 %morphological structuring element
 if DNTLoadIM == 1                                                           %if the images are not loaded, i need to get the image from directory
-    tmpIM = imread([subsImDir imNames{1}]);                                 %load image from directory with substracted images
+    tmpIM = imread([subsImDir '/' imNames{1}]);                             %load image from directory with substracted images
 else
     tmpIM = ImDataCell{1};                                                  %else i can get it from handles
 end
@@ -220,10 +228,10 @@ handles.statusbar = statusbar(handles.MainWindow,...
     'Finding elements edges on image %d of %d (%.1f%%)',...                 %updating statusbar
     i,nImages,100*i/nImages);
 set(handles.statusbar.ProgressBar,...
-    'Visible','on', 'Minimum',0, 'Maximum',numel(nImages), 'Value',i);
+    'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
     % Find cuvettes on the image
     if DNTLoadIM == 1                                                       %if the images are not loaded, i need to get the image from directory
-        tmpIM = imread([subsImDir imNames{i}]);                             %load image from directory with substracted images
+        tmpIM = imread([subsImDir '/' imNames{i}]);                         %load image from directory with substracted images
     else
         tmpIM = ImDataCell{i};                                              %else i can get it from handles
     end
@@ -338,7 +346,7 @@ set(handles.statusbar.ProgressBar,...
     end
 % Find edges of the plate
     if DNTLoadIM == 1                                                       %if the images are not loaded, i need to get the image from directory
-        tmpIM = imread([subsImDir imNames{i}]);                             %load image from directory with substracted images
+        tmpIM = imread([subsImDir '/' imNames{i}]);                         %load image from directory with substracted images
     else
         tmpIM = ImDataCell{i};                                              %else i can get it from handles
     end
@@ -413,9 +421,9 @@ if AUTO ~= 0                                                                %if 
                   xyVer(xyVer>edgXR)...                                     %hor. ....               right...
                   xyHor(xyHor>edgYB)};                                      %ver. ....               bottom....
     nDNF       = sum(cellfun(@isempty,coordsCell));                         %number of not found edges
-    indDNF     = [];                                                        %index of not specified edge to be used later
+    indDNF     = zeros(1,4);                                                %index of not specified edge to be used later
     % edge estimation
-    if nDNF < 2                                                             %found all 4 or at least 3 edges
+    if nDNF < 2 || (nDNF >= 2 && AUTO == 3)                                                             %found all 4 or at least 3 edges
         coordVec   = zeros(1,4);                                            %vector of edge coordinates
         for k = 1:4                                                         %for each cell
             if isempty(coordsCell{k}) == 0 && mod(k,2) == 1                 %impair cells - vertical edges
@@ -450,7 +458,7 @@ if AUTO ~= 0                                                                %if 
                     case 'Automatically'
                         estEdg = 1;                                         %automatic edge estimation
                 end
-            elseif nEdg > 0 && AUTO == 2                                    %find more edges but user wants completely automatic run
+            elseif nEdg > 0 && AUTO >= 2                                    %find more edges but user wants completely automatic run
                 warning('Pers:TMDatPl',['There were found more than 1 ('... %write out warning
                     mat2str(nEdg+1)...                                      %number of found lines
                     ') distinct lines on the ' ...
@@ -469,7 +477,7 @@ if AUTO ~= 0                                                                %if 
                 coordVec(k) = round(sum(weightVec.*coordsCell{k})/...
                     sum(weightVec));                                        %weighted mean value coordinate
             elseif estEdg == 1 && isempty(coordsCell{k}) == 1               %i want to automatically specify non-found edge
-                indDNF = k;
+                indDNF(k) = k;
             else                                                            %if manually, call outside function with appropriate parameters
                 set(handles.statusbar,'Waiting for user response')          %update statusbar
                 tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];            %contruct vector of parameters for plotLines
@@ -477,19 +485,26 @@ if AUTO ~= 0                                                                %if 
                 clear tmpPars
             end
         end
+        indDNF =indDNF(indDNF~=0);                                          %strip of zero elements from indDNF
         if isempty(indDNF) == 0                                             %if there is non-specified edge (this is not an exemple of elegance)
-            if indDNF == 1                                                  %left vertical edge is not specified
-                coordVec(indDNF) = coordVec(3)...
-                    - round((coordVec(4)-coordVec(2))/2);
-            elseif indDNF == 2                                              %top horizontal edge is not specified
-                coordVec(indDNF) = coordVec(4)...
-                    - round((coordVec(3)-coordVec(1))*2);
-            elseif indDNF == 3                                              %right vertical edge is not specified
-                coordVec(indDNF) = coordVec(1)...
-                    + round((coordVec(4)-coordVec(2))/2);
-            else                                                            %bottom horizontal edge is not specified
-                coordVec(indDNF) = coordVec(2)...
-                    + round((coordVec(3)-coordVec(1))*2);
+            if numel(indDNF) == 1                                           %only 1 non-specified edge
+                if indDNF == 1                                              %left vertical edge is not specified
+                    coordVec(indDNF) = coordVec(3)...
+                        - round((coordVec(4)-coordVec(2))/2);
+                elseif indDNF == 2                                          %top horizontal edge is not specified
+                    coordVec(indDNF) = coordVec(4)...
+                        - round((coordVec(3)-coordVec(1))*2);
+                elseif indDNF == 3                                          %right vertical edge is not specified
+                    coordVec(indDNF) = coordVec(1)...
+                        + round((coordVec(4)-coordVec(2))/2);
+                else                                                        %bottom horizontal edge is not specified
+                    coordVec(indDNF) = coordVec(2)...
+                        + round((coordVec(3)-coordVec(1))*2);
+                end
+            else                                                            %more than 1 n-s edge => cannot specify remaining edges
+                for j = 1:numel(indDNF)
+                    coordVec(indDNF(j)) = NaN;                              %assign not-a-number to not specified edges
+                end
             end
         end
     else

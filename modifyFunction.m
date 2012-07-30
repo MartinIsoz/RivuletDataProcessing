@@ -31,7 +31,7 @@ function EdgCoord = modifyFunction(metricdata)
 
 % check if it is necessary to run the function
 if isempty(metricdata.prbMsg) == 1                                          %no problem, than return
-    EdgeCoord = handles.metricdata.EdgCoord;                                %#ok<NASGU> %assign output variable
+    EdgCoord = metricdata.EdgCoord;                                         %assign output variable
     return
 end
 

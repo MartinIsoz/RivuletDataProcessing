@@ -86,7 +86,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 % Edit the above text to modify the response to help
 % RivuletExpDataProcessing
 
-% Last Modified by GUIDE v2.5 27-Jul-2012 10:13:22
+% Last Modified by GUIDE v2.5 30-Jul-2012 16:09:23
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -217,7 +217,7 @@ start_path  = '~/Documents/Freiberg/Experiments/';
 msgbox('Choose background image','modal');uiwait(gcf);
 [bgName bgDir] = uigetfile(FilterSpec,DlgTitle1,start_path);
 if bgDir ~= 0                                                               %basic input control
-bgImage        = imread([bgDir bgName]);
+bgImage        = imread([bgDir '/' bgName]);
 
 % updating statusbar
 statusStr = ['Background image ' bgDir bgName...
@@ -303,9 +303,9 @@ msgbox({'Background is loaded,'...
 if imDir ~= 0                                                               %basic input control
     subsImDir = [storDir '/Subtracted'];                                    %directory with subtracted images
 for i = 1:numel(imNames)
-    tmpIM = imread([imDir imNames{i}]);                                     %load images from selected directory
+    tmpIM = imread([imDir '/' imNames{i}]);                                 %load images from selected directory
     tmpIM = imsubtract(tmpIM,bgImage);                                      %subtract background from image
-    imwrite(tmpIM,[subsImDir imNames{i}]);                                  %save new images into subfolder
+    imwrite(tmpIM,[subsImDir '/' imNames{i}]);                              %save new images into subfolder
     if handles.prgmcontrol.DNTLoadIM == 0                                   %if i dont want to have stored images in handles.metricdata
         daten{i} = tmpIM;                                                   %if i want the images to be saved into handles
     end
@@ -498,7 +498,7 @@ handles.metricdata.prbMsg= prbMsg;
 handles.metricdata.sumMsg= sumMsg;
 
 % modify potential mistakes
-EdgCoord = modifyFunction(handles.metricdata);                              %call modifyFunction with handles.metricdata input
+handles.metricdata.EdgCoord = modifyFunction(handles.metricdata);           %call modifyFunction with handles.metricdata input
 set(handles.statusbar,'Text','EdgCoord is prepared for rivulet processing');%update statusbar
 
 % Update handles structure
@@ -723,258 +723,6 @@ end
 
 %% Editable fields - Rivulet processing
 
-function EditpltSX_Callback(hObject, eventdata, handles)
-% hObject    handle to EditpltSX (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditpltSX as text
-%        str2double(get(hObject,'String')) returns contents of EditpltSX as a double
-
-handles.metricdata.plateSize(1) = str2double(get(hObject,'String'));        %save width of the plate
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-
-% --- Executes during object creation, after setting all properties.
-function EditpltSX_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditpltSX (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function EditpltSY_Callback(hObject, eventdata, handles)
-% hObject    handle to EditpltSY (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditpltSY as text
-%        str2double(get(hObject,'String')) returns contents of EditpltSY as a double
-
-handles.metricdata.plateSize(2) = str2double(get(hObject,'String'));        %save length of the plate
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditpltSY_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditpltSY (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function EditnCuts_Callback(hObject, eventdata, handles)
-% hObject    handle to EditnCuts (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditnCuts as text
-%        str2double(get(hObject,'String')) returns contents of EditnCuts as a double
-
-handles.metricdata.nCuts = str2double(get(hObject,'String'));               %save number of horizontal cuts
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditnCuts_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditnCuts (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function EditScuvHW_Callback(hObject, eventdata, handles)
-% hObject    handle to EditScuvHW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditScuvHW as text
-%        str2double(get(hObject,'String')) returns contents of EditScuvHW as a double
-
-handles.metricdata.filmTh(1) = str2double(get(hObject,'String'));           %highest film thickness in small cuvette
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditScuvHW_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditScuvHW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function EditScuvLW_Callback(hObject, eventdata, handles)
-% hObject    handle to EditScuvLW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditScuvLW as text
-%        str2double(get(hObject,'String')) returns contents of EditScuvLW as a double
-
-handles.metricdata.filmTh(2) = str2double(get(hObject,'String'));           %lowest film thickness in small cuvette
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditScuvLW_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditScuvLW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function EditBcuvHW_Callback(hObject, eventdata, handles)
-% hObject    handle to EditBcuvHW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditBcuvHW as text
-%        str2double(get(hObject,'String')) returns contents of EditBcuvHW as a double
-
-handles.metricdata.filmTh(3) = str2double(get(hObject,'String'));           %highest film thickness in big cuvette
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditBcuvHW_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditBcuvHW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function EditBcuvLW_Callback(hObject, eventdata, handles)
-% hObject    handle to EditBcuvLW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditBcuvLW as text
-%        str2double(get(hObject,'String')) returns contents of EditBcuvLW as a double
-
-handles.metricdata.filmTh(4) = str2double(get(hObject,'String'));           %lowest film thickness in big cuvette
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditBcuvLW_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditBcuvLW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function EditCuvWidth_Callback(hObject, eventdata, handles)
-% hObject    handle to EditCuvWidth (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditCuvWidth as text
-%        str2double(get(hObject,'String')) returns contents of EditCuvWidth as a double
-
-handles.metricdata.filmTh(5) = str2double(get(hObject,'String'));           %width of cuvettes, in pixels
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditCuvWidth_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditCuvWidth (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-function EditPolDeg_Callback(hObject, eventdata, handles)
-% hObject    handle to EditPolDeg (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditPolDeg as text
-%        str2double(get(hObject,'String')) returns contents of EditPolDeg as a double
-
-handles.metricdata.PolDeg = str2double(get(hObject,'String'));              %degree of polynomial for cuvette regression
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditPolDeg_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditPolDeg (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
 function EditTreshold_Callback(hObject, eventdata, handles)
 % hObject    handle to EditTreshold (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -1127,7 +875,6 @@ function PlotSetts_SelectionChangeFcn(hObject, eventdata, handles)
 %	NewValue: handle of the currently selected object
 % handles    structure with handles and user data (see GUIDATA)
 
-
 switch get(eventdata.NewValue,'Tag') % Get Tag of selected object.
     case 'RadioShowPlots'
         handles.prgmcontrol.GR.regime = 0;                                  %only show plots
@@ -1154,25 +901,9 @@ function PushCalculate_Callback(hObject, eventdata, handles)
 if isfield(handles.metricdata,'EdgCoord') == 0                              %if EdgeCoord is not present, lets find it
         msgbox(['There are no edges of cuvettes'...
             ' and plate specified'],'modal');uiwait(gcf);
-else                                                                        %if there is EdgeCoord present, all the other variables should
-    EdgCoord = handles.metricdata.EdgCoord;                                 %be there as well
-    daten    = handles.metricdata.daten;
-    % extract variables from handles
-    % metricdata
-    FilterSensitivity = handles.metricdata.FSensitivity;
-    Treshold          = handles.metricdata.Treshold;
-    files             = handles.metricdata.imNames;
-    plateSize         = handles.metricdata.plateSize;
-    nCuts             = handles.metricdata.nCuts;
-    filmTh            = handles.metricdata.filmTh;
-    RegrPlate         = handles.metricdata.PolDeg;
-    storDir           = handles.metricdata.storDir;
-    rootDir           = handles.metricdata.rootDir;
-    fluidData         = handles.metricdata.fluidData;
-    % prgmcontrol
-    GR                = handles.prgmcontrol.GR;
-    rivuletProcessing(daten,Treshold,FilterSensitivity,EdgCoord,...         %call function for rivulet processing with collected parameters
-        GR,files,fluidData,storDir,rootDir,plateSize,nCuts,filmTh,RegrPlate);
+else                                                                        %otherwise call the rivuletProcessing function
+    handles.metricdata.RivProcPars = [];                                    %temporary, until gui will be written
+    rivuletProcessing(handles);
     
     msgbox('Program succesfully ended','modal');uiwait(gcf);
 end
@@ -1205,25 +936,14 @@ handles.metricdata.Treshold     = 0.1;                                      %set
 set(handles.EditTreshold, 'String', handles.metricdata.Treshold);           %fill in the field
 handles.metricdata.FSensitivity = 10;
 set(handles.EditFSensitivity, 'String', handles.metricdata.FSensitivity);
-% set empty spaces in places of varargin variables
-handles.metricdata.plateSize    = [];
-set(handles.EditpltSX, 'String', handles.metricdata.plateSize);
-set(handles.EditpltSY, 'String', handles.metricdata.plateSize);
-handles.metricdata.nCuts        = [];
-set(handles.EditnCuts, 'String', handles.metricdata.nCuts);
-handles.metricdata.filmTh        = [];
-set(handles.EditScuvHW, 'String', handles.metricdata.filmTh);
-set(handles.EditScuvLW, 'String', handles.metricdata.filmTh);
-set(handles.EditBcuvHW, 'String', handles.metricdata.filmTh);
-set(handles.EditBcuvLW, 'String', handles.metricdata.filmTh);
-set(handles.EditCuvWidth, 'String', handles.metricdata.filmTh);
-handles.metricdata.PolDeg       = [];
-set(handles.EditPolDeg, 'String', handles.metricdata.PolDeg);
+% default rivulet processing parameters
+handles.metricdata.RivProcPars = [];
 % popup menu
 handles.metricdata.fluidData = fluidDataFcn('???');                         %set vaules into handles
 set(handles.PopupLiqType,'Value',1);                                        %select 2 choice
 
-
+handles.statusbar = statusbar(handles.MainWindow,...
+        'Default rivulet processing parameters were set');
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -1236,6 +956,9 @@ function PushSaveToBase_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 save_to_base(1)                                                             %save all variables to base workspace
+
+handles.statusbar = statusbar(handles.MainWindow,...
+        'All variables were saved into base workspace');
 
 
 % --- Executes on button press in PushClearALL.
@@ -1250,8 +973,9 @@ handles = rmfield(handles,'prgmcontrol');
 [handles.metricdata handles.prgmcontrol] =...                               %reinitialize GUI
     initializeGUI(hObject, eventdata, handles);
 
-msgbox({'All user defined variables were cleared.'...
-    'Start by loading images again'},'modal');uiwait(gcf);
+handles.statusbar = statusbar(handles.MainWindow,...
+    ['All user defined variables were cleared.'...
+    ' Start by loading images again']);
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -1279,9 +1003,9 @@ set(handles.EditStorDir,'String',['No outputs storage directory is'...      %fie
     ' selected.']);
 set(handles.EditBcgLoc,'String','No background is loaded.');
 set(handles.EditIMLoc,'String','No images are loaded.');
-minVal = get(handles.CheckDNL,'Min');                                       %uncheck checkbox
-set(handles.CheckDNL,'Value',minVal);
-handles.prgmcontrol.DNTLoadIM = minVal;                                        %by default, i dont want to store all iamge data in handles
+maxVal = get(handles.CheckDNL,'Max');                                       %uncheck checkbox
+set(handles.CheckDNL,'Value',maxVal);
+handles.prgmcontrol.DNTLoadIM = maxVal;                                     %by default, i dont want to store all image data in handles
 
 % set default values for fields in Image Processing
 handles.prgmcontrol.autoEdges = 2;                                          %default - completely automatic program execution
@@ -1308,26 +1032,20 @@ minVal = get(handles.CheckCompProfGR,'Min');                                %unc
 set(handles.CheckCompProfGR,'Value',minVal);
 minVal = get(handles.CheckMeanCutsGR,'Min');                                %uncheck checkboxes
 set(handles.CheckMeanCutsGR,'Value',minVal);
+minVal = get(handles.RadioShowPlots,'Min');
+set(handles.RadioShowPlots,'Value',minVal);
+maxVal = get(handles.RadioSavePlots,'Max');
+set(handles.RadioSavePlots,'Value',maxVal);
+minVal = get(handles.RadioShowSavePlots,'Min');
+set(handles.RadioShowSavePlots,'Value',minVal);
 % metricdata
 % set default values for mandaroty variables
 handles.metricdata.Treshold     = 0.1;                                      %set value
 set(handles.EditTreshold, 'String', handles.metricdata.Treshold);           %fill in the field
 handles.metricdata.FSensitivity = 10;
 set(handles.EditFSensitivity, 'String', handles.metricdata.FSensitivity);
-% set empty spaces in places of varargin variables
-handles.metricdata.plateSize    = [];
-set(handles.EditpltSX, 'String', handles.metricdata.plateSize);
-set(handles.EditpltSY, 'String', handles.metricdata.plateSize);
-handles.metricdata.nCuts        = [];
-set(handles.EditnCuts, 'String', handles.metricdata.nCuts);
-handles.metricdata.filmTh       = [];
-set(handles.EditScuvHW, 'String', handles.metricdata.filmTh);
-set(handles.EditScuvLW, 'String', handles.metricdata.filmTh);
-set(handles.EditBcuvHW, 'String', handles.metricdata.filmTh);
-set(handles.EditBcuvLW, 'String', handles.metricdata.filmTh);
-set(handles.EditCuvWidth, 'String', handles.metricdata.filmTh);
-handles.metricdata.PolDeg       = [];
-set(handles.EditPolDeg, 'String', handles.metricdata.PolDeg);
+% default values for rivulet processing optional parameters
+handles.metricdata.RivProcPars = [];
 % set data for the liquid
 handles.metricdata.fluidData = fluidDataFcn('DC 10');                       %set vaules into handles
 set(handles.PopupLiqType,'Value',1);                                        %select 2 choice
@@ -1381,9 +1099,9 @@ nBC  = 0; oBC = 0;
 nPl  = 0; oPl = 0;
 for i = 1:nCol                                                              %better to do for each column separately(remove only parts of NaN row)
     tmpVar = EdgCoord(:,i);                                                 %reduce input matrix only to i-th column
-    % find NaN values in the EdgCoord matrix
-    INaN = find(isnan(EdgCoord) == 1);
-    tmpVar(any(isnan(tmpVar)'),:) = [];                                     %remove rows with NaN in them
+    % find NaN values in the ith column of EdgCoord matrix
+    INaN = find(isnan(EdgCoord(:,i)) == 1);
+    tmpVar = tmpVar(isnan(tmpVar) == 0);                                     %remove rows with NaN in them
     % calculate standard deviation of each column of EdgCoord
     coordSTD= std(tmpVar);
     coordMU = mean(tmpVar);                                                 %mean value in each column
@@ -1401,12 +1119,12 @@ for i = 1:nCol                                                              %bet
     Iout    = find(outliers == 1);                                          %find position of outliers
     % translate the Iout for each found NaN
     if isempty(INaN) == 0
-        for j = INaN
+        for j = 1:numel(INaN)
             Iout(Iout>=INaN(j)) = Iout(Iout>=INaN(j))+1;                    %must add 1 for every left out row
         end
     end
     % write out messages for the column
-    Iwr = [Iout INaN];
+    Iwr = [Iout;INaN];
     for j = 1:length(Iwr)                                                   %for all problems
         prbMsg(k).coords = [Iwr(j) i];                                      %coordinates of the problem in the EdgCoord matrix
         prbMsg(k).nImg   = Iwr(j);                                          %number of problematic image
@@ -1439,6 +1157,36 @@ for i = 1:nCol                                                              %bet
         end
         k = k+1;
     end
+end
+
+% setting up state variable
+state = [nSC oSC nBC oBC nPl oPl];
+
+% setting up summary report
+sumMsg.totalPrb = nSC + nBC + nPl + oSC + oBC + oPl;                        %total number of "warnings"
+sumMsg.oSC      = oSC;
+sumMsg.nSc      = nSC;
+sumMsg.oBC      = oBC;
+sumMsg.nBC      = nBC;
+sumMsg.oPl      = oPl;
+sumMsg.nPl      = nPl;
+if sum(state) ~= 0                                                          %write out human readable string string for user
+    sumMsg.string   = {['In EdgCoord matrix from '...
+        mat2str(numel(EdgCoord(:,1))) ' images, there were found at total '...
+        mat2str(sumMsg.totalPrb) ' problems. Namely there were found:']...
+        [mat2str(oSC) ' outer values and ' mat2str(nSC)...
+        ' NaN in Small cuvettes edges estimation,']...
+        [mat2str(oBC) ' outer values and ' mat2str(nBC)...
+        ' NaN in Big cuvettes edges estimation and']...
+        [mat2str(oPl) ' outer values and ' mat2str(nPl)...
+        ' NaN in plate edges estimation.']};
+else
+    sumMsg.string = 'There were no problems found.';
+end
+
+% check prbMsg variable existence
+if exist('prbMsg','var') == 0
+    prbMsg = struct([]);
 end
 
 % setting up state variable
@@ -1504,7 +1252,7 @@ function EdgCoord = modifyFunction(metricdata)
 
 % check if it is necessary to run the function
 if isempty(metricdata.prbMsg) == 1                                          %no problem, than return
-    EdgeCoord = handles.metricdata.EdgCoord;                                %#ok<NASGU> %assign output variable
+    EdgCoord = metricdata.EdgCoord;                                         %assign output variable
     return
 end
 
@@ -1585,7 +1333,7 @@ switch choice
             for k = 1:numel(prbCoord(:,2));                                 %for all problems
                 i = prbCoord(k,1);j = prbCoord(k,2);                        %save indexes into temporary variables
                 if DNTLoadIM == 1                                           %if the images are not loaded, i need to get the image from directory
-                    tmpIM = imread([subsImDir imNames{1}]);                 %load image from directory with substracted images
+                    tmpIM = imread([subsImDir '/' imNames{1}]);             %load image from directory with substracted images
                 else
                     tmpIM = IMDataCell{i};                                  %else i can get it from handles
                 end
@@ -1757,282 +1505,6 @@ else
     set(o,'data',tableData);                                                %push data back to uitable
 end
 
-%% Copied functions, not my own
-function statusbarHandles = statusbar(varargin)
-%statusbar set/get the status-bar of Matlab desktop or a figure
-%
-%   statusbar sets the status-bar text of the Matlab desktop or a figure.
-%   statusbar accepts arguments in the format accepted by the <a href="matlab:doc sprintf">sprintf</a>
-%   function and returns the statusbar handle(s), if available.
-%
-%   Syntax:
-%      statusbarHandle = statusbar(handle, text, sprintf_args...)
-%
-%   statusbar(text, sprintf_args...) sets the status bar text for the
-%   current figure. If no figure is selected, then one will be created.
-%   Note that figures with 'HandleVisibility' turned off will be skipped
-%   (compare <a href="matlab:doc findobj">findobj</a> & <a href="matlab:doc findall">findall</a>).
-%   In these cases, simply pass their figure handle as first argument.
-%   text may be a single string argument, or anything accepted by sprintf.
-%
-%   statusbar(handle, ...) sets the status bar text of the figure
-%   handle (or the figure which contains handle). If the status bar was
-%   not yet displayed for this figure, it will be created and displayed.
-%   If text is not supplied, then any existing status bar is erased,
-%   unlike statusbar(handle, '') which just clears the text.
-%
-%   statusbar(0, ...) sets the Matlab desktop's status bar text. If text is
-%   not supplied, then any existing text is erased, like statusbar(0, '').
-%
-%   statusbar([handles], ...) sets the status bar text of all the
-%   requested handles.
-%
-%   statusbarHandle = statusbar(...) returns the status bar handle
-%   for the selected figure. The Matlab desktop does not expose its
-%   statusbar object, so statusbar(0, ...) always returns [].
-%   If multiple unique figure handles were requested, then
-%   statusbarHandle is an array of all non-empty status bar handles.
-%
-%   Notes:
-%      1) The format statusbarHandle = statusbar(handle) does NOT erase
-%         any existing statusbar, but just returns the handles.
-%      2) The status bar is 20 pixels high across the entire bottom of
-%         the figure. It hides everything between pixel heights 0-20,
-%         even parts of uicontrols, regardless of who was created first!
-%      3) Three internal handles are exposed to the user (Figures only):
-%         - CornerGrip: a small square resizing grip on bottom-right corner
-%         - TextPanel: main panel area, containing the status text
-%         - ProgressBar: a progress bar within TextPanel (default: invisible)
-%
-%   Examples:
-%      statusbar;  % delete status bar from current figure
-%      statusbar(0, 'Desktop status: processing...');
-%      statusbar([hFig1,hFig2], 'Please wait while processing...');
-%      statusbar('Processing %d of %d (%.1f%%)...',idx,total,100*idx/total);
-%      statusbar('Running... [%s%s]',repmat('*',1,fix(N*idx/total)),repmat('.',1,N-fix(N*idx/total)));
-%      existingText = get(statusbar(myHandle),'Text');
-%
-%   Examples customizing the status-bar appearance:
-%      sb = statusbar('text');
-%      set(sb.CornerGrip, 'visible','off');
-%      set(sb.TextPanel, 'Foreground',[1,0,0], 'Background','cyan', 'ToolTipText','tool tip...')
-%      set(sb, 'Background',java.awt.Color.cyan);
-%
-%      % sb.ProgressBar is by default invisible, determinite, non-continuous fill, min=0, max=100, initial value=0
-%      set(sb.ProgressBar, 'Visible','on', 'Minimum',0, 'Maximum',500, 'Value',234);
-%      set(sb.ProgressBar, 'Visible','on', 'Indeterminate','off'); % indeterminate (annimated)
-%      set(sb.ProgressBar, 'Visible','on', 'StringPainted','on');  % continuous fill
-%      set(sb.ProgressBar, 'Visible','on', 'StringPainted','on', 'string',''); % continuous fill, no percentage text
-%
-%      % Adding a checkbox
-%      jCheckBox = javax.swing.JCheckBox('cb label');
-%      sb.add(jCheckBox,'West');  % Beware: East also works but doesn't resize automatically
-%
-%   Technical description:
-%      http://UndocumentedMatlab.com/blog/setting-status-bar-text
-%      http://UndocumentedMatlab.com/blog/setting-status-bar-components
-%
-%   Notes:
-%     Statusbar will probably NOT work on Matlab versions earlier than 6.0 (R12)
-%     In Matlab 6.0 (R12), figure statusbars are not supported (only desktop statusbar)
-%
-%   Warning:
-%     This code heavily relies on undocumented and unsupported Matlab
-%     functionality. It works on Matlab 7+, but use at your own risk!
-%
-%   Bugs and suggestions:
-%     Please send to Yair Altman (altmany at gmail dot com)
-%
-%   Change log:
-%     2007-04-25: First version posted on MathWorks file exchange: <a href="http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=14773">http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=14773</a>
-%     2007-04-29: Added internal ProgressBar; clarified main comment
-%     2007-05-04: Added partial support for Matlab 6
-%     2011-10-14: Fix for R2011b
-%
-%   See also:
-%     ishghandle, sprintf, findjobj (on the <a href="http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=14317">file exchange</a>)
-
-% License to use and modify this code is granted freely without warranty to all, as long as the original author is
-% referenced and attributed as such. The original author maintains the right to be solely associated with this work.
-
-% Programmed and Copyright by Yair M. Altman: altmany(at)gmail.com
-% $Revision: 1.5 $  $Date: 2011/10/14 04:10:04 $
-
-    % Check for available Java/AWT (not sure if Swing is really needed so let's just check AWT)
-    if ~usejava('awt')
-        error('YMA:statusbar:noJava','statusbar only works on Matlab envs that run on java');
-    end
-
-    % Args check
-    if nargin < 1 | ischar(varargin{1})  %#ok for Matlab 6 compatibility
-        handles = gcf;  % note: this skips over figures with 'HandleVisibility'='off'
-    else
-        handles = varargin{1};
-        varargin(1) = [];
-    end
-
-    % Ensure that all supplied handles are valid HG GUI handles (Note: 0 is a valid HG handle)
-    if isempty(handles) | ~all(ishandle(handles))  %#ok for Matlab 6 compatibility
-        error('YMA:statusbar:invalidHandle','invalid GUI handle passed to statusbar');
-    end
-
-    % Retrieve the requested text string (only process once, for all handles)
-    if isempty(varargin)
-        deleteFlag = (nargout==0);
-        updateFlag = 0;
-        statusText = '';
-    else
-        deleteFlag = 0;
-        updateFlag = 1;
-        statusText = sprintf(varargin{:});
-    end
-
-    % Loop over all unique root handles (figures/desktop) of the supplied handles
-    rootHandles = [];
-    if any(handles)  % non-0, i.e. non-desktop
-        try
-            rootHandles = ancestor(handles,'figure');
-            if iscell(rootHandles),  rootHandles = cell2mat(rootHandles);  end
-        catch
-            errMsg = 'Matlab version is too old to support figure statusbars';
-            % Note: old Matlab version didn't have the ID optional arg in warning/error, so I can't use it here
-            if any(handles==0)
-                warning([errMsg, '. Updating the desktop statusbar only.']);  %#ok for Matlab 6 compatibility
-            else
-                error(errMsg);
-            end
-        end
-    end
-    rootHandles = unique(rootHandles);
-    if any(handles==0), rootHandles(end+1)=0; end
-    statusbarObjs = handle([]);
-    for rootIdx = 1 : length(rootHandles)
-        if rootHandles(rootIdx) == 0
-            setDesktopStatus(statusText);
-        else
-            thisStatusbarObj = setFigureStatus(rootHandles(rootIdx), deleteFlag, updateFlag, statusText);
-            if ~isempty(thisStatusbarObj)
-                statusbarObjs(end+1) = thisStatusbarObj;
-            end
-        end
-    end
-
-    % If statusbarHandles requested
-    if nargout
-        % Return the list of all valid (non-empty) statusbarHandles
-        statusbarHandles = statusbarObjs;
-    end
-
-%end  % statusbar  %#ok for Matlab 6 compatibility
-
-% Set the status bar text of the Matlab desktop
-function setDesktopStatus(statusText)
-    try
-        % First, get the desktop reference
-        try
-            desktop = com.mathworks.mde.desk.MLDesktop.getInstance;      % Matlab 7+
-        catch
-            desktop = com.mathworks.ide.desktop.MLDesktop.getMLDesktop;  % Matlab 6
-        end
-
-        % Schedule a timer to update the status text
-        % Note: can't update immediately, since it will be overridden by Matlab's 'busy' message...
-        try
-            t = timer('Name','statusbarTimer', 'TimerFcn',{@setText,desktop,statusText}, 'StartDelay',0.05, 'ExecutionMode','singleShot');
-            start(t);
-        catch
-            % Probably an old Matlab version that still doesn't have timer
-            desktop.setStatusText(statusText);
-        end
-    catch
-        %if any(ishandle(hFig)),  delete(hFig);  end
-        error('YMA:statusbar:desktopError',['error updating desktop status text: ' lasterr]);
-    end
-%end  %#ok for Matlab 6 compatibility
-
-% Utility function used as setDesktopStatus's internal timer's callback
-function setText(varargin)
-    if nargin == 4  % just in case...
-        targetObj  = varargin{3};
-        statusText = varargin{4};
-        targetObj.setStatusText(statusText);
-    else
-        % should never happen...
-    end
-%end  %#ok for Matlab 6 compatibility
-
-% Set the status bar text for a figure
-function statusbarObj = setFigureStatus(hFig, deleteFlag, updateFlag, statusText)
-    try
-        jFrame = get(handle(hFig),'JavaFrame');
-        jFigPanel = get(jFrame,'FigurePanelContainer');
-        jRootPane = jFigPanel.getComponent(0).getRootPane;
-
-        % If invalid RootPane, retry up to N times
-        tries = 10;
-        while isempty(jRootPane) & tries>0  %#ok for Matlab 6 compatibility - might happen if figure is still undergoing rendering...
-            drawnow; pause(0.001);
-            tries = tries - 1;
-            jRootPane = jFigPanel.getComponent(0).getRootPane;
-        end
-        jRootPane = jRootPane.getTopLevelAncestor;
-
-        % Get the existing statusbarObj
-        statusbarObj = jRootPane.getStatusBar;
-
-        % If status-bar deletion was requested
-        if deleteFlag
-            % Non-empty statusbarObj - delete it
-            if ~isempty(statusbarObj)
-                jRootPane.setStatusBarVisible(0);
-            end
-        elseif updateFlag  % status-bar update was requested
-            % If no statusbarObj yet, create it
-            if isempty(statusbarObj)
-               statusbarObj = com.mathworks.mwswing.MJStatusBar;
-               jProgressBar = javax.swing.JProgressBar;
-               jProgressBar.setVisible(false);
-               statusbarObj.add(jProgressBar,'West');  % Beware: East also works but doesn't resize automatically
-               jRootPane.setStatusBar(statusbarObj);
-            end
-            statusbarObj.setText(statusText);
-            jRootPane.setStatusBarVisible(1);
-        end
-        statusbarObj = handle(statusbarObj);
-
-        % Add quick references to the corner grip and status-bar panel area
-        if ~isempty(statusbarObj)
-            addOrUpdateProp(statusbarObj,'CornerGrip',  statusbarObj.getParent.getComponent(0));
-            addOrUpdateProp(statusbarObj,'TextPanel',   statusbarObj.getComponent(0));
-            addOrUpdateProp(statusbarObj,'ProgressBar', statusbarObj.getComponent(1).getComponent(0));
-        end
-    catch
-        try
-            try
-                title = jFrame.fFigureClient.getWindow.getTitle;
-            catch
-                title = jFrame.fHG1Client.getWindow.getTitle;
-            end
-        catch
-            title = get(hFig,'Name');
-        end
-        error('YMA:statusbar:figureError',['error updating status text for figure ' title ': ' lasterr]);
-    end
-%end  %#ok for Matlab 6 compatibility
-
-% Utility function: add a new property to a handle and update its value
-function addOrUpdateProp(handle,propName,propValue)
-    try
-        if ~isprop(handle,propName)
-            schema.prop(handle,propName,'mxArray');
-        end
-        set(handle,propName,propValue);
-    catch
-        % never mind... - maybe propName is already in use
-        %lasterr
-    end
-%end  %#ok for Matlab 6 compatibility
-
 %% Menus
 % --------------------------------------------------------------------
 function FileMenu_Callback(hObject, eventdata, handles)
@@ -2128,11 +1600,13 @@ if exist('EdgCoord','var') == 0
         'Loading EdgCoord from file failed.');
 else
     handles.metricdata.EdgCoord = EdgCoord;
-    handles.prgmcontrol= prgmcontrol;
     set(handles.statusbar,'Text',...
         ['User defined variables were loaded from file.'...
         ' EdgCoord is prepared for rivulet processing.']);
 end
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
 
 
 % --------------------------------------------------------------------
@@ -2153,6 +1627,26 @@ function BestMethod_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+handles.prgmcontrol.autoEdges = 3;                                          %force completely automatic method
+
+% call function findEdges and save output into handles
+handles.metricdata.EdgCoord = findEdges(handles);
+
+% call control function
+[state,prbMsg,sumMsg] = controlFunction(handles.metricdata.EdgCoord);
+
+% save output parameters into handles
+handles.metricdata.state = state;
+handles.metricdata.prbMsg= prbMsg;
+handles.metricdata.sumMsg= sumMsg;
+
+% modify potential mistakes
+handles.metricdata.EdgCoord = modifyFunction(handles.metricdata);           %call modifyFunction with handles.metricdata input
+set(handles.statusbar,'Text','EdgCoord is prepared for rivulet processing');%update statusbar
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
 
 % --------------------------------------------------------------------
 function QuitPrgm_Callback(hObject, eventdata, handles)
@@ -2160,3 +1654,22 @@ function QuitPrgm_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 close(handles.MainWindow);                                                  %call closing function
+
+
+% --------------------------------------------------------------------
+function rivProcMenu_Callback(hObject, eventdata, handles)
+% hObject    handle to rivProcMenu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function ModExpPars_Callback(hObject, eventdata, handles)
+% hObject    handle to ModExpPars (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+handles.metricdata.RivProcPars = changeRPPars;                              %call gui for changing parameters
+
+% Update handles structure
+guidata(handles.MainWindow, handles);

@@ -38,9 +38,9 @@ nBC  = 0; oBC = 0;
 nPl  = 0; oPl = 0;
 for i = 1:nCol                                                              %better to do for each column separately(remove only parts of NaN row)
     tmpVar = EdgCoord(:,i);                                                 %reduce input matrix only to i-th column
-    % find NaN values in the EdgCoord matrix
-    INaN = find(isnan(EdgCoord) == 1);
-    tmpVar(any(isnan(tmpVar)'),:) = [];                                     %remove rows with NaN in them
+    % find NaN values in the ith column of EdgCoord matrix
+    INaN = find(isnan(EdgCoord(:,i)) == 1);
+    tmpVar = tmpVar(isnan(tmpVar) == 0);                                     %remove rows with NaN in them
     % calculate standard deviation of each column of EdgCoord
     coordSTD= std(tmpVar);
     coordMU = mean(tmpVar);                                                 %mean value in each column
@@ -58,12 +58,12 @@ for i = 1:nCol                                                              %bet
     Iout    = find(outliers == 1);                                          %find position of outliers
     % translate the Iout for each found NaN
     if isempty(INaN) == 0
-        for j = INaN
+        for j = 1:numel(INaN)
             Iout(Iout>=INaN(j)) = Iout(Iout>=INaN(j))+1;                    %must add 1 for every left out row
         end
     end
     % write out messages for the column
-    Iwr = [Iout INaN];
+    Iwr = [Iout;INaN];
     for j = 1:length(Iwr)                                                   %for all problems
         prbMsg(k).coords = [Iwr(j) i];                                      %coordinates of the problem in the EdgCoord matrix
         prbMsg(k).nImg   = Iwr(j);                                          %number of problematic image
