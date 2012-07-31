@@ -208,7 +208,17 @@ function modData = openUITable(hFig,EdgCoord,prbCoord,coefVec,allowEdit)
 % OUTPUT variables
 %
 
-tmpMat = [EdgCoord;round(mean(EdgCoord));kurtosis(EdgCoord);...             %tmpMat with mean value, kurtosis and used coefficient for finding
+% calculate mean values of not-NaN and not-outliers for each column
+meanVals = round(mean(EdgCoord));                                           %calculate mean for all values
+tmpVec= unique(prbCoord(:,2));
+for j = 1:numel(tmpVec)                                                     %for every column with problem
+    i = tmpVec(j);
+    meanVals(i) =...
+       round(mean(removerows(EdgCoord(:,i),prbCoord(prbCoord(:,2) == i)))); %remove all the NaN and outliers from mean value estimation
+end
+
+% construct temporary matrix for writing
+tmpMat = [EdgCoord;meanVals;kurtosis(EdgCoord);...                          %tmpMat with mean value, kurtosis and used coefficient for finding
     coefVec];                                                               %outliers in each column
 tmpMat = reshape(strtrim(cellstr(num2str(tmpMat(:)))), size(tmpMat));
 for i = 1:numel(prbCoord(:,1))

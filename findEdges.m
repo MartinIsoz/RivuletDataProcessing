@@ -190,26 +190,33 @@ EdgCoord = zeros(nImages,10);                                        %OUTPUT var
 % Position of the plate differs one measurement to another, so I have to
 % ask the user to specify approximate position of the plate on the
 % precessed images
-options.Interpreter = 'tex';
-options.WindowStyle = 'modal';
-msgbox({['Please specify approximate position of the'...
-    ' plate on processed images']...
-    ['Click little bit outside of {\bf upper left} '...
-    'and {\bf lower right corner}']},options);uiwait(gcf);
 se      = strel('disk',12);                                                 %morphological structuring element
-if DNTLoadIM == 1                                                           %if the images are not loaded, i need to get the image from directory
-    tmpIM = imread([subsImDir '/' imNames{1}]);                             %load image from directory with substracted images
-else
-    tmpIM = ImDataCell{1};                                                  %else i can get it from handles
+if isfield(handles.metricdata,'AppPlatePos') == 0                           %approximate plate edges are not yet specified
+    options.Interpreter = 'tex';
+    options.WindowStyle = 'modal';
+    msgbox({['Please specify approximate position of the'...
+        ' plate on processed images']...
+        ['Click little bit outside of {\bf upper left} '...
+        'and {\bf lower right corner}']},options);uiwait(gcf);
+    if DNTLoadIM == 1                                                       %if the images are not loaded, i need to get the image from directory
+        tmpIM = imread([subsImDir '/' imNames{1}]);                         %load image from directory with substracted images
+    else
+        tmpIM = ImDataCell{1};                                              %else i can get it from handles
+    end
+    tmpIM   = imtophat(tmpIM,se);
+    tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                %enhance contrasts
+    tmpIM   = im2bw(tmpIM,0.16);                                            %conversion to black and white
+    set(handles.statusbar,'Text','Waiting for user response');              %update statusbar
+    figure;imshow(tmpIM);                                                   %show image to work with
+    cutMat  = round(ginput(2));close(gcf);                                  %let the user specify approximate position of the plate
+    cutLeft = cutMat(1,1);cutRight = cutMat(2,1);
+    cutTop  = cutMat(1,2);cutBottom= cutMat(2,2);                           %cut out \pm the plate (less sensitive than exact borders)
+else                                                                        %otherwise, I can load it from handles structure
+    cutLeft = handles.metricdata.AppPlatePos(1);
+    cutTop  = handles.metricdata.AppPlatePos(2);
+    cutRight= handles.metricdata.AppPlatePos(3);
+    cutBottom=handles.metricdata.AppPlatePos(4);
 end
-tmpIM   = imtophat(tmpIM,se);
-tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                    %enhance contrasts
-tmpIM   = im2bw(tmpIM,0.16);                                                %conversion to black and white
-set(handles.statusbar,'Text','Waiting for user response');                  %update statusbar
-figure;imshow(tmpIM);                                                       %show image to work with
-cutMat  = round(ginput(2));close(gcf);                                      %let the user specify approximate position of the plate
-cutLeft = cutMat(1,1);cutRight = cutMat(2,1);
-cutTop  = cutMat(1,2);cutBottom= cutMat(2,2);                               %cut out \pm the plate (less sensitive than exact borders)
 trnVec  = [cutLeft cutTop cutLeft cutTop];                                  %translation vector for moving the found coordinates
 epsX    = 15; epsY     = 15;                                                %maximal non-verticality/non-horizontality of found lines
 edgXL   = round((cutRight - cutLeft)*0.10);                                 %max. distance from left edge of the picture

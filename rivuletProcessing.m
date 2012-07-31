@@ -62,6 +62,16 @@ function OUT = rivuletProcessing(handles)
 %                   - InclAngle, inclination angle of the plate
 %                     default: 60 (in degrees)
 %
+% => in handles.prgmcontrl
+% GR        ...     structure with graphics output specifications
+%   required fields:
+%                   - GR.regr       = 0/1 - graphs from regression
+%                   - GR.contour    = 0/1 - view from top
+%                   - GR.profcompl  = 0/1 - complete profile
+%                   - GR.profcut    = 0/1 - mean profiles in cuts
+%                   - GR.regime     = 0/1/2 - show/save/show+save
+%                   - GR.format     = string - format for SAVEAS
+%
 % OUTPUTS - text files
 % a. text file for plotting profiles - cuts
 %    1 file for each image
@@ -164,7 +174,7 @@ if DNTLoadIM == 0                                                           %are
         ['Converting grayscale values into distances for all images ',...   %updating th statusbar
         'loaded in memory']);
     YProfilPlatte = ImConv(daten,EdgCoord,filmTh,RegressionPlate,...        %if the are, I can process them all at once
-        GR.regr,GR.regime,storDir,rootDir);
+        GR.regr,GR.regime,GR.format,storDir,rootDir);
     tmpCell = cell(size(YProfilPlatte));                                    %create empty cell
     tmpCell(:) = {fspecial('disk',FilterSensitivity)};
     YProfilPlatte = cellfun(@imfilter,YProfilPlatte,...                     %apply selected filter to YProfilPlatte
@@ -186,7 +196,7 @@ else                                                                        %oth
             'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
         tmpIM = {imread([subsImDir '/' files{i}])};                         %load image from substracted directory and save it as cell
         tmpIM = ImConv(tmpIM,EdgCoord,filmTh,RegressionPlate,...            %convert it to distances
-            GR.regr,GR.regime,storDir,rootDir,i);
+            GR.regr,GR.regime,GR.format,storDir,rootDir,i);
         tmpIM = imfilter(tmpIM{:},...                                       %use selected filter
             fspecial('disk',FilterSensitivity));
         imwrite(tmpIM,[smImDir '/' files{i}]);                              %save it into 'Smoothed' folder (but under original name)
@@ -223,7 +233,8 @@ if GR.contour == 1 || GR.regime == 1                                        %if 
             ylabel(colbarh,'rivulet height, [mm]')                          %set units to colorbar
             axis ij                                                         %switch axis to match photos
             if GR.regime ~= 0                                               %if I want to save the images
-                saveas(gcf,[plotDir '/riv' mat2str(i) 'fromtop'],'png');
+                saveas(gcf,[plotDir '/riv' mat2str(i) 'fromtop'],...
+                    GR.format);
                 if GR.regime == 1                                           %I want images only to be saved
                     close(gcf)
                 end
@@ -243,7 +254,8 @@ if GR.contour == 1 || GR.regime == 1                                        %if 
             zlabel('height of the rivulet, [mm]')
             title(['\bf Profile of the rivulet ' mat2str(i)],'FontSize',13);
             if GR.regime ~= 0                                               %if I want to save the images
-                saveas(gcf,[plotDir '/riv' mat2str(i) 'complprof'],'png');
+                saveas(gcf,[plotDir '/riv' mat2str(i) 'complprof'],...
+                    GR.format);
                 if GR.regime == 1                                           %I want images only to be saved
                     close(gcf)
                 end
@@ -290,13 +302,13 @@ if DNTLoadIM == 1
             'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
         load([tmpfDir '/' files{i}(1:end-4) '.mat']);                       %if images are not present in handles, load them from tmpfDir
         [YProfilPlatte(i),XProfilPlatte]=cutRiv({tmpIM'},nCuts,plateSize,...%call with calculation variables
-            GR.profcut,GR.regime,storDir,rootDir,i);                        %auxiliary variables for graphics and data manipulation
+            GR.profcut,GR.regime,GR.format,storDir,rootDir,i);              %auxiliary variables for graphics and data manipulation
     end
-    rmdir(tmpfDir,'s');                                                    %remove unnecessary temporary folder
+    rmdir(tmpfDir,'s');                                                     %remove unnecessary temporary folder with all contents
 else
     set(handles.statusbar,'Text','Calculating mean profiles along the rivulets');%update statusbar
     [YProfilPlatte,XProfilPlatte]=cutRiv(YProfilPlatte,nCuts,plateSize,...  %call with calculation variables
-        GR.profcut,GR.regime,storDir,rootDir);                              %auxiliary variables for graphics and data manipulation
+        GR.profcut,GR.regime,GR.format,storDir,rootDir);                    %auxiliary variables for graphics and data manipulation
 end
 
 %% Calculate variables to be saved, mean values in each cut
@@ -339,36 +351,34 @@ cd([storDir '/Profile'])
 % in 1 file for each image, i will save:
 % impairs columns: x-coordinates
 % pairs   columns: heights of the rivulet correspondings to the x-coord.
-saveProf(XProfilPlatte,YProfilPlatte,minLVec,minRVec,files)
+OUT.Profiles = saveProf(XProfilPlatte,YProfilPlatte,minLVec,minRVec,files);
 cd(rootDir)
 
 sPars = {M plateSize nCuts};                                                %common variables for all saved files
 
 % 2. Local mean speed in cuts
 cd([storDir '/Speed'])
-saveMatSliced(mSpeed,sPars,files,'Speed')
+OUT.mSpeed = saveMatSliced(mSpeed,sPars,files,'Speed');
 cd(rootDir)
 
 % 3. Width of the rivulets (local)
 cd([storDir '/Width'])
-saveMatSliced(RivWidth2,sPars,files,'Width')
+OUT.RivWidth = saveMatSliced(RivWidth2,sPars,files,'Width');
 cd(rootDir)
 
 % 4. Max height of the rivulets
 cd([storDir '/Height'])
-saveMatSliced(RivHeight2,sPars,files,'Height')
+OUT.RivHeight = saveMatSliced(RivHeight2,sPars,files,'Height');
 cd(rootDir)
 
 % 5. Interfacial area of the rivulets
 cd([storDir '/Correlation'])
 varIN = {sigma rho eta M InclAngle};                                        %input variables for correlation
 varOUT= IFArea;                                                             %output variable for correlation
-saveCorrData(varOUT,varIN,'IFAreaCorr')
+OUT.IFACorr = saveCorrData(varOUT,varIN,'IFAreaCorr');
 cd(rootDir)
 
 set(handles.statusbar,'Text','Rivulet processing ended succesfully');
-
-OUT = 0;                                                                    %currently unused output variable
 end
 
 
@@ -378,10 +388,10 @@ end
 % 21/11/2011, rewritten July 2012, by Martin Isoz
 
 function ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
-    GR,GRregime,storDir,rootDir,imNumber)
+    GR,GRregime,GRformat,storDir,rootDir,imNumber)
 %
 %   ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
-%    GR,GRregime,storDir,rootDir,[imNumber])
+%    GR,GRregime,GRformat,storDir,rootDir,[imNumber])
 %
 % function for conversion images from grayscale to distances using
 % polynomial regression with polynomial of degree specified in RegDegree
@@ -395,6 +405,7 @@ function ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
 % RegDegree ... degree of polynomial used for the regression
 % GR                ... variable for graphics (yes/no)
 % GRregime          ... variable for graphics (show/save/show+save)
+% GRformat          ... format of save graphics (compatible with SAVEAS)
 % storDir           ... directory for storing outputs
 % rootDir           ... main execution directory
 % imNumber  ... optional input parameter, if the images are processed 1 by
@@ -480,7 +491,7 @@ for i = 1:numel(ImData)                                                     %for
         ylabel('height of the liquid, mm')
         if GRregime ~= 0                                                    %if I want to save the images
             cd([storDir '/Plots']);
-            saveas(gcf,['riv' mat2str(imNumber) 'regrstate'],'png');
+            saveas(gcf,['riv' mat2str(imNumber) 'regrstate'],GRformat);
             if GRregime == 1                                                %I want images only to be saved
                 close(gcf)
             end
@@ -528,10 +539,10 @@ end
 %% Function for cutting rivulet into nCuts parts along the vertical
 %% coordinate (Z)
 function [YProfilPlatte XProfilPlatte] =...
-    cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,storDir,rootDir,imNumber)
+    cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,GRformat,storDir,rootDir,imNumber)
 %
 %   [YProfilPlatte XProfilPlatte] =...
-%       cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,storDir,rootDir,imNumber)
+%       cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,GRformat,storDir,rootDir,imNumber)
 %
 % INPUT variables
 % YProfilPlatte     ... variable with heights of the rivulet
@@ -539,6 +550,7 @@ function [YProfilPlatte XProfilPlatte] =...
 % plateSize         ... size of the plate [width length], in m
 % GR                ... variable for graphics (yes/no)
 % GRregime          ... variable for graphics (show/save/show+save)
+% GRformat          ... format of saved graphics (compatible with SAVEAS)
 % storDir           ... directory for storing outputs
 % rootDir           ... main execution directory
 % imNumber          ... optional arguments, if the images are processed 1
@@ -590,7 +602,7 @@ for i=1:numel(YProfilPlatte)
         set(ttl,'FontSize',13,'Interpreter','tex')
         if GRregime ~= 0                                                    %if I want to save the images
             cd([storDir '/Plots']);
-            saveas(gcf,['riv' mat2str(imNumber) 'cutprof'],'png');
+            saveas(gcf,['riv' mat2str(imNumber) 'cutprof'],GRformat);
             if GRregime == 1                                                %I want images only to be saved
                 close(gcf)
             end
@@ -629,6 +641,9 @@ function [IFArea RivWidth RivHeight minLVec minRVec] = ...
 % dimensions (as a results of automatic plate size estimation)
 % => very carefully control the code for obtaining the interfacial area
 
+% processing input
+Treshold= Treshold*1e-3;                                                    %convert treshold to m
+
 % allocating space for variables
 m = 0;n = 0;
 mVec = zeros(1,numel(YProfilPlatte));nVec = mVec;
@@ -646,35 +661,40 @@ for i = 1:numel(YProfilPlatte)
     % calculating the deltaX (distance between 2 pixels)
     deltaX  = plateSize(1)/mVec(i);                                         %distance between 2 points on X-axis (in m)
     deltaZ  = plateSize(2)/nVec(i);                                         %distance between 2 points on Z-axis (in m)
+    YProfilPlatte{i} = YProfilPlatte{i}*1e-3;                               %mm -> m
     
+    % find width of the rivulet
     [MaxVec,IndX] = max(YProfilPlatte{i});                                  %find maximum in every horizontal row and save its position
-    dummyL        = YProfilPlatte{i}(1:max(IndX),:);                        %left side of the rivulet (in the middle, they are superposed)
-    dummyR        = YProfilPlatte{i}(min(IndX):end,:);                      %right side of the rivulet
     for j = 1:numel(MaxVec)
-        tmpIndL      = find(dummyL(:,j) >= Treshold,1,'first');             %find the first element bigger then Treshold (search from L->R)
-        tmpIndR      = find(dummyR(:,j) <= Treshold,1,'first');             %find the first element lower then Treshold
-        if isempty(tmpIndL) == 1                                            %low treshold
-            tmpIndL = 1;
-            warning('Pers:HoPiR',['Treshold is lower than liquid heigh'...
+        tmpVecL      = YProfilPlatte{i}(1:IndX(j),j);                       %left side of the rivulet
+        tmpVecR      = YProfilPlatte{i}(IndX(j)+1:end,j);                   %right side of the rivulet
+        tmpIndL      = find(tmpVecL >= Treshold,1,'first');                 %find the first element bigger then Treshold (search from L->R)
+        tmpIndR      = find(tmpVecR <= Treshold,1,'first');                 %find the first element lower then Treshold
+        if isempty(tmpIndL) == 1                                            %there werent found any value higher then treshold on left side of r.
+            tmpIndL = numel(tmpVecL);
+            warning('Pers:LoPiL',['Treshold is higher than liquid heigh'...
                 ' for all the left side of the rivulet'])
-        elseif isempty(tmpIndR) == 1
-            tmpIndR = numel(dummyR(:,j));
+        elseif isempty(tmpIndR) == 1                                        %there werent found any value lower than treshold on right side of r.
+            tmpIndR = numel(tmpVecR);
             warning('Pers:HoPiR',['Treshold is lower than liquid heigh'...
+                ' for all the right side of the rivulet'])
+        elseif tmpIndL == 1                                                 %first value bigger than treshold is first value on the plate
+            warning('Pers:HoPiL',['Treshold is lower than liquid heigh'...
+                ' for all the left side of the rivulet'])
+        elseif tmpIndR == 1                                                 %first value of the right side of the rivulet is smaller than Tr.
+            warning('Pers:LoPiR',['Treshold is higher than liquid heigh'...
                 ' for all the right side of the rivulet'])
         end
         minLVec(i,j) = tmpIndL;
-        minRVec(i,j) = tmpIndR;
+        minRVec(i,j) = tmpIndR + numel(tmpVecL);                            %I need to add length of the left side of the rivulet
     end
-    minRVec(i,:) = minRVec(i,:)+(mVec(i)-size(dummyR,1));                   %need to move right side of the rivulet by the length of skipped ind.
 
-    % calculate local widths of i-th rivulet
+    % calculate local widths and heights of i-th rivulet
     RivWidth(i,:) = (minRVec(i,:) - minLVec(i,:))*deltaX;                   %number of elements in rivulet x width of element
+    RivHeight(i,1:nVec(i))  = MaxVec;                                       %saves maximum height of each part of the rivulet, in m
     
     % calculate the interfacial area of the rivulet
     % IFArea = lengthOfArc x lengthOfPlate(between 2 arcs)
-    % convert YProfilPlatte to m
-    YProfilPlatte{i}        = YProfilPlatte{i}*1e-3;                        %mm -> m
-    RivHeight(i,1:nVec(i))  = max(YProfilPlatte{i});                        %saves maximum height of each part of the rivulet
     
     % for all horizontal cuts
     for j = 1:nVec(i)-1                                                     %need to omit the last piece (but the error wouldn't be big)
@@ -699,11 +719,13 @@ end
 end
 
 %% Functions for saving files
-function saveProf(XProfilPlatte,YProfilPlatte,minLVec,minRVec,files)
+function ProfOUT = saveProf(XProfilPlatte,YProfilPlatte,minLVec,minRVec,files)
 %
-%   function saveProf(XProfilPlatte,YProfilPlatte,files)
+%   ProfOUT = function saveProf(XProfilPlatte,YProfilPlatte,files)
 %
 % function for saving X and Y profiles on the plate into the file
+%
+% INPUT variables
 % XProfilPlatte ... vector containing linspace which defines distances on
 %                   the x-axes of the plate (width)
 % YProfilPlatte ... cell (numel(YPP) = number of images, local heights of
@@ -711,11 +733,19 @@ function saveProf(XProfilPlatte,YProfilPlatte,minLVec,minRVec,files)
 % minLVec,minRVec.. vectors containig indexes of edges of the rivulet
 % files         ... cell containing the names of analyzed images
 %
+% OUTPUT variables
+% ProfOUT       ... cell with profiles for the each image
+%
+% OTHER OUTPUTS
 % function creates files with names corresponding to names of the images
 % and saves there X-Y profile on the plate
 % impairs columns: x-coordinates
 % pairs   columns: heights of the rivulet correspondings to the x-coord.
 
+% preallocate output variable
+ProfOUT = cell(1,numel(YProfilPlatte));
+
+% save data and fill in output
 for i = 1:numel(YProfilPlatte)                                              %1 file for each image
     widthF  = size(YProfilPlatte{i},2)*2;                                   %width of the file (number of columns)
     lengthF = max(minRVec(i,:)) - min(minLVec(i,:))+1;                      %length of the file (number of rows)
@@ -735,12 +765,13 @@ for i = 1:numel(YProfilPlatte)                                              %1 f
     clear k                                                                 %get rid of temp index
     nameStr = [files{i}(1:end-4) '.txt'];                                   %constructuin of the name string - name of the file \ .tif
     dlmwrite(nameStr,tmp,'delimiter','\t','precision','%5.6e')              %save data, in m
+    ProfOUT{i} = tmp;                                                       %save created matrix also in output
 end
 end
 
-function saveMatSliced(Var,Pars,files,fileNm)
+function VarOUT = saveMatSliced(Var,Pars,files,fileNm)
 %
-%   function saveMatSliced(Var,Pars,files,fileNm)
+%   VarOUT = function saveMatSliced(Var,Pars,files,fileNm)
 %
 % function for saving matrix-forme variables into different files depending
 % on the pumpe/flow regime
@@ -758,6 +789,10 @@ function saveMatSliced(Var,Pars,files,fileNm)
 % files ... cell of filenames of analyzed images
 %           every filename must have structure ddd_ddd.tif (d - digit)
 % fileNm... filename, string
+%
+% OUTPUT variables
+% VarOUT... cell with matrix for all regimes
+%
 % !! saving locations must be handled outside this function !! -
 % unnecessary junk
 
@@ -779,6 +814,10 @@ for i = 1:numel(files)
     slInd      = [find(tmpVec == 1) numel(tmpVec)+1];                       %find slicing indexes, last index must be length of Vec + 1
 end
 
+% preallocate output variable
+VarOUT = cell(1,length(slInd)-1);
+
+% create data files and fill in output
 for i = 1:length(slInd)-1                                                   %for every regime
     tmpMat  = [Var(slInd(i):slInd(i+1)-1,:)' zeros(n,1) ...                 %base variable data
         mean(Var(slInd(i):slInd(i+1)-1,:),1)'...                            %mean values for each cut
@@ -787,12 +826,13 @@ for i = 1:length(slInd)-1                                                   %for
         DistVec'];
     nameStr = [fileNm '_' files{slInd(i)}(1:3) '.txt'];                     %create filename
     dlmwrite(nameStr,tmpMat,'delimiter','\t','precision','%5.6e')           %write write data matrix into file, SI unist
+    VarOUT{i} = tmpMat;                                                     %save i-th regime into cell output
 end
 end
 
-function saveCorrData(varOUT,varIN,fileNM)
+function CorMat = saveCorrData(varOUT,varIN,fileNM)
 %
-%  saveCorrData(varOUT,varIN,fileNM)
+%  CorMat = saveCorrData(varOUT,varIN,fileNM)
 %
 % function for saving data for contstruction of correlations
 %
@@ -800,6 +840,9 @@ function saveCorrData(varOUT,varIN,fileNM)
 % varOUT    ... output variables for correlation (ie IFArea)
 % varIN     ... input variables for correlations (ie sigma, eta, M)
 % fileNM    ... name of output file, fileNM.txt
+%
+% OUTPUT variables
+% CorMat    ... data matrix with the same structure as output file 
 %
 % file has structure of:
 % varIN \t varOUT
@@ -811,17 +854,18 @@ function saveCorrData(varOUT,varIN,fileNM)
 
 % processing input
 numRows = size(varOUT,1);                                                   %number of rows in output variable
-tmpMat  = zeros(numRows,numel(varIN) + size(varOUT,2));
+CorMat  = zeros(numRows,numel(varIN) + size(varOUT,2));
 for i = 1:numel(varIN)
     if size(varIN{i},2) == 1                                                %scalar value
-        tmpMat(1:numRows,i) = varIN{i};                                     %write the same value in all fields
+        CorMat(1:numRows,i) = varIN{i};                                     %write the same value in all fields
     else
-        tmpMat(:,i) = varIN{i};
+        CorMat(:,i) = varIN{i};
     end
 end
-tmpMat(:,numel(varIN)+1:end) = varOUT;
+CorMat(:,numel(varIN)+1:end) = varOUT;
 
-dlmwrite(fileNM,tmpMat,'delimiter','\t','precision','%5.6e')                %write write data matrix into file, SI unist
+dlmwrite(fileNM,CorMat,'delimiter','\t','precision','%5.6e')                %write write data matrix into file, SI unist
+
 end
 
 %% Functions for Graphics

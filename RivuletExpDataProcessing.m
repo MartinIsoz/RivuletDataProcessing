@@ -86,7 +86,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 % Edit the above text to modify the response to help
 % RivuletExpDataProcessing
 
-% Last Modified by GUIDE v2.5 30-Jul-2012 16:09:23
+% Last Modified by GUIDE v2.5 31-Jul-2012 16:22:50
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -302,6 +302,9 @@ msgbox({'Background is loaded,'...
             start_path);
 if imDir ~= 0                                                               %basic input control
     subsImDir = [storDir '/Subtracted'];                                    %directory with subtracted images
+if isa(imNames,'char') == 1
+    imNames = {imNames};                                                    %if only 1 is selected, convert to cell
+end
 for i = 1:numel(imNames)
     tmpIM = imread([imDir '/' imNames{i}]);                                 %load images from selected directory
     tmpIM = imsubtract(tmpIM,bgImage);                                      %subtract background from image
@@ -697,6 +700,8 @@ selected = contents{get(hObject,'Value')};                                  %get
 
 % save selected value to handles
 switch selected
+    case 'Force-automatic'
+        handles.prgmcontrol.autoEdges = 3;                                  % 3 ... automatically skiping not specified edges
     case 'Automatic'
         handles.prgmcontrol.autoEdges = 2;                                  % 2 ... completely automatic finding
     case 'Semi-automatic'
@@ -810,6 +815,36 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
+% --- Executes on selection change in PopupGrFormat.
+function PopupGrFormat_Callback(hObject, eventdata, handles)
+% hObject    handle to PopupGrFormat (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns PopupGrFormat contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from PopupGrFormat
+
+contents = cellstr(get(hObject,'String'));
+selected = contents{get(hObject,'Value')};                                  %get selected value from popmenu
+
+handles.prgmcontrol.GR.format = selected;                                   %save selected format for later use
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+% --- Executes during object creation, after setting all properties.
+function PopupGrFormat_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to PopupGrFormat (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
 
 %% Checkboxes - Rivulet processing
 
@@ -902,11 +937,24 @@ if isfield(handles.metricdata,'EdgCoord') == 0                              %if 
         msgbox(['There are no edges of cuvettes'...
             ' and plate specified'],'modal');uiwait(gcf);
 else                                                                        %otherwise call the rivuletProcessing function
-    handles.metricdata.RivProcPars = [];                                    %temporary, until gui will be written
-    rivuletProcessing(handles);
+    handles.metricdata.OUT = rivuletProcessing(handles);
     
-    msgbox('Program succesfully ended','modal');uiwait(gcf);
+    % set GUI
+    msgbox('Program succesfully ended','modal');uiwait(gcf);                %inform user about ending
+    set(handles.statusbar,'Text',['Program succesfully ended. '...          %update statusbar
+        'Data for postprocessing are availible']);
+    
+    % create list for listboxes
+    liststr = cell(1,numel(handles.metricdata.imNames));
+    for i = 1:numel(liststr)
+        liststr{i} = handles.metricdata.imNames{i}(1:end-4);                %I dont want the .tif extension at the end of imNames
+    end
+    set(handles.ListProfiles,'String',liststr);                             %for each image, there is now availible profile
+    
 end
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
 
 
 
@@ -923,6 +971,9 @@ handles.prgmcontrol.GR.contour  = 0;
 handles.prgmcontrol.GR.profcompl= 0;
 handles.prgmcontrol.GR.profcut  = 0;
 handles.prgmcontrol.GR.regime   = 1;                                        %want only to save images
+handles.prgmcontrol.GR.format   = 'png';                                    %default format for graphics saving
+set(handles.PopupLiqType,'Value',1);                                        %select 1 choice
+%
 minVal = get(handles.CheckCuvRegrGR,'Min');                                 %uncheck checkboxes
 set(handles.CheckCuvRegrGR,'Value',minVal);
 minVal = get(handles.CheckRivTopGR,'Min');                                  %uncheck checkboxes
@@ -991,6 +1042,105 @@ set(handles.MainWindow,'HandleVisibility','off');                              %
 close all                                                                   %close every other figure
 set(handles.MainWindow,'HandleVisibility','on');
 
+%% Pushbuttons - Outputs overview
+
+% --- Executes on button press in PushShowProfiles.
+function PushShowProfiles_Callback(hObject, eventdata, handles)
+% hObject    handle to PushShowProfiles (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+if isfield(handles.prgmcontrol,'showProf') == 0
+    msgbox('You must choose the profiles to be shown','modal');
+    uiwait(gcf);
+else
+    showProf = handles.prgmcontrol.showProf;
+    colNames = cell(1,numel(handles.metricdata.OUT.Profiles{1}(1,:)));      %preallocate varieble for column names
+    for i = 1:numel(colNames)/2
+        colNames{2*i-1} = ['Cut ' mat2str(i) '|X'];
+        colNames{2*i}   = ['Cut ' mat2str(i) '|Y'];
+    end
+    for i = 1:numel(showProf)
+        hFig = figure;                                                      %open figure window
+        set(hFig,'Units','Pixels','Position',[0 0 1000 750],...
+            'Name',['Mean profiles' mat2str(showProf)]);
+        uitable(hFig,'Data',handles.metricdata.OUT.Profiles{showProf(i)},...
+            'ColumnName',colNames,...
+            'ColumnWidth','auto', ...
+            'Units','Normal', 'Position',[0 0 1 1]);
+    end
+end
+
+% --- Executes on button press in PushShowOtherData.
+function PushShowOtherData_Callback(hObject, eventdata, handles)
+% hObject    handle to PushShowOtherData (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+%% Listboxes - Outputs overview
+
+% --- Executes on selection change in ListProfiles.
+function ListProfiles_Callback(hObject, eventdata, handles)
+% hObject    handle to ListProfiles (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns ListProfiles contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from ListProfiles
+
+handles.prgmcontrol.showProf = get(hObject,'Value');                        %save indexes of selected
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+
+% --- Executes during object creation, after setting all properties.
+function ListProfiles_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to ListProfiles (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: listbox controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+% --- Executes on selection change in ListOtherData.
+function ListOtherData_Callback(hObject, eventdata, handles)
+% hObject    handle to ListOtherData (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns ListOtherData contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from ListOtherData
+
+
+% --- Executes during object creation, after setting all properties.
+function ListOtherData_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to ListOtherData (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: listbox controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+%% Checkboxes - Outputs overview
+
+% --- Executes on button press in CheckShowDataPlots.
+function CheckShowDataPlots_Callback(hObject, eventdata, handles)
+% hObject    handle to CheckShowDataPlots (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of CheckShowDataPlots
+
+
 %% Auxiliary functions
 function [metricdata prgmcontrol] = ...
     initializeGUI(hObject,eventdata,handles)
@@ -1008,7 +1158,7 @@ set(handles.CheckDNL,'Value',maxVal);
 handles.prgmcontrol.DNTLoadIM = maxVal;                                     %by default, i dont want to store all image data in handles
 
 % set default values for fields in Image Processing
-handles.prgmcontrol.autoEdges = 2;                                          %default - completely automatic program execution
+handles.prgmcontrol.autoEdges = 3;                                          %default - completely automatic program execution
 minVal = get(handles.CheckCuvettes,'Min');                                  %default - no graphic output
 set(handles.CheckCuvettes,'Value',minVal);
 minVal = get(handles.CheckPlate,'Min'); 
@@ -1024,6 +1174,10 @@ handles.prgmcontrol.GR.contour  = 0;
 handles.prgmcontrol.GR.profcompl= 0;
 handles.prgmcontrol.GR.profcut  = 0;
 handles.prgmcontrol.GR.regime   = 1;
+handles.prgmcontrol.GR.format   = 'png';                                    %default format for graphics saving
+set(handles.PopupLiqType,'Value',1);                                        %select 1 choice
+%
+%
 minVal = get(handles.CheckCuvRegrGR,'Min');                                 %uncheck checkboxes
 set(handles.CheckCuvRegrGR,'Value',minVal);
 minVal = get(handles.CheckRivTopGR,'Min');                                  %uncheck checkboxes
@@ -1047,8 +1201,8 @@ set(handles.EditFSensitivity, 'String', handles.metricdata.FSensitivity);
 % default values for rivulet processing optional parameters
 handles.metricdata.RivProcPars = [];
 % set data for the liquid
-handles.metricdata.fluidData = fluidDataFcn('DC 10');                       %set vaules into handles
-set(handles.PopupLiqType,'Value',1);                                        %select 2 choice
+handles.metricdata.fluidData = fluidDataFcn('DC 5');                        %set vaules into handles
+set(handles.PopupLiqType,'Value',2);                                        %select 2 choice
 
 % Specify root folder for program execution (must contain all the used
 % functions)
@@ -1059,451 +1213,7 @@ prgmcontrol= handles.prgmcontrol;
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
-function [state prbMsg sumMsg] = controlFunction(EdgCoord)
-%
-%   [state prbMsg sumMsg] = controlFunction(EdgCoord)
-%
-% function for controling the output of findEdges function. The algorithm
-% walks through the EdgCoord matrix and saves positions of the wrongly
-% guessed coordinates into problemIndexes matrix. If the control is passed
-% without any problems, the state variable is set to 0.
-%
-% Algorithm:
-% - at first, the NaN values are removed.
-% - than the mean value and kurtosis of each column are calculated
-% - from kurtosis is defined coefficient for search for outliers in each
-%   column
-% - outliers are found
-%
-% INPUT variables
-% EdgCoord  ... matrix of guessed edge coordinates, output of function
-%               findEdges
-%
-% OUTPUT variables
-% state     ... how well are defined the edges
-%               [nSC oSC nBC oBC nPl oPl], where
-%               nSc     ... number of NaN in small cuvettes
-%               oSc     ... number of outerliers in small cuvettes
-%               and so on...
-%           ... the length of state variable can vary in dependence of
-%               found problem from 1(scalar) up to 4 [1 2 3 4];
-% prbMsg    ... structure containing indexes of rows (images)
-%               where was found something odd
-% sumMsg    ... summary message for the found problems
 
-nCol = size(EdgCoord,2);                                                    %number of columns in the input matrix (10)
-k    = 1;                                                                   %auxiliary indexing variable for prbMsg
-% problem counters
-nSC  = 0; oSC = 0;                                                          %n* counts NaN and o* outliers
-nBC  = 0; oBC = 0;
-nPl  = 0; oPl = 0;
-for i = 1:nCol                                                              %better to do for each column separately(remove only parts of NaN row)
-    tmpVar = EdgCoord(:,i);                                                 %reduce input matrix only to i-th column
-    % find NaN values in the ith column of EdgCoord matrix
-    INaN = find(isnan(EdgCoord(:,i)) == 1);
-    tmpVar = tmpVar(isnan(tmpVar) == 0);                                     %remove rows with NaN in them
-    % calculate standard deviation of each column of EdgCoord
-    coordSTD= std(tmpVar);
-    coordMU = mean(tmpVar);                                                 %mean value in each column
-    coordKUR= kurtosis(tmpVar);                                             %curtosis of each column (should be 3 for normally distr. data)
-    nRow    = numel(tmpVar);                                                %number of elements in tmpVar after removing the NaNs
-    
-    % calculating the coeficient for identifying outliers, for std. data
-    % distr, it should be 3 and I will decrease it for more outlier-prone
-    % datasets
-    coef    = 7/coordKUR;                                                   %should be 9/.. but I am expecting very narrow data
-
-    % find outliers - values more different than coef * std. deviation
-    outliers= abs(tmpVar-coordMU(ones(nRow,1),:))>...
-        coef*coordSTD(ones(nRow,1),:);                                      %matrix of indexes of values more different than coef * std. dev.
-    Iout    = find(outliers == 1);                                          %find position of outliers
-    % translate the Iout for each found NaN
-    if isempty(INaN) == 0
-        for j = 1:numel(INaN)
-            Iout(Iout>=INaN(j)) = Iout(Iout>=INaN(j))+1;                    %must add 1 for every left out row
-        end
-    end
-    % write out messages for the column
-    Iwr = [Iout;INaN];
-    for j = 1:length(Iwr)                                                   %for all problems
-        prbMsg(k).coords = [Iwr(j) i];                                      %coordinates of the problem in the EdgCoord matrix
-        prbMsg(k).nImg   = Iwr(j);                                          %number of problematic image
-        if isempty(find(Iwr(j) == Iout, 1)) == 1
-            prbMsg(k).type   = 'NaN';
-        else
-            prbMsg(k).type   = 'outliers';
-        end
-        if i < 4
-            prbMsg(k).device = 'small cuvette';                             %write the device type to the structure
-            if isempty(find(Iwr(j) == Iout, 1)) == 1                        %set counter for the device
-                nSC = nSC + 1;
-            else
-                oSC = oSC + 1;
-            end
-        elseif i >= 4 && i < 7
-            prbMsg(k).device = 'big cuvette';
-            if isempty(find(Iwr(j) == Iout, 1)) == 1
-                oBC = nBC + 1;
-            else
-                oBC = oBC + 1;
-            end
-        else
-            prbMsg(k).device = 'plate';
-            if isempty(find(Iwr(j) == Iout, 1)) == 1
-                nPl = nPl + 1;
-            else
-                oPl = oPl + 1;
-            end
-        end
-        k = k+1;
-    end
-end
-
-% setting up state variable
-state = [nSC oSC nBC oBC nPl oPl];
-
-% setting up summary report
-sumMsg.totalPrb = nSC + nBC + nPl + oSC + oBC + oPl;                        %total number of "warnings"
-sumMsg.oSC      = oSC;
-sumMsg.nSc      = nSC;
-sumMsg.oBC      = oBC;
-sumMsg.nBC      = nBC;
-sumMsg.oPl      = oPl;
-sumMsg.nPl      = nPl;
-if sum(state) ~= 0                                                          %write out human readable string string for user
-    sumMsg.string   = {['In EdgCoord matrix from '...
-        mat2str(numel(EdgCoord(:,1))) ' images, there were found at total '...
-        mat2str(sumMsg.totalPrb) ' problems. Namely there were found:']...
-        [mat2str(oSC) ' outer values and ' mat2str(nSC)...
-        ' NaN in Small cuvettes edges estimation,']...
-        [mat2str(oBC) ' outer values and ' mat2str(nBC)...
-        ' NaN in Big cuvettes edges estimation and']...
-        [mat2str(oPl) ' outer values and ' mat2str(nPl)...
-        ' NaN in plate edges estimation.']};
-else
-    sumMsg.string = 'There were no problems found.';
-end
-
-% check prbMsg variable existence
-if exist('prbMsg','var') == 0
-    prbMsg = struct([]);
-end
-
-% setting up state variable
-state = [nSC oSC nBC oBC nPl oPl];
-
-% setting up summary report
-sumMsg.totalPrb = nSC + nBC + nPl + oSC + oBC + oPl;                        %total number of "warnings"
-sumMsg.oSC      = oSC;
-sumMsg.nSc      = nSC;
-sumMsg.oBC      = oBC;
-sumMsg.nBC      = nBC;
-sumMsg.oPl      = oPl;
-sumMsg.nPl      = nPl;
-if sum(state) ~= 0                                                          %write out human readable string string for user
-    sumMsg.string   = {['In EdgCoord matrix from '...
-        mat2str(numel(EdgCoord(:,1))) ' images, there were found at total '...
-        mat2str(sumMsg.totalPrb) ' problems. Namely there were found:']...
-        [mat2str(oSC) ' outer values and ' mat2str(nSC)...
-        ' NaN in Small cuvettes edges estimation,']...
-        [mat2str(oBC) ' outer values and ' mat2str(nBC)...
-        ' NaN in Big cuvettes edges estimation and']...
-        [mat2str(oPl) ' outer values and ' mat2str(nPl)...
-        ' NaN in plate edges estimation.']};
-else
-    sumMsg.string = 'There were no problems found.';
-end
-
-% check prbMsg variable existence
-if exist('prbMsg','var') == 0
-    prbMsg = struct([]);
-end
-
-function EdgCoord = modifyFunction(metricdata)
-%
-%   EdgCoord = modifyFunction(metricdata)
-%
-% Function that takes found coordinates and messages about rate of finding
-% succes and returns modified coordinates base on user interaction
-%
-% For prefered automatic estimation, the outliers and NaN are replaced by
-% mean values of found coordinates. Otherwise, the user can choose to find
-% the problematic edges manually and then, is asked to specify 3 different
-% points on each border from which is estimated the mean coordinate
-%
-% Rq: The code for manual selection is not very elegant, but it is doing
-% what it is suppose to do...
-%
-% INPUT variables
-% metricdata... structure obtained by previous run of the program,
-%               must contain following fields:
-% EdgCoord  ... matrix with estimated edge coordinates
-% state
-% prbMsg    ... outputs from controlFunction
-% sumMsg
-%
-%               there also must be present specific combination of
-%               following fields:
-% daten     ... cell with image data
-% imNames   ... if daten is not present this list of processed images
-%               names is used for loading images from subsImDir
-% subsImDir ... if daten is not present, images specified by imNames are
-%               loaded from this directory
-
-% check if it is necessary to run the function
-if isempty(metricdata.prbMsg) == 1                                          %no problem, than return
-    EdgCoord = metricdata.EdgCoord;                                         %assign output variable
-    return
-end
-
-% process input:
-EdgCoord = metricdata.EdgCoord;
-state    = metricdata.state;
-prbMsg   = metricdata.prbMsg;
-sumMsg   = metricdata.sumMsg;
-if isfield(metricdata,'daten') == 1                                         %there are present image data into metricdata
-    IMDataCell = metricdata.daten;
-    DNTLoadIM  = 0;
-else
-    imNames    = metricdata.imNames;
-    subsImDir  = metricdata.subsImDir;
-    DNTLoadIM  = 1;
-end
-
-% extract variables auxiliary variables from structures
-% prbMsg.coords -> [row column] of the problem
-prbCoord = zeros(numel(prbMsg),2);                                          %preallocate variable for problems coordinates
-parfor i = 1:numel(prbMsg)
-    prbCoord(i,:) = prbMsg(i).coords;
-end
-
-% write out results of edge finding and ask user what to do
-if sum(state) ~= 0                                                          %there are some problems
-    options.Default = 'From mean values';
-    options.Interpreter = 'tex';
-    stringCell= [sumMsg.string{:} {'Do you want to modify these edges:'}];
-    choice = myQst('autstr',stringCell);
-    if strcmp(choice,'Show EdgCoord') == 1                                  %user wants to show the EdgeCoord matrix
-        coefVec= 7./kurtosis(EdgCoord);
-        hFig = figure;                                                      %open figure window
-        set(hFig,'Units','Pixels','Position',[0 0 1000 750],...
-            'Name','EdgCoord');                                             %set window size +- matching the EdgeCoord needs
-        openUITable(hFig,EdgCoord,prbCoord,coefVec,0);
-        choice = menu('Modify selected values',...
-            'From mean values','Manually','Don`t modify');                  %questdlg is prettier, but menu is not modal
-        switch choice
-            case 1
-                choice = 'From mean values';
-            case 2
-                choice = 'Manually';
-            case 3
-                choice = 'Don`t modify';
-        end
-    end
-else
-    msgbox('Edges of the plate and cuvettes were found','modal');
-    uiwait(gcf);
-    choice = 'Don`t modify';
-end
-
-% switch in dependence on user choice
-% manual specification of the cuvettes edges shoud be fun :-/ (let's leave
-% it out for now - cuvettes edge finding is quite solid, the mean values
-% shoud be enough)
-switch choice
-    case 'From mean values'
-        tmpVec= unique(prbCoord(:,2));
-        for j = 1:numel(tmpVec)                                             %for every column with problem
-            i = tmpVec(j);
-            EdgCoord(prbCoord(prbCoord(:,2) == i),i) =...                   %all values with specified column index
-                round(mean(removerows(EdgCoord(:,i),prbCoord(prbCoord(:,2) == i))));%replace all outliers and NaN with mean values of the rest
-        end
-    case 'Manually'
-        choice  = menu('Do you want to:',...                                %open new menu, and let user choose between graphical and text input
-            'Specify new values graphically',...
-            'Directly modify values in table');
-        if choice == 1                                                      %user wants to specify new values from images
-            se      = strel('disk',12);                                     %morphological structuring element
-            strVerL = 'Specify {\bf 3} times left vertical edge of the ';   %string preparation
-            strVerR = 'Specify {\bf 3} times right vertical edge of the ';
-            strHorT = 'Specify {\bf 3} times top horizontal edge of the ';
-            strHorB = 'Specify {\bf 3} times bottom horizontal edge of the ';
-            options.WindowStyle = 'modal';
-            options.Interpreter = 'tex';
-            for k = 1:numel(prbCoord(:,2));                                 %for all problems
-                i = prbCoord(k,1);j = prbCoord(k,2);                        %save indexes into temporary variables
-                if DNTLoadIM == 1                                           %if the images are not loaded, i need to get the image from directory
-                    tmpIM = imread([subsImDir '/' imNames{1}]);             %load image from directory with substracted images
-                else
-                    tmpIM = IMDataCell{i};                                  %else i can get it from handles
-                end
-                switch prbMsg(k).device                                     %check the device, extreme SWITCH...
-                    case 'plate'
-                        tmpIM = tmpIM(:,1:2*round(end/3));                  %for the plate I need only left side of the image
-                        trVec = [0 0];
-                        if mod(j,7) == 0                                    %left vertical edge
-                            str = [strVerL prbMsg(k).device];
-                            chInd   = 1;
-                        elseif mod(j,7) == 1                                %top horizontal edge
-                            str = [strHorT prbMsg(k).device];
-                            chInd   = 2;
-                        elseif mod(j,7) == 2                                %right vertical edge
-                            str = [strVerR prbMsg(k).device];
-                            chInd   = 1;
-                        else                                                %bottom horizontal edge
-                            str = [strHorB prbMsg(k).device];
-                            chInd   = 2;
-                        end
-                        nInput  = 3;
-                    otherwise
-                        if strcmp(prbMsg(k).device,'small cuvette') == 1        %choose which part of the image I want to show
-                            tmpIM = tmpIM(1:round(2*end/3),round(end/2):end);   %for small cuvette I need only top right side of the image
-                            trVec = [round(size(tmpIM,2)/2)-1 0];
-                        else
-                            tmpIM = tmpIM(round(end/3):end,round(end/2):end);   %for big cuvette I need only bottom right side of the imagee
-                            trVec = [round(size(tmpIM,2)/2)-1 round(size(tmpIM,1))];
-                        end
-                        if mod(j,3) == 1                                        %indexes 1 or 4, mean x values of cuvettes
-                            str = ['Specify both vertical edges of the '...
-                                prbMsg(k).device...
-                                ', both of them {\bf 3} times.'];
-                            nInput = 6;                                         %need to take 6 inputs from ginput
-                            chInd   = 1;                                        %I am interested in first ginput coordinate
-                        elseif mod(j,3) == 2                                    %top horizontal edge
-                            str = [strHorT prbMsg(k).device];
-                            nInput  = 3;                                        %need to take 3 inputs from ginput
-                            chInd   = 2;                                        %I am interested second ginput coordinate
-                        else                                                    %bottom horiznotal edge
-                            str = [strHorB prbMsg(k).device];
-                            nInput  = 3;                                        %need to take 3 inputs from ginput
-                            chInd   = 2;                                        %I am interested in second ginput coordinate
-                        end
-                end                
-            % write out info about what should be specified
-            msgbox(str,options);uiwait(gcf);
-            % some image processing
-            tmpIM   = imtophat(tmpIM,se);
-            tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);        %enhance contrasts
-            tmpIM   = im2bw(tmpIM,0.16);                                    %conversion to black and white
-            figure;imshow(tmpIM);                                           %show image to work with
-            tmpMat  = ginput(nInput);close(gcf);
-            EdgCoord(i,j) = round(mean(tmpMat(:,chInd))) + trVec(chInd);
-            end
-        else                                                                %user wants directly modify values
-            if exist('coefVec','var') == 0                                  %if coefVec is not specified (no table was opened yet)
-                coefVec= 7./kurtosis(EdgCoord);
-                hFig = figure;                                              %open figure window
-                set(hFig,'Units','Pixels','Position',[0 0 1000 750],...
-                    'Name','EdgCoord');                                     %set window size +- matching the EdgeCoord needs
-            end
-            EdgCoord = openUITable(hFig,EdgCoord,prbCoord,coefVec,1);
-        end
-    case 'Don`t modify'
-end
-
-% see if hFig is opened and if it is, actualize it
-if exist('hFig','var') == 1
-    openUITable(hFig,EdgCoord,prbCoord,coefVec,0);
-end
-hMBox = msgbox('Press Enter to continue','modal');uiwait(hMBox);            %notify user about end of the program
-if exist('hFig','var')                                                      %if exists, close uitable
-    close(hFig)
-end
-
-function modData = openUITable(hFig,EdgCoord,prbCoord,coefVec,allowEdit)
-%
-%   function openUITable(EdgCoord,prbCoord,coefVec,allowEdit)
-%
-% function for opening uitable with specified parameters and highlighted
-% outlietr and NaNs
-%
-% INPUT variables
-% hFig      ... handles to figure where uitable shoud be opened
-% EdgCoord  ... variable to be shown in uitable
-% prbCoord  ... coordinates of NaNs and outliers in the EdgCoord
-% coefVec   ... vector of coeficients used for identifying outliers
-% allowEdit ... 0/1 if I want allow user to edit fields in resulting
-%               uitable
-%
-% OUTPUT variables
-%
-
-tmpMat = [EdgCoord;round(mean(EdgCoord));kurtosis(EdgCoord);...             %tmpMat with mean value, kurtosis and used coefficient for finding
-    coefVec];                                                               %outliers in each column
-tmpMat = reshape(strtrim(cellstr(num2str(tmpMat(:)))), size(tmpMat));
-for i = 1:numel(prbCoord(:,1))
-    tmpMat(prbCoord(i,1),prbCoord(i,2)) = strcat(...                        %modify format of the problematic value
-        '<html><span style="color: #FF0000; font-weight: bold;">', ...
-        tmpMat(prbCoord(i,1),prbCoord(i,2)), ...
-        '</span></html>');
-end
-tmpMat(end-2,:) = strcat(...                                                %modify format of the mean value
-    '<html><span style="color: #FF00FF; font-weight: bold;">', ...
-    tmpMat(end-2,:), ...
-    '</span></html>');
-tmpMat(end-1,:) = strcat(...                                                %modify format of the kurtosis
-    '<html><span style="color: #0000FF; font-weight: bold;">', ...
-    tmpMat(end-1,:), ...
-    '</span></html>');
-tmpMat(end,:) = strcat(...                                                  %modify format of the used coeficient
-    '<html><span style="color: #FFFF00; font-weight: bold;">', ...
-    tmpMat(end,:), ...
-    '</span></html>');
-colNames = {'Small cuv. xMean',...                                          %set column names
-    'Small cuv. yTop', 'Small cuv. yBottom',...
-    'Big cuv. xMean',...
-    'Big cuv. yTop', 'Big cuv. yBottom',...
-    'Plate xLeft','Plate yTop',...
-    'Plate xRight','Plate yBottom'};
-rowNames = 1:numel(EdgCoord(:,1));                                          %set row names
-rowNames = reshape(strtrim(cellstr(num2str(rowNames(:)))), size(rowNames));
-rowNames = [rowNames {'Mean Value' 'Kurtosis' 'Used coef.'}];
-if allowEdit == 1                                                           %want I let user to change columns
-    ColumnEditable = zeros(1,numel(EdgCoord(1,:)));
-    ColumnEditable(unique(prbCoord(:,2))) = 1;                              %make columns with NaNs and outliers editable
-    ColumnEditable = logical(ColumnEditable);
-else
-    ColumnEditable = [];
-end
-hTable = uitable(hFig,'Data',tmpMat,'ColumnName',colNames,...               %open uitable
-    'RowName',rowNames,...
-    'ColumnEditable',ColumnEditable,...
-    'ColumnWidth','auto', ...
-    'Units','Normal', 'Position',[0 0 1 1]);
-if allowEdit == 1
-    set(hTable,'CellEditCallback', @hTableEditCallback);                    %set cell edit callback and DeleteFcn
-    choice = menu('Save values and stop editing','OK');
-    if choice == 1                                                          %if user is done editing values
-        modData = get(hTable,'Data');
-        modData = regexp(modData,'([1-9])[\d.]\d+','match');                %'unformat' these values
-        modData = cellfun(@str2double,modData);                             %convert them to double
-        modData = modData(1:end-2,:);                                       %strip off automatically generated values
-    end
-end
-
-function hTableEditCallback(o,e)
-tableData = get(o, 'Data');
-if (e.Indices(1) > numel(tableData(:,1))-3)                                 %check if the user is not trying to modify automatically gen. data
-    tableData{e.Indices(1), e.Indices(2)} = e.PreviousData;
-    set(o, 'data', tableData);
-    errordlg('Do not modify automatically generated values','modal')
-else
-    tmpData = regexp(tableData(:,e.Indices(2)),'([1-9])[\d.]\d+','match');  %unformat column of data with modified value
-    tmpData = cellfun(@str2double,tmpData);                                 %convert column into doubles
-    tmpData = [round(mean(tmpData(1:end-2)));                               %update automatically modified values
-               kurtosis(tmpData(1:end-2))];
-    tmpData = reshape(strtrim(cellstr(num2str(tmpData(:)))),size(tmpData)); %convert results into string
-    tmpData(1) = strcat(...                                                 %modify format of automatically modified data
-        '<html><span style="color: #FF00FF; font-weight: bold;">', ...
-        tmpData(1), ...
-        '</span></html>');
-    tmpData(2) = strcat(...
-        '<html><span style="color: #0000FF; font-weight: bold;">', ...
-        tmpData(2), ...
-        '</span></html>');
-    tableData(end-2:end-1,e.Indices(2)) = tmpData;                          %reconstruct data table
-    set(o,'data',tableData);                                                %push data back to uitable
-end
 
 %% Menus
 % --------------------------------------------------------------------
@@ -1552,13 +1262,13 @@ if exist('metricdata','var') == 0 || exist('prgmcontrol','var') == 0
     msgbox(['You can use this option only to load variables saved by'...
         '"save variables into .mat file" option from program menu.'],...
         'modal');uiwait(gcf);
-    set(handles.statusbar,'Text',...
+    handles.statusbar = statusbar(handles.MainWindow,...
         'Loading variables from file failed.');
 else
     handles.metricdata = metricdata;
     handles.prgmcontrol= prgmcontrol;
-    set(handles.statusbar,'Text',...
-        'User defined variables were loaded from file.');
+    handles.statusbar = statusbar(handles.MainWindow,...
+        'Loading variables from file failed.');
 end
 
 % Update handles structure
@@ -1578,8 +1288,12 @@ function SaveEdgCoord_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-EdgCoord = handles.metricdata.EdgCoord;
-uisave('EdgCoord','EdgCoord')
+if isfield(handles.metricdata,'EdgCoord') == 1
+    EdgCoord = handles.metricdata.EdgCoord;
+    uisave('EdgCoord','EdgCoord')
+else
+    msgbox('You must specify EdgCoord at first','modal');uiwait(gcf);
+end
 
 set(handles.statusbar,'Text',...
     'Edges of plate and cuvettes were saved into .mat file');
@@ -1627,22 +1341,14 @@ function BestMethod_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-handles.prgmcontrol.autoEdges = 3;                                          %force completely automatic method
+% check if there all required data are present
+if isfield(handles.metricdata,'imNames') == 0                               %are there loaded images?                                                               %if not, force user to load them
+    msgbox('First, you must load images','modal');uiwait(gcf);
+    return
+end
 
-% call function findEdges and save output into handles
-handles.metricdata.EdgCoord = findEdges(handles);
-
-% call control function
-[state,prbMsg,sumMsg] = controlFunction(handles.metricdata.EdgCoord);
-
-% save output parameters into handles
-handles.metricdata.state = state;
-handles.metricdata.prbMsg= prbMsg;
-handles.metricdata.sumMsg= sumMsg;
-
-% modify potential mistakes
-handles.metricdata.EdgCoord = modifyFunction(handles.metricdata);           %call modifyFunction with handles.metricdata input
-set(handles.statusbar,'Text','EdgCoord is prepared for rivulet processing');%update statusbar
+handles.metricdata.IMProcPars = ...                                         %call method for finding best image processing method
+    bestMethod(handles);
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -1673,3 +1379,130 @@ handles.metricdata.RivProcPars = changeRPPars;                              %cal
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
+
+
+% --------------------------------------------------------------------
+function SaveIMPars_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveIMPars (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+if isempty(handles.metricdata.IMProcPars) == 0
+    IMProcPars = handles.metricdata.IMProcPars;
+    uisave('IMProcPars','IMProcPars')
+else
+    msgbox('You must specify IMProcPars at first','modal');uiwait(gcf);
+end
+
+set(handles.statusbar,'Text',...
+    'Image processing parameters were saved into .mat file');
+
+
+% --------------------------------------------------------------------
+function LoadIMPars_Callback(hObject, eventdata, handles)
+% hObject    handle to LoadIMPars (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+uiopen('load');                                                             %open dialog for loading variable
+if exist('IMProcPars','var') == 0
+    msgbox(['You can use this option only to load IMProcPars saved by'...
+        '"save IMProcPars into .mat file" option from program menu.'],...
+        'modal');uiwait(gcf);
+    set(handles.statusbar,'Text',...
+        'Loading IMProcPars from file failed.');
+else
+    handles.metricdata.IMProcPars = IMProcPars;
+    set(handles.statusbar,'Text',...
+        ['User defined variables were loaded from file.'...
+        ' IMProcPars is prepared for image processing.']);
+end
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+% --------------------------------------------------------------------
+function SpecAppPlatePos_Callback(hObject, eventdata, handles)
+% hObject    handle to SpecAppPlatePos (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% extracting needed values from handles
+if isfield(handles.metricdata,'daten') == 1                                 %see if there are images saved into handles
+    DNTLoadIM = 0;
+else
+    DNTLoadIM = 1;
+    imNames   = handles.metricdata.imNames;                                 %if not, obtain info for loading
+    subsImDir = handles.metricdata.subsImDir;
+end
+
+% setting up the statusbar
+handles.statusbar = statusbar(handles.MainWindow,...
+    'Waiting for user response');
+
+% obtaining approximate coordinates of the plate
+options.Interpreter = 'tex';
+options.WindowStyle = 'modal';
+msgbox({['Please specify approximate position of the'...
+    ' plate on processed images']...
+    ['Click little bit outside of {\bf upper left} '...
+    'and {\bf lower right corner}']},options);uiwait(gcf);
+se      = strel('disk',12);                                                 %morphological structuring element
+if DNTLoadIM == 1                                                           %if the images are not loaded, i need to get the image from directory
+    tmpIM = imread([subsImDir '/' imNames{1}]);                             %load image from directory with substracted images
+else
+    tmpIM = handles.metricdata.daten{1};                                    %else i can get it from handles
+end
+tmpIM   = imtophat(tmpIM,se);
+tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                    %enhance contrasts
+tmpIM   = im2bw(tmpIM,0.16);                                                %conversion to black and white
+figure;imshow(tmpIM);                                                       %show image to work with
+cutMat  = round(ginput(2));close(gcf);                                      %let the user specify approximate position of the plate
+cutLeft = cutMat(1,1);cutRight = cutMat(2,1);
+cutTop  = cutMat(1,2);cutBottom= cutMat(2,2);                               %cut out \pm the plate (less sensitive than exact borders)
+
+handles.metricdata.AppPlatePos = ...                                        %save approximate plate position into handles
+    [cutLeft cutTop cutRight cutBottom];
+
+set(handles.statusbar,'Text',['Approximate plate edges position was '...
+    'saved into handles']);
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+% --------------------------------------------------------------------
+function PostProcMenu_Callback(hObject, eventdata, handles)
+% hObject    handle to PostProcMenu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function ShowGenPlots_Callback(hObject, eventdata, handles)
+% hObject    handle to ShowGenPlots (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+FilterSpec  = {'*.fig';'*.png;*.eps;*.tif'};
+DlgTitle   = 'Select figures to load';
+if isfield(handles.metricdata,'storDir')                                    %if storDir is selected and subdirectories created
+    start_path = [handles.metricdata.storDir '/Plots'];
+else
+    start_path = pwd;
+end
+selectmode  = 'on';
+% choose background image
+[fileNames fileDir] = uigetfile(FilterSpec,DlgTitle,'Multiselect',...
+    selectmode,start_path);
+if isa(fileNames,'char') == 1
+    fileNames = {fileNames};                                                %if only 1 is selected, convert to cell
+end
+for i = 1:numel(fileNames)                                                  %for all loaded images
+    if strcmp(fileNames{1}(end-3:end),'.fig') == 1
+        openfig([fileDir '/' fileNames{i}]);
+    else
+        figure;imshow([fileDir '/' fileNames{i}]);
+    end
+end
