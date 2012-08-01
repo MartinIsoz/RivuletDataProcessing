@@ -66,7 +66,7 @@ if sum(state) ~= 0                                                          %the
         coefVec= 7./kurtosis(EdgCoord);
         hFig = figure;                                                      %open figure window
         set(hFig,'Units','Pixels','Position',[0 0 1000 750],...
-            'Name','EdgCoord');                                             %set window size +- matching the EdgeCoord needs
+            'Name','EdgCoord','MenuBar', 'none','NumberTitle', 'off');      %set window size +- matching the EdgeCoord needs
         openUITable(hFig,EdgCoord,prbCoord,coefVec,0);
         choice = menu('Modify selected values',...
             'From mean values','Manually','Don`t modify');                  %questdlg is prettier, but menu is not modal
@@ -173,7 +173,7 @@ switch choice
                 coefVec= 7./kurtosis(EdgCoord);
                 hFig = figure;                                              %open figure window
                 set(hFig,'Units','Pixels','Position',[0 0 1000 750],...
-                    'Name','EdgCoord');                                     %set window size +- matching the EdgeCoord needs
+                    'Name','EdgCoord','MenuBar', 'none','NumberTitle', 'off');%set window size +- matching the EdgeCoord needs
             end
             EdgCoord = openUITable(hFig,EdgCoord,prbCoord,coefVec,1);
         end

@@ -51,7 +51,7 @@ function EdgCoord = findEdges(handles)
 % processed to be used if DNTLoadIM == 1, resaved as subsImDir
 % subsImDir     ... directory with saved substracted images
 % 
-% handles.metricdata.IMProcPars - set of optional parameters for Image
+% handles.metricdata.IMProcPars - set of additional parameters for Image
 % processing, output of the changeIMPars.m
 % hpTr          ... treshold parameter for the hough peaks function
 % numPeaks      .... number of peaks to identify by houghpeaks
@@ -147,23 +147,13 @@ function EdgCoord = findEdges(handles)
 warning('off', 'Images:initSize:adjustingMag');
 
 %% Processing function input
-if isempty(handles.metricdata.IMProcPars) == 1                              %check if optional arguments are defined
-    hpTr      =   0.33;                                                     %if not, load defaults
-    numPeaks  = 200;
-    fG        =  35;
-    mL        =  25;
-    im2bwTr   =   0.40;
-    DntUIm2Bw =   0;
-    EdgFMethod= 'Prewitt';
-else
-    hpTr      = handles.metricdata.IMProcPars{1};                           %otherwise load specified values
-    numPeaks  = handles.metricdata.IMProcPars{2};
-    fG        = handles.metricdata.IMProcPars{3};
-    mL        = handles.metricdata.IMProcPars{4};
-    im2bwTr   = handles.metricdata.IMProcPars{5};
-    DntUIm2Bw = handles.metricdata.IMProcPars{6};
-    EdgFMethod= handles.metricdata.IMProcPars{7};
-end
+hpTr      = handles.metricdata.IMProcPars{1};                               %extract additional parameters
+numPeaks  = handles.metricdata.IMProcPars{2};
+fG        = handles.metricdata.IMProcPars{3};
+mL        = handles.metricdata.IMProcPars{4};
+im2bwTr   = handles.metricdata.IMProcPars{5};
+DntUIm2Bw = handles.metricdata.IMProcPars{6};
+EdgFMethod= handles.metricdata.IMProcPars{7};
 
 % extract handles
 if isfield(handles.metricdata,'daten') == 1                                 %there are saved images into handles

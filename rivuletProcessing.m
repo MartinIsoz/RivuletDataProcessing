@@ -41,7 +41,7 @@ function OUT = rivuletProcessing(handles)
 %                   (formerly stored in Konstanten_Fluid.txt)
 % storDir   ...     directory for storing outputs
 % rootDir   ...     root directory for program execution
-% RivProcPars..     cell with optional parameters for rivulet
+% RivProcPars..     cell with additional parameters for rivulet
 %                   processing (changeables through menus in the main
 %                   program).
 %   required cells:
@@ -49,18 +49,20 @@ function OUT = rivuletProcessing(handles)
 %                   OR
 %                   - plateSize, size of the plate in metres
 %                     default: [0.15 0.30]
-%                   - nCuts, number of centered cuts to make along the
-%                     rivulet
-%                     default: 5
-%                   - filmTh, thickness of the fil in cuvettes in mm +
+%                   - InclAngle, inclination angle of the plate
+%                     default: 60 (in degrees)
+%                   - filmTh, thickness of the film in cuvettes in mm +
 %                     width of the cuvettes in pixels
 %                     default: [1.93 0.33 6 2.25 80]
 %                   - RegrPlate, degree of polynomial to be used in
 %                     conversion if image from grayscale values into
 %                     distances
 %                     default: 2
-%                   - InclAngle, inclination angle of the plate
-%                     default: 60 (in degrees)
+%                   - nCuts, number of centered cuts to make along the
+%                     rivulet
+%                     default: 5
+%                   - countercurrent gas flow, m3/s
+%                     default: 0
 %
 % => in handles.prgmcontrl
 % GR        ...     structure with graphics output specifications
@@ -72,7 +74,16 @@ function OUT = rivuletProcessing(handles)
 %                   - GR.regime     = 0/1/2 - show/save/show+save
 %                   - GR.format     = string - format for SAVEAS
 %
-% OUTPUTS - text files
+% OUTPUT variable
+% OUT   ... structure with same data as are saved into files
+% OUT.profiles  ... cell with mean profiles in cuts for every processed
+%                   image
+% OUT.mSpeed    ... cells with sliced var data, last cell is string with
+% OUT.RivWidth      regimes of the pumpe
+% OUT.RivHeight
+% OUT.IFACorr   ... double with data for correlations
+%
+% other OUTPUTS - text files
 % a. text file for plotting profiles - cuts
 %    1 file for each image
 % b. text file with mean speeds in cuts
@@ -110,19 +121,13 @@ function OUT = rivuletProcessing(handles)
 % is taken care of in "Choose storDir"
 
 %% Processing function input
-if isempty(handles.metricdata.RivProcPars) == 1
-    plateSize   =[0.15 0.30];                                               %size of the plate, [width length], in m
-    InclAngle   = 60;                                                       %inclination angle of the plate, in degrees
-    filmTh      = [1.93 0.33 6 2.25 80];                                    %max and min thickness of the film in cuvettes
-    RegressionPlate = 2;                                                    %degree of polynomial for regression in converting gray val. to dist.
-    nCuts       = 5;                                                        %every 50 mm 5/10/15/20/25 cm
-else
-    plateSize   = handles.metricdata.RivProcPars{1};
-    InclAngle   = handles.metricdata.RivProcPars{2};
-    filmTh      = handles.metricdata.RivProcPars{3};
-    RegressionPlate = handles.metricdata.RivProcPars{4};
-    nCuts       = handles.metricdata.RivProcPars{5};
-end
+
+plateSize   = handles.metricdata.RivProcPars{1};                            %now these parameters are set by default
+InclAngle   = handles.metricdata.RivProcPars{2};
+filmTh      = handles.metricdata.RivProcPars{3};
+RegressionPlate = handles.metricdata.RivProcPars{4};
+nCuts       = handles.metricdata.RivProcPars{5};
+GasFlow     = handles.metricdata.RivProcPars{6};
 
 % extracting programcontrol
 DNTLoadIM = handles.prgmcontrol.DNTLoadIM;
@@ -153,9 +158,9 @@ nImages = numel(files);                                                     %num
 %% Rotameter calibration
 % Pumpenkonstante und Stoffwerte
 [M,V_Pumpe]= rotameterCalib(files,fluidData);                               %rotameter calibration
-sigma = fluidData(5);                                                       %save input parameters for correlations
-rho   = fluidData(6);
-eta   = fluidData(7);
+sigma = fluidData(2);                                                       %save input parameters for correlations
+rho   = fluidData(3);
+eta   = fluidData(4);
 clear fluidData
 
 %% Importing images into workspace
@@ -283,7 +288,8 @@ if DNTLoadIM == 1
         IFArea(i)= RivSurf({tmpIM'},Treshold,plateSize);                    %I need to transpose tmpIM -> coherence with YProfilPlatte
     end
 else
-    set(handles.statusbar,'Text','Calculating interfacial area of rivulets');%update statusbar
+    handles.statusbar = statusbar(handles.MainWindows,...
+        'Calculating interfacial area of rivulets');                        %update statusbar
     IFArea = RivSurf(YProfilPlatte,Treshold,plateSize);                     %this function does not need graphical output
 end
 
@@ -354,7 +360,7 @@ cd([storDir '/Profile'])
 OUT.Profiles = saveProf(XProfilPlatte,YProfilPlatte,minLVec,minRVec,files);
 cd(rootDir)
 
-sPars = {M plateSize nCuts};                                                %common variables for all saved files
+sPars = {M GasFlow plateSize nCuts};                                        %common variables for all saved files
 
 % 2. Local mean speed in cuts
 cd([storDir '/Speed'])
@@ -373,7 +379,7 @@ cd(rootDir)
 
 % 5. Interfacial area of the rivulets
 cd([storDir '/Correlation'])
-varIN = {sigma rho eta M InclAngle};                                        %input variables for correlation
+varIN = {sigma rho eta M InclAngle GasFlow};                                %input variables for correlation
 varOUT= IFArea;                                                             %output variable for correlation
 OUT.IFACorr = saveCorrData(varOUT,varIN,'IFAreaCorr');
 cd(rootDir)
@@ -784,8 +790,9 @@ function VarOUT = saveMatSliced(Var,Pars,files,fileNm)
 %           number of horizontal cuts along the length of the plate
 % Pars  ... another parametres to be saved into file
 %           Pars{1} = M (dimensionless flow),
-%           Pars{2} = plateSize
-%           Pars{3} = nCuts (number of cuts)
+%           Pars{2} = V_gas (volumetric gas flow, m3/s)
+%           Pars{3} = plateSize
+%           Pars{4} = nCuts (number of cuts)
 % files ... cell of filenames of analyzed images
 %           every filename must have structure ddd_ddd.tif (d - digit)
 % fileNm... filename, string
@@ -798,8 +805,9 @@ function VarOUT = saveMatSliced(Var,Pars,files,fileNm)
 
 % extract parameters
 M         = Pars{1};
-plateSize = Pars{2};
-nCuts     = Pars{3};
+V_gas     = Pars{2};
+plateSize = Pars{3};
+nCuts     = Pars{4};
 
 % calculate distances
 deltaDis  = plateSize(2)/(nCuts+1);                                         %distance between 2 cuts, m
@@ -815,7 +823,7 @@ for i = 1:numel(files)
 end
 
 % preallocate output variable
-VarOUT = cell(1,length(slInd)-1);
+VarOUT = cell(1,length(slInd));
 
 % create data files and fill in output
 for i = 1:length(slInd)-1                                                   %for every regime
@@ -823,10 +831,12 @@ for i = 1:length(slInd)-1                                                   %for
         mean(Var(slInd(i):slInd(i+1)-1,:),1)'...                            %mean values for each cut
         std(Var(slInd(i):slInd(i+1)-1,:),[],1)'...                          %standard deviation for each cut
         [M(slInd(i));zeros(n-1,1)]...                                       %dimensionless flow rate during regime
+        [V_gas;zeros(n-1,1)]...                                             %volumetric gas flow rate during experiments
         DistVec'];
     nameStr = [fileNm '_' files{slInd(i)}(1:3) '.txt'];                     %create filename
     dlmwrite(nameStr,tmpMat,'delimiter','\t','precision','%5.6e')           %write write data matrix into file, SI unist
     VarOUT{i} = tmpMat;                                                     %save i-th regime into cell output
+    VarOUT{end}(i) = {files{slInd(i)}(1:3)};
 end
 end
 

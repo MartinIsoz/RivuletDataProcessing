@@ -43,7 +43,27 @@ function changeIMPars_OpeningFcn(hObject, eventdata, handles, varargin)
 handles.output = hObject;
 
 % Initialize gui
-handles.metricdata = initializeGUI(hObject,eventdata,handles);
+% Initialize gui
+if(nargin > 3)
+    for index = 1:2:(nargin-3),
+        if nargin-3==index, break, end
+        switch lower(varargin{index})
+         case 'onlyshow'
+            tmpVar =  varargin{index+1};                                    %input - parameters to show
+            set(handles.PushOK,'enable','off');                             %if parameters are only shown, they cannot be set
+            % extract input
+            handles.metricdata.hpTr     = tmpVar{1};
+            handles.metricdata.numPeaks = tmpVar{2};
+            handles.metricdata.fG       = tmpVar{3};
+            handles.metricdata.mL       = tmpVar{4};
+            handles.metricdata.im2bwTr  = tmpVar{5};
+            handles.metricdata.DUIM2BW  = tmpVar{6};
+            handles.metricdata.method   = tmpVar{7};
+        end
+    end
+end
+
+handles.metricdata = initializeGUI(hObject,eventdata,handles);              %if there are not any parameters to show, load defaults
 
 % Update handles structure
 guidata(hObject, handles);
@@ -314,9 +334,9 @@ function metricdata = ...
 % function for gui inicialization, to be executed just before progGui is
 % made visible
 
+if isfield(handles,'metricdata') == 0;
 % set checkboxes
 minVal = get(handles.CheckDUIM2BW,'Min'); 
-set(handles.CheckDUIM2BW,'Value',minVal);
 handles.metricdata.DUIM2BW = minVal;
 % set editable fields
 handles.metricdata.hpTr     = 0.33;
@@ -325,8 +345,8 @@ handles.metricdata.fG       = 35;
 handles.metricdata.mL       = 25;
 handles.metricdata.im2bwTr  = 0.40;
 % set pop-up menu
-set(handles.PopupEdgeMethod,'Value',2);                                     %set it to Prewitt
 handles.metricdata.method   = 'Prewitt';
+end
 
 % fill in the fields
 set(handles.EdithpTr,'String',handles.metricdata.hpTr);
@@ -334,6 +354,18 @@ set(handles.EditnumPeaks,'String',handles.metricdata.numPeaks);
 set(handles.EditfG,'String',handles.metricdata.fG);
 set(handles.EditmL,'String',handles.metricdata.mL);
 set(handles.EditIm2BW,'String',handles.metricdata.im2bwTr);
+
+% check checkboxes
+set(handles.CheckDUIM2BW,'Value',handles.metricdata.DUIM2BW);
+
+% set popup menu
+contents = cellstr(get(handles.PopupEdgeMethod,'String'));                  %get cell of strings
+for i = 1:numel(contents)
+    if strcmp(handles.metricdata.method,contents{i}) == 1
+        set(handles.PopupEdgeMethod,'Value',i);
+        break
+    end
+end
 
 metricdata = handles.metricdata;
 % Update handles structure

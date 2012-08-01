@@ -22,7 +22,7 @@ function varargout = changeRPPars(varargin)
 
 % Edit the above text to modify the response to help changeRPPars
 
-% Last Modified by GUIDE v2.5 30-Jul-2012 15:57:59
+% Last Modified by GUIDE v2.5 01-Aug-2012 12:28:28
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -56,7 +56,30 @@ function changeRPPars_OpeningFcn(hObject, eventdata, handles, varargin)
 handles.output = hObject;
 
 % Initialize gui
-handles.metricdata = initializeGUI(hObject,eventdata,handles);
+if(nargin > 3)
+    for index = 1:2:(nargin-3),
+        if nargin-3==index, break, end
+        switch lower(varargin{index})
+         case 'onlyshow'
+            tmpVar =  varargin{index+1};                                    %input - parameters to show
+            % extract input
+            handles.metricdata.Width    = tmpVar{1}(1);
+            handles.metricdata.Length   = tmpVar{1}(2);
+            handles.metricdata.Angle    = tmpVar{2};
+            handles.metricdata.HfThS    = tmpVar{3}(1);
+            handles.metricdata.HfThB    = tmpVar{3}(2);
+            handles.metricdata.LfThS    = tmpVar{3}(3);
+            handles.metricdata.LfThB    = tmpVar{3}(4);
+            handles.metricdata.CuvWidth = tmpVar{3}(5);
+            handles.metricdata.PolDeg   = tmpVar{4};
+            handles.metricdata.nCuts    = tmpVar{5};
+            handles.metricdata.Gas      = tmpVar{6};
+            set(handles.PushOK,'enable','off');                             %if parameters are only shown, they cannot be set
+        end
+    end
+end
+
+handles.metricdata = initializeGUI(hObject,eventdata,handles);              %call initialization function
 
 % Update handles structure
 guidata(hObject, handles);
@@ -91,6 +114,7 @@ function PushOK_Callback(hObject, eventdata, handles)
 Width   = handles.metricdata.Width;
 Length  = handles.metricdata.Length;
 Angle   = handles.metricdata.Angle;
+Gas     = handles.metricdata.Gas;
 
 HfThS   = handles.metricdata.HfThS;
 LfThS   = handles.metricdata.LfThS;
@@ -104,7 +128,7 @@ nCuts   = handles.metricdata.nCuts;
 
 % assign the output cell
 handles.output = {[Width Length] Angle [HfThS LfThS HfThB LfThB CuvWidth]... 
-    PolDeg nCuts};
+    PolDeg nCuts Gas};
 
 % Update handles structure
 guidata(hObject, handles);
@@ -422,6 +446,31 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
+function EditGas_Callback(hObject, eventdata, handles)
+% hObject    handle to EditGas (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of EditGas as text
+%        str2double(get(hObject,'String')) returns contents of EditGas as a double
+
+handles.metricdata.Gas = str2double(get(hObject,'String'));
+
+% Update handles structure
+guidata(hObject, handles);
+
+% --- Executes during object creation, after setting all properties.
+function EditGas_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to EditGas (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
 %% Auxiliary functions
 function metricdata = ...
     initializeGUI(hObject,eventdata,handles)
@@ -429,22 +478,26 @@ function metricdata = ...
 % function for gui inicialization, to be executed just before progGui is
 % made visible
 
-% set editable fields
-handles.metricdata.Width    = 0.15;
-handles.metricdata.Length   = 0.30;
-handles.metricdata.Angle    = 60;
-handles.metricdata.HfThS    = 1.93;
-handles.metricdata.HfThB    = 0.33;
-handles.metricdata.LfThS    = 6.00;
-handles.metricdata.LfThB    = 2.25;
-handles.metricdata.PolDeg   = 2;
-handles.metricdata.CuvWidth = 80;
-handles.metricdata.nCuts    = 5;
+if isfield(handles,'metricdata') == 0                                       %if data are not present, I need to set them
+    % set editable fields
+    handles.metricdata.Width    = 0.15;
+    handles.metricdata.Length   = 0.30;
+    handles.metricdata.Angle    = 60;
+    handles.metricdata.Gas      = 0;
+    handles.metricdata.HfThS    = 1.93;
+    handles.metricdata.HfThB    = 6.00;
+    handles.metricdata.LfThS    = 0.33;
+    handles.metricdata.LfThB    = 2.25;
+    handles.metricdata.PolDeg   = 2;
+    handles.metricdata.CuvWidth = 80;
+    handles.metricdata.nCuts    = 5;
+end
 
 % fill in the fields
 set(handles.EditWidth,'String',handles.metricdata.Width);
 set(handles.EditLength,'String',handles.metricdata.Length);
 set(handles.EditAngle,'String',handles.metricdata.Angle);
+set(handles.EditGas,'String',handles.metricdata.Gas);
 set(handles.EditHfThS,'String',handles.metricdata.HfThS);
 set(handles.EditHfThB,'String',handles.metricdata.HfThB);
 set(handles.EditLfThS,'String',handles.metricdata.LfThS);
@@ -453,6 +506,9 @@ set(handles.EditPolDeg,'String',handles.metricdata.PolDeg);
 set(handles.EditCuvWidth,'String',handles.metricdata.CuvWidth);
 set(handles.EditnCuts,'String',handles.metricdata.nCuts);
 
+% set up output
 metricdata = handles.metricdata;
+
 % Update handles structure
 guidata(handles.figure1, handles);
+

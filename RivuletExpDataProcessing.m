@@ -86,7 +86,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 % Edit the above text to modify the response to help
 % RivuletExpDataProcessing
 
-% Last Modified by GUIDE v2.5 31-Jul-2012 16:22:50
+% Last Modified by GUIDE v2.5 01-Aug-2012 16:04:00
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -272,7 +272,7 @@ if isfield(handles.metricdata,'daten');
     handles.metricdata = rmfield(handles.metricdata,{'daten' 'imNames'});
 end
 
-% auxiliary variebles for dialogs
+% auxiliary variables for dialogs
 FilterSpec  = '*.tif';
 DlgTitle1   = 'Select background image';
 DlgTitle2   = 'Select images to be processed';
@@ -530,8 +530,7 @@ function PushDefEdg_Callback(hObject, eventdata, handles)
 
 % set default values for fields in Image Processing
 handles.prgmcontrol.autoEdges = 2;                                          %default - completely automatic program execution
-set(handles.PopupIMProc,'String',...
-    {'Automatic' 'Semi-automatic' 'Manual'});
+set(handles.PopupIMProc,'Value',1);
 minVal = get(handles.CheckCuvettes,'Min');                                  %default - no graphic output
 set(handles.CheckCuvettes,'Value',minVal);
 minVal = get(handles.CheckPlate,'Min'); 
@@ -542,6 +541,8 @@ handles.metricdata.hpTr     = [];                                           %do 
 handles.metricdata.numPeaks = [];
 handles.metricdata.fG       = [];
 handles.metricdata.mL       = [];
+% default values for image processing
+handles.metricdata.IMProcPars = {0.3300 200 35 25 0.4000 0 'Prewitt'};
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -796,8 +797,10 @@ function PopupLiqType_Callback(hObject, eventdata, handles)
 contents = cellstr(get(hObject,'String'));
 selected = contents{get(hObject,'Value')};                                  %get selected value from popmenu
 
+angle = handles.metricdata.RivProcPars{2};                                  %get angle from rivulet processing parameters
+
 % save selected value to handles
-handles.metricdata.fluidData = fluidDataFcn(selected);                      %call database function
+handles.metricdata.fluidData = fluidDataFcn(selected,angle);                %call database function
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -939,18 +942,50 @@ if isfield(handles.metricdata,'EdgCoord') == 0                              %if 
 else                                                                        %otherwise call the rivuletProcessing function
     handles.metricdata.OUT = rivuletProcessing(handles);
     
-    % set GUI
-    msgbox('Program succesfully ended','modal');uiwait(gcf);                %inform user about ending
-    set(handles.statusbar,'Text',['Program succesfully ended. '...          %update statusbar
-        'Data for postprocessing are availible']);
-    
-    % create list for listboxes
+    % create lists for listboxes - list with profiles
     liststr = cell(1,numel(handles.metricdata.imNames));
     for i = 1:numel(liststr)
         liststr{i} = handles.metricdata.imNames{i}(1:end-4);                %I dont want the .tif extension at the end of imNames
     end
     set(handles.ListProfiles,'String',liststr);                             %for each image, there is now availible profile
     
+    % create lists for listboxes - list with other data
+    % other data are divisible into 2 groups - description of the rivulet
+    % (rivWidth, rivHeight, mSpeed) and data for correlations (IFACorr)
+    fieldsCell = fields(handles.metricdata.OUT);                            %get field names of output structure
+    fieldsCell = fieldsCell(strcmp(fieldsCell,'Profiles') == 0);            %get rid of the Profiles field
+    % preallocate liststr
+    nElmnts = 0;
+    for i = 1:numel(fieldsCell);                                            %for all fields (except Profiles)
+        tmpVar = handles.metricdata.OUT.(fieldsCell{i});                    %save current field
+        if isa(tmpVar,'cell') == 1
+            nReg = numel(tmpVar{end});                                      %number of regimes for current cell
+            nElmnts = nElmnts + nReg;                                       %if current field is cell, number of elements in liststr is
+        else                                                                %increased by number of regimes for current cell
+            nElmnts = nElmnts + 1;                                          %if current fields is not a cell, number of elements in liststr
+        end                                                                 %increases by 1
+    end
+    liststr = cell(1,nElmnts);
+    % fill liststr
+    k = 1;                                                                  %auxiliary indexing variable
+    for i = 1:numel(fieldsCell)                                             %for all remaining fields
+        tmpVar = handles.metricdata.OUT.(fieldsCell{i});                    %create temporary variable from structure field
+        if isa(tmpVar,'cell') == 1                                          %is the variable cell? (true for descriptiv OUTPUTS)
+            for j = 1:numel(tmpVar{end})
+                liststr{k} = [fieldsCell{i} '_' tmpVar{end}{j}];            %create k-th list string
+                k = k+1;                                                    %increase counter
+            end
+        else
+            liststr{k} = fieldsCell{i};                                     %if fields is class double, there are no subfields
+            k = k+1;                                                        %increase counter
+        end
+    end
+    set(handles.ListOtherData,'String',liststr);                            %update list in appropriate listbox
+    
+    % set GUI
+    msgbox('Program succesfully ended','modal');uiwait(gcf);                %inform user about ending
+    set(handles.statusbar,'Text',['Program succesfully ended. '...          %update statusbar
+        'Data for postprocessing are availible']);
 end
 
 % Update handles structure
@@ -987,11 +1022,12 @@ handles.metricdata.Treshold     = 0.1;                                      %set
 set(handles.EditTreshold, 'String', handles.metricdata.Treshold);           %fill in the field
 handles.metricdata.FSensitivity = 10;
 set(handles.EditFSensitivity, 'String', handles.metricdata.FSensitivity);
-% default rivulet processing parameters
-handles.metricdata.RivProcPars = [];
+% default values for rivulet processing optional parameters
+handles.metricdata.RivProcPars = {[0.15 0.30] 60 [1.93 0.33 6 2.25 80]... 
+    2 5 0};
 % popup menu
-handles.metricdata.fluidData = fluidDataFcn('???');                         %set vaules into handles
-set(handles.PopupLiqType,'Value',1);                                        %select 2 choice
+handles.metricdata.fluidData = fluidDataFcn('DC 5');                        %set vaules into handles
+set(handles.PopupLiqType,'Value',2);                                        %select 2 choice
 
 handles.statusbar = statusbar(handles.MainWindow,...
         'Default rivulet processing parameters were set');
@@ -1055,10 +1091,10 @@ if isfield(handles.prgmcontrol,'showProf') == 0
     uiwait(gcf);
 else
     showProf = handles.prgmcontrol.showProf;
-    colNames = cell(1,numel(handles.metricdata.OUT.Profiles{1}(1,:)));      %preallocate varieble for column names
+    colNames = cell(1,numel(handles.metricdata.OUT.Profiles{1}(1,:)));      %preallocate variable for column names
     for i = 1:numel(colNames)/2
-        colNames{2*i-1} = ['Cut ' mat2str(i) '|X'];
-        colNames{2*i}   = ['Cut ' mat2str(i) '|Y'];
+        colNames{2*i-1} = ['Cut ' mat2str(i) '|X, [m]'];
+        colNames{2*i}   = ['Cut ' mat2str(i) '|Y, [m]'];
     end
     for i = 1:numel(showProf)
         hFig = figure;                                                      %open figure window
@@ -1066,7 +1102,7 @@ else
             'Name',['Mean profiles' mat2str(showProf)]);
         uitable(hFig,'Data',handles.metricdata.OUT.Profiles{showProf(i)},...
             'ColumnName',colNames,...
-            'ColumnWidth','auto', ...
+            'ColumnWidth',{90}, ...
             'Units','Normal', 'Position',[0 0 1 1]);
     end
 end
@@ -1076,6 +1112,37 @@ function PushShowOtherData_Callback(hObject, eventdata, handles)
 % hObject    handle to PushShowOtherData (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+if isfield(handles.prgmcontrol,'showOther') == 0
+    msgbox('You must choose the data to be shown','modal');
+    uiwait(gcf);
+else
+    % part commun for graphic and non-graphic output
+    showOther = handles.prgmcontrol.showOther;                              %resave indexes of data to be shown
+    fieldsCell = fields(handles.metricdata.OUT);                            %get field names of output structure
+    fieldsCell = fieldsCell(strcmp(fieldsCell,'Profiles') == 0);            %get rid of the Profiles field
+    k = 1;                                                                  %auxiliary indexing variable
+    for i = 1:numel(fieldsCell)                                             %for all remaining fields
+        tmpVar = handles.metricdata.OUT.(fieldsCell{i});                    %create temporary variable from structure field
+        if isa(tmpVar,'cell') == 1                                          %is the variable cell? (true for descriptiv OUTPUTS)
+            for j = 1:numel(tmpVar{end})
+                NameStr = [fieldsCell{i} '_' tmpVar{end}{j}];               %create i-th list string
+                if isempty(showOther(showOther == k)) == 0                  %data are chosen to be shown
+                    plots = get(handles.CheckShowDataPlots,'Value');        %does user want plots?
+                    showOtherDataUITable(tmpVar{j},NameStr,1,plots);        %show uitable with description option, without plots
+                end
+                k = k+1;                                                    %increase counter
+            end
+        else
+            NameStr = fieldsCell{i};                                        %if fields is class double, there are no subfields
+            if isempty(showOther(showOther == k)) == 0                      %data are chosen to be shown
+                plots = get(handles.CheckShowDataPlots,'Value');            %does user want plots?
+                showOtherDataUITable(tmpVar,NameStr,0,plots);               %show uitable with correlation options
+            end
+            k = k+1;                                                        %increase counter
+        end
+    end
+end
 
 
 %% Listboxes - Outputs overview
@@ -1116,6 +1183,11 @@ function ListOtherData_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns ListOtherData contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from ListOtherData
+
+handles.prgmcontrol.showOther = get(hObject,'Value');                       %save indexes of selected
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -1165,7 +1237,7 @@ minVal = get(handles.CheckPlate,'Min');
 set(handles.CheckPlate,'Value',minVal);
 handles.metricdata.GREdges    = [0 0];                                      %default - dont want any graphics
 % default values for image processing
-handles.metricdata.IMProcPars = [];                                         %empty field -> use default built-in parameters
+handles.metricdata.IMProcPars = {0.3300 200 35 25 0.4000 0 'Prewitt'};
 
 % set defaults values for fields in rivutel processing
 % program controls
@@ -1199,9 +1271,11 @@ set(handles.EditTreshold, 'String', handles.metricdata.Treshold);           %fil
 handles.metricdata.FSensitivity = 10;
 set(handles.EditFSensitivity, 'String', handles.metricdata.FSensitivity);
 % default values for rivulet processing optional parameters
-handles.metricdata.RivProcPars = [];
+handles.metricdata.RivProcPars = {[0.15 0.30] 60 [1.93 0.33 6 2.25 80]... 
+    2 5 0};
 % set data for the liquid
-handles.metricdata.fluidData = fluidDataFcn('DC 5');                        %set vaules into handles
+angle = handles.metricdata.RivProcPars{2};
+handles.metricdata.fluidData = fluidDataFcn('DC 5',angle);                  %set vaules into handles
 set(handles.PopupLiqType,'Value',2);                                        %select 2 choice
 
 % Specify root folder for program execution (must contain all the used
@@ -1212,7 +1286,6 @@ metricdata = handles.metricdata;
 prgmcontrol= handles.prgmcontrol;
 % Update handles structure
 guidata(handles.MainWindow, handles);
-
 
 
 %% Menus
@@ -1274,6 +1347,13 @@ end
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
+% --------------------------------------------------------------------
+function QuitPrgm_Callback(hObject, eventdata, handles)
+% hObject    handle to QuitPrgm (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+close(handles.MainWindow);                                                  %call closing function
+
 
 % --------------------------------------------------------------------
 function findEdgesMenu_Callback(hObject, eventdata, handles)
@@ -1324,61 +1404,28 @@ guidata(handles.MainWindow, handles);
 
 
 % --------------------------------------------------------------------
-function ModHough_Callback(hObject, eventdata, handles)
-% hObject    handle to ModHough (see GCBO)
+function ModIMPars_Callback(hObject, eventdata, handles)
+% hObject    handle to ModIMPars (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-handles.metricdata.IMProcPars = changeIMPars;                               %call gui for changing parameters
+IMProcPars = changeIMPars;                                                  %call gui for changing parameters
 
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --------------------------------------------------------------------
-function BestMethod_Callback(hObject, eventdata, handles)
-% hObject    handle to BestMethod (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% check if there all required data are present
-if isfield(handles.metricdata,'imNames') == 0                               %are there loaded images?                                                               %if not, force user to load them
-    msgbox('First, you must load images','modal');uiwait(gcf);
-    return
+% check ouptuts
+if isempty(IMProcPars) == 0
+    handles.metricdata.IMProcPars = IMProcPars;                             %if parameters are changed, save them into structure
 end
 
-handles.metricdata.IMProcPars = ...                                         %call method for finding best image processing method
-    bestMethod(handles);
-
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
-
 % --------------------------------------------------------------------
-function QuitPrgm_Callback(hObject, eventdata, handles)
-% hObject    handle to QuitPrgm (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-close(handles.MainWindow);                                                  %call closing function
-
-
-% --------------------------------------------------------------------
-function rivProcMenu_Callback(hObject, eventdata, handles)
-% hObject    handle to rivProcMenu (see GCBO)
+function ShowIMPars_Callback(hObject, eventdata, handles)
+% hObject    handle to ShowIMPars (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-
-% --------------------------------------------------------------------
-function ModExpPars_Callback(hObject, eventdata, handles)
-% hObject    handle to ModExpPars (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-handles.metricdata.RivProcPars = changeRPPars;                              %call gui for changing parameters
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
+changeIMPars('onlyshow',handles.metricdata.IMProcPars);                     %call gui for changing parameters with loaded current
 
 
 % --------------------------------------------------------------------
@@ -1417,6 +1464,24 @@ else
         ['User defined variables were loaded from file.'...
         ' IMProcPars is prepared for image processing.']);
 end
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+% --------------------------------------------------------------------
+function BestMethod_Callback(hObject, eventdata, handles)
+% hObject    handle to BestMethod (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% check if there all required data are present
+if isfield(handles.metricdata,'imNames') == 0                               %are there loaded images?                                                               %if not, force user to load them
+    msgbox('First, you must load images','modal');uiwait(gcf);
+    return
+end
+
+handles.metricdata.IMProcPars = ...                                         %call method for finding best image processing method
+    bestMethod(handles);
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -1467,6 +1532,42 @@ handles.metricdata.AppPlatePos = ...                                        %sav
 
 set(handles.statusbar,'Text',['Approximate plate edges position was '...
     'saved into handles']);
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+
+% --------------------------------------------------------------------
+function rivProcMenu_Callback(hObject, eventdata, handles)
+% hObject    handle to rivProcMenu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function ModExpPars_Callback(hObject, eventdata, handles)
+% hObject    handle to ModExpPars (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+RivProcPars = changeRPPars;                                                 %call gui for changing parameters
+
+%check output
+if isempty(RivProcPars) == 0                                                %if parameters were modified, save them into structures
+    handles.metricdata.RivProcPars = RivProcPars;
+end
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+% --------------------------------------------------------------------
+function ShowExpPars_Callback(hObject, eventdata, handles)
+% hObject    handle to ShowExpPars (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+changeRPPars('onlyshow',handles.metricdata.RivProcPars);                  %call gui for changing parameters with loaded current
 
 % Update handles structure
 guidata(handles.MainWindow, handles);

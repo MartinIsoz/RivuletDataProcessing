@@ -1,11 +1,12 @@
-function fluidData = fluidDataFcn(LiquidName)
+function fluidData = fluidDataFcn(LiquidName,angle)
 %
-%   function fluidData = fluidDataFcn(LiquidName)
+%   function fluidData = fluidDataFcn(LiquidName,angle)
 %
 % database function which returns fluidData for selected liquid type
 %
 % INPUT variable
 % LiquidName    ... name of the liquid used for the experiment
+% angle         ... plate inclination angle (for calculation of g)
 %
 % OUTPUT variable
 % fluidData     ... necessary data for the rivulet processing
@@ -20,7 +21,7 @@ function fluidData = fluidDataFcn(LiquidName)
 %
 % See also: RIVULETEXPDATAPROCESSING RIVULETPROCESSING
 
-g   = sin(pi/3)*9.81;                                                       %gravitational acceleration, plate inclination angle = pi/3
+g   = sin(angle/180*pi)*9.81;                                               %gravitational acceleration, plate incl. angle conv deg -> rad
 
 switch LiquidName
     case '???'                                                              %liquid used for testing of the program, different than the others
