@@ -33,18 +33,21 @@ function EdgCoord = findEdges(handles)
 % will be used to load images from /Subtracted directory, in this case,
 % this field is resaved as imNames
 % imNames       ... list of names of images to be processed
-% handles.metricdata.GREdges - to be resaved as GR
+% handles.prgmcontrol.GREdges - to be resaved as GR
 % GR            ... variable for handling graphics
 % handles.prgmcontrol.autoEdges - to be resaved as AUTO
 % AUTO          ... variable that enables enforcing of completely automated
 %                   image processing (if there is problem with line
 %                   finding, processing throught weighted mean values is
 %                   chosen automatically)
-%               ... 0 -> completely manual, edges are chosen manually for
+%               ... Manual -> completely manual, edges are chosen manually for
 %                   each image
-%               ... 1 -> semi-manual, if there is a problem, option to
+%               ... Semi-automatic -> semi-manual, if there is a problem, option to
 %                   chose concerning edges manually is presented
-%               ... 2 -> completely automatic (in fact, its "not 0 or 1")
+%               ... Automatic -> completely automatic (except not specified
+%                   edges)
+%               ... Force-automatic -> doesnt ask even if the edges are not
+%                   specified
 % handles.progmcontrol.DNTLoadIM - are all images loaded into
 % handles.metricdata.daten, or is there only list of filenames to be loaded
 % handles.metricdata.subsImDir - location of substracted images to be
@@ -162,8 +165,17 @@ if isfield(handles.metricdata,'daten') == 1                                 %the
 else
     DNTLoadIM = 1;
 end
-GR         = handles.metricdata.GREdges;                                    %graphical output
-AUTO       = handles.prgmcontrol.autoEdges;                                 %measure of automaticallity
+GR         = handles.prgmcontrol.GREdges;                                   %graphical output
+switch handles.prgmcontrol.autoEdges                                        %see how automatical shoud the program execution be
+    case 'Manual'
+        AUTO = 0;
+    case 'Semi-automatic'
+        AUTO = 1;
+    case 'Automatic'
+        AUTO = 2;
+    case 'Force-automatic'
+        AUTO = 3;
+end
 if DNTLoadIM == 1                                                           %if i dont have loaded images
     subsImDir = handles.metricdata.subsImDir;                               %i need location of the directory from where to save them
     imNames   = handles.metricdata.imNames;                                 %and list of names of images to be processed

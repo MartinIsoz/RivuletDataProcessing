@@ -212,9 +212,13 @@ end
 %% Saving smoothed images and obtaining visualizations of the riv.
 % store and plot smoothed images
 if GR.contour == 1 || GR.regime == 1                                        %if any of the graphics are wanted, enter the cycle
-    set(handles.statusbar.ProgressBar,'Visible','off');                     %update statusbar
-    set(handles.statusbar,'Text','Creating graphic output')
-    for i=1:numel(files) %#ok<*FORPF>                                       %for each image
+    for i=1:nImages                                                         %for each image
+        handles.statusbar = statusbar(handles.MainWindow,...
+            ['Creating profiles and/or contour plots ',...
+            'for image %d of %d (%.1f%%)'],...                              %updating statusbar
+            i,nImages,100*i/nImages);
+        set(handles.statusbar.ProgressBar,...
+            'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
         if DNTLoadIM == 1
             load([tmpfDir '/' files{i}(1:end-4) '.mat']);                   %if images are not present in handles, load them from tmpfDir
         else
@@ -223,46 +227,61 @@ if GR.contour == 1 || GR.regime == 1                                        %if 
         end
         if GR.contour == 1                                                  %contour visualization
             % graphical output, look on the rivulets from top
-            figure;figSet_size(gcf,[400 700])
+            if GR.regime == 1
+                Visible = 'off';                                            %if I want the graphs only to be saved, I dont have to make them
+            else                                                            %visible
+                Visible = 'on';
+            end
+            hFig = figure('Visible',Visible);figSet_size(hFig,[400 700]);
+            hAxs = axes('OuterPosition',[0 0 1 1]);                         %this is usefull when user does something else on the computer
+            set(hFig,'CurrentAxes',hAxs);
             XProfilPlatte = linspace(0,plateSize(1),...
                 size(tmpIM,2));                                             %width coord, number of columns in YProfilPlatte
             ZProfilPlatte = linspace(0,plateSize(2),...
                 size(tmpIM,1));                                             %length coord, number of rows in YProfilPlatte
             [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
-            contour(XX,ZZ,tmpIM);                                           %here I keep rivulet height in mm because it looks better
-            title(['\bf Look on the rivulet ' mat2str(i) ' from top'],...
+            contour(hAxs,XX,ZZ,tmpIM);                                      %here I keep rivulet height in mm because it looks better
+            title(hAxs,['\bf Look on the rivulet ' mat2str(i) ' from top'],...
                 'FontSize',13)
-            xlabel('width coordinate, [m]');
-            ylabel('length coordinate, [m]');
-            colbarh = colorbar('Location','East');                          %add the colorbar - scale
+            xlabel(hAxs,'width coordinate, [m]');
+            ylabel(hAxs,'length coordinate, [m]');
+            colbarh = colorbar('peer',hAxs);                                %open colorbar in desired axes
+            set(colbarh,'Location','East');                                 %add the colorbar - scale
             ylabel(colbarh,'rivulet height, [mm]')                          %set units to colorbar
-            axis ij                                                         %switch axis to match photos
+            axis(hAxs,'ij');                                                         %switch axis to match photos
             if GR.regime ~= 0                                               %if I want to save the images
-                saveas(gcf,[plotDir '/riv' mat2str(i) 'fromtop'],...
+                saveas(hFig,[plotDir '/riv' mat2str(i) 'fromtop'],...
                     GR.format);
                 if GR.regime == 1                                           %I want images only to be saved
-                    close(gcf)
+                    close(hFig)
                 end
             end
         end
         if GR.profcompl == 1                                                %Y-Profile over entire plate width
-            figure;figSet_size(gcf,[1100 600])
+            if GR.regime == 1
+                Visible = 'off';                                            %if I want the graphs only to be saved, I dont have to make them
+            else                                                            %visible
+                Visible = 'on';
+            end
+            hFig = figure('Visible',Visible);figSet_size(hFig,[1100 600]);
+            hAxs = axes('OuterPosition',[0 0 1 1]);
+            set(hFig,'CurrentAxes',hAxs);
             XProfilPlatte = linspace(0,plateSize(1),...
                 size(tmpIM,2));
             ZProfilPlatte = linspace(0,plateSize(2),...
                 size(tmpIM,1));
             [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
-            mesh(XX,ZZ,tmpIM)                                               %I need to convert the liquid height into mm
+            mesh(hAxs,XX,ZZ,tmpIM)
             axis tight
-            xlabel('width of the plate, [m]')
-            ylabel('length of the plate, [m]')
-            zlabel('height of the rivulet, [mm]')
-            title(['\bf Profile of the rivulet ' mat2str(i)],'FontSize',13);
+            xlabel(hAxs,'width of the plate, [m]')
+            ylabel(hAxs,'length of the plate, [m]')
+            zlabel(hAxs,'height of the rivulet, [mm]')
+            title(hAxs,['\bf Profile of the rivulet ' mat2str(i)],'FontSize',13);
             if GR.regime ~= 0                                               %if I want to save the images
-                saveas(gcf,[plotDir '/riv' mat2str(i) 'complprof'],...
+                saveas(hFig,[plotDir '/riv' mat2str(i) 'complprof'],...
                     GR.format);
                 if GR.regime == 1                                           %I want images only to be saved
-                    close(gcf)
+                    close(hFig)
                 end
             end
         end
@@ -476,33 +495,40 @@ for i = 1:numel(ImData)                                                     %for
     [fitS deltaS] = polyval(RegS,CuvetteS(:,1),ErrorEstS);                  %fitted values and estimated errors
     [fitB deltaB] = polyval(RegB,CuvetteB(:,1),ErrorEstB);
     % Graphs to control regression state..
-        figure;figSet_size(gcf,[1100 600])
-        subplot(121)
-        plot(CuvetteS(:,1),CuvetteS(:,2),'+',...                            %experimental points
-             CuvetteS(:,1),fitS,'g-',...                                    %fit
-             CuvetteS(:,1),fitS+2*deltaS,'r:',...                           %95% confidence interval for large samples
-             CuvetteS(:,1),fitS-2*deltaS,'r:');
-        title(['\bf Calibration, figure ' mat2str(imNumber) ', small cuvette']...
-            ,'FontSize',13)
-        xlabel('grayscale value')
-        ylabel('height of the liquid, mm')
-        subplot(122)
-        plot(CuvetteB(:,1),CuvetteB(:,2),'+',...                            %experimental points
-             CuvetteB(:,1),fitB,'g-',...                                    %fit
-             CuvetteB(:,1),fitB+2*deltaB,'r:',...                           %95% confidence interval for large samples
-             CuvetteB(:,1),fitB-2*deltaB,'r:');
-        title(['\bf Calibration, figure ' mat2str(imNumber) ', big cuvette']...
-            ,'FontSize',13)
-        xlabel('grayscale value')
-        ylabel('height of the liquid, mm')
-        if GRregime ~= 0                                                    %if I want to save the images
-            cd([storDir '/Plots']);
-            saveas(gcf,['riv' mat2str(imNumber) 'regrstate'],GRformat);
-            if GRregime == 1                                                %I want images only to be saved
-                close(gcf)
-            end
-            cd(rootDir);
+    if GRregime == 1
+        Visible = 'off';                                                    %if I want the graphs only to be saved, I dont have to make them
+    else                                                                    %visible
+        Visible = 'on';
+    end
+    hFig = figure('Visible',Visible);figSet_size(hFig,[1100 600]);
+    hAxsL = axes('OuterPosition',[0 0 0.5 1]);                              %create axes for left side of the image
+    hAxsR = axes('OuterPosition',[0.5 0 0.5 1]);                            %axes for the right side of the image
+    subplot(hAxsL)
+    plot(hAxsL,CuvetteS(:,1),CuvetteS(:,2),'+',...                          %experimental points
+        CuvetteS(:,1),fitS,'g-',...                                         %fit
+        CuvetteS(:,1),fitS+2*deltaS,'r:',...                                %95% confidence interval for large samples
+        CuvetteS(:,1),fitS-2*deltaS,'r:');
+    title(hAxsL,['\bf Calibration, figure ' mat2str(imNumber) ', small cuvette']...
+        ,'FontSize',13)
+    xlabel(hAxsL,'grayscale value')
+    ylabel(hAxsL,'height of the liquid, mm')
+    subplot(hAxsR)
+    plot(hAxsR,CuvetteB(:,1),CuvetteB(:,2),'+',...                          %experimental points
+        CuvetteB(:,1),fitB,'g-',...                                         %fit
+        CuvetteB(:,1),fitB+2*deltaB,'r:',...                                %95% confidence interval for large samples
+        CuvetteB(:,1),fitB-2*deltaB,'r:');
+    title(hAxsR,['\bf Calibration, figure ' mat2str(imNumber) ', big cuvette']...
+        ,'FontSize',13)
+    xlabel(hAxsR,'grayscale value')
+    ylabel(hAxsR,'height of the liquid, mm')
+    if GRregime ~= 0                                                        %if I want to save the images
+        cd([storDir '/Plots']);
+        saveas(hFig,['riv' mat2str(imNumber) 'regrstate'],GRformat);
+        if GRregime == 1                                                    %I want images only to be saved
+            close(hFig);
         end
+        cd(rootDir);
+    end
     end
 end
 end
@@ -552,7 +578,7 @@ function [YProfilPlatte XProfilPlatte] =...
 %
 % INPUT variables
 % YProfilPlatte     ... variable with heights of the rivulet
-% nCuts             ... number of parts in which cut the rivulet (scalar)
+% nCuts             ... number of cuts to make along the rivulet (scalar)
 % plateSize         ... size of the plate [width length], in m
 % GR                ... variable for graphics (yes/no)
 % GRregime          ... variable for graphics (show/save/show+save)
@@ -568,19 +594,17 @@ function [YProfilPlatte XProfilPlatte] =...
 % XProfilPlatte     ... linspace coresponding to plate width, m
 %
 
-ZProfilPlatte= linspace(0,plateSize(2),nCuts)';                             %this is same for all the images
-
-
 for i=1:numel(YProfilPlatte)
     if nargin < 8
         imNumber = i;
     end
     Distance     = round(size(YProfilPlatte{i},2)/(nCuts+1));               %number of points in each mean profile
     if nCuts == 0 || Distance < 50                                          %if too much cuts is specified
-        warning('Pers:ManCuts',['The number of cuts specified is bigger than'...
-            ' number of rows necessary to obtain mean values for each cut'])
+        warndlg(['The number of cuts specified is bigger than'...           %notify user by dialog
+            ' number of rows necessary to obtain mean values for each cut'],...
+            'modal');uiwait(gcf);
         fprintf(1,'Change the number of cuts\n');
-        nCuts = input('nCuts = ');
+        nCuts = input('nCuts = ');                                          %inputs from keyboard, to command window (!!)
         Distance     = round(size(YProfilPlatte{i},2)/(nCuts+1));           %need to recalculate distance
     end
     XProfilPlatte= linspace(0,plateSize(1),size(YProfilPlatte{i},1));       %this changes from image to image - auto coordinates, m
@@ -591,26 +615,33 @@ for i=1:numel(YProfilPlatte)
     YProfilPlatte{i} = YProfilPlatte{i}(:,1:nCuts)*1e-3;                    %need to change size of output matrix, mm -> m
 % ploting results
     if GR == 1
-        figure;figSet_size(gcf,[700 550]);
-        plot(XProfilPlatte,YProfilPlatte{i})
-        axis tight
-        xlabel('width of the plate, [m]')
-        ylabel('height of the rivulet, [m]')
-        if nCuts ~= 0
-            ttl=title(['\bf Mean profiles of riv. ' mat2str(imNumber)...
-                ' over every ' mat2str(plateSize(2)/(nCuts+1)*1e3,3)...
-                ' mm of the plate']);
-        else
-            ttl=title(['\bf Mean profiles of riv. ' mat2str(imNumber)...
-                ' over every ' mat2str(plateSize(2)/numel(ZProfilPlatte)*1e3,3)...
-                ' mm of the plate']);
+        if GRregime == 1
+            Visible = 'off';                                                %if I want the graphs only to be saved, I dont have to make them
+        else                                                                %visible
+            Visible = 'on';
         end
+        hFig = figure('Visible',Visible);figSet_size(hFig,[700 550]);
+        hAxs = axes('OuterPosition',[0 0 1 1]);
+        set(hFig,'CurrentAxes',hAxs);
+        plot(hAxs,XProfilPlatte,YProfilPlatte{i})
+        axis(hAxs,'tight');
+        xlabel(hAxs,'width of the plate, [m]')
+        ylabel(hAxs,'height of the rivulet, [m]')
+        ttl=title(hAxs,['\bf Mean profiles of riv. ' mat2str(imNumber)...
+            ' over every ' mat2str(plateSize(2)/(nCuts+1)*1e3,3)...
+            ' mm of the plate']);
         set(ttl,'FontSize',13,'Interpreter','tex')
+        legCell = (1:nCuts) * plateSize(2)/(nCuts+1)*1e3;                   %create vector of legend entries
+        legCell = cellstr(num2str(legCell(:)));                             %convert vector to cell of string
+        for j = 1:numel(legCell)
+            legCell{j} = [legCell{j} ' mm'];                                %add to every element units
+        end
+        legend(hAxs,legCell);                                               %create legend automatically
         if GRregime ~= 0                                                    %if I want to save the images
             cd([storDir '/Plots']);
-            saveas(gcf,['riv' mat2str(imNumber) 'cutprof'],GRformat);
+            saveas(hFig,['riv' mat2str(imNumber) 'cutprof'],GRformat);
             if GRregime == 1                                                %I want images only to be saved
-                close(gcf)
+                close(hFig);
             end
             cd(rootDir);
         end

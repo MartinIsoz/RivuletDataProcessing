@@ -86,7 +86,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 % Edit the above text to modify the response to help
 % RivuletExpDataProcessing
 
-% Last Modified by GUIDE v2.5 01-Aug-2012 16:04:00
+% Last Modified by GUIDE v2.5 02-Aug-2012 10:57:38
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -107,7 +107,6 @@ else
 end
 % End initialization code - DO NOT EDIT
 
-
 % --- Executes just before progGUI is made visible.
 function progGUI_OpeningFcn(hObject, eventdata, handles, varargin)
 % This function has no output args, see OutputFcn.
@@ -118,7 +117,12 @@ function progGUI_OpeningFcn(hObject, eventdata, handles, varargin)
 
 % fill gui with defaults values
 [handles.metricdata handles.prgmcontrol] =...
-    initializeGUI(hObject, eventdata, handles);
+    initializeGUI(hObject, eventdata, handles,'all');                       %call initialize function for all availible data
+
+set(handles.MainWindow,'DockControl','off');                                %I want to make the window undockable
+
+% handles.statusbar = statusbar(handles.MainWindow,'Program is ready');
+
 
 % Choose default command line output for progGUI
 handles.output = hObject;
@@ -132,18 +136,15 @@ guidata(hObject, handles);
 function my_closereq(src,evnt)
 % User-defined close request function 
 % to display a question dialog box 
-   selection = questdlg('Close Rivulet data processing program?',...
-      'Close Request Function',...
-      'Yes','No','Yes'); 
-   switch selection, 
-      case 'Yes',
-         delete(gcf)
-      case 'No'
-      return 
-   end
-
-% UIWAIT makes progGUI wait for user response (see UIRESUME)
-% uiwait(handles.MainWindow);
+selection = questdlg('Close Rivulet data processing program?',...
+    'Close Request Function',...
+    'Yes','No','Yes');
+switch selection,
+    case 'Yes',
+        delete(gcf)
+    case 'No'
+        return
+end
 
 
 % --- Outputs from this function are returned to the command line.
@@ -153,8 +154,15 @@ function varargout = progGUI_OutputFcn(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+% set statusbar - this function is executed after GUI is made visible and
+% before user can set any inputs => java object is ready for statusbar
+handles.statusbar = statusbar(hObject,'Program is ready');
+
 % Get default command line output from handles structure
 varargout{1} = handles.output;
+
+% Update handles structure
+guidata(hObject, handles);                                                  %i need to do this because of the handles.statusbar
 
 %% PushButtons - Preprocessing
 
@@ -170,14 +178,36 @@ storDir = uigetdir(start_path,'Select folder to store outputs');            %let
 
 if storDir ~= 0                                                             %here i dont care about indent, its just basic input control
 % create subdirectories
-mkdir(storDir,'Subtracted');                                                %directory for subtracted images
-mkdir(storDir,'Subtracted/Smoothed');                                       %smoothed images -> appears not to be *.tiff ?!
-mkdir(storDir,'Height');                                                    %height of the rivulet
-mkdir(storDir,'Profile');                                                   %vertical profiles of the rivulet
-mkdir(storDir,'Speed');                                                     %mean velocity
-mkdir(storDir,'Width');                                                     %width of the rivulet
-mkdir(storDir,'Correlation');                                               %directory for saving data necessary for correlations
-mkdir(storDir,'Plots');                                                     %directory for saving plots
+nameList= {'Subtracted' 'Height' 'Profile' 'Speed' 'Width' 'Correlation' ...%names of the directories for saving outputs
+    'Plots'};
+nameSubs= {{'Smoothed'} [] [] [] [] [] []};                                 %names of subdirectories for every folder
+
+if exist(storDir,'dir') == 0
+    mkdir(storDir);                                                         %if user specified directory doesnt exist, create it
+end
+d         = dir(storDir);                                                   %create list of subdirectories in storDir
+isub      = [d(:).isdir];                                                   %returns logical vector
+nameFolds = {d(isub).name};                                                 %get list of names of folders
+nameFolds(ismember(nameFolds,{'.','..'})) = [];                             %remove . and .. from the list
+% create subdirectories
+parfor i = 1:numel(nameList)
+    if sum(strcmp(nameFolds,nameList{i})) == 0                              %folder of the nameList is not present into storDir
+        mkdir([storDir '/' nameList{i}]);                                   %create directory
+        for j = 1:numel(nameSubs{i})
+            mkdir([storDir '/' nameList{i} '/' nameSubs{i}{j}]);            %and all subdirectories
+        end
+    elseif isempty(nameSubs{i}) == 0                                        %check if there are any subdirectories required in the checked dir.
+        d         = dir([storDir '/' nameList{i}]);                         %create list of subdirectories in checked dir
+        isub      = [d(:).isdir];                                           %returns logical vector
+        namesFolds = {d(isub).name};                                        %get list of names of folders
+        namesFolds(ismember(namesFolds,{'.','..'})) = [];                   %remove . and .. from the list
+        for j = numel(nameSubs{i})                                          %for every created subfolder
+            if sum(strcmp(namesFolds,nameSubs{i}{j})) == 0                  %if the subdirectory is not present in current dir
+                mkdir([storDir '/' nameList{i} '/' nameSubs{i}{j}]);        %create it
+            end
+        end
+    end
+end
 
 %modify string to display in statusbar
 statusStr = ['Data storage directory ' storDir...
@@ -196,7 +226,7 @@ handles.metricdata.subsImDir = [storDir '/Subtracted'];                     %dir
 handles.statusbar = statusbar(handles.MainWindow,statusStr);
 else
 %modify string to display in statusbar
-statusStr = 'Choosing of data storage directory cancelled.'; 
+statusStr = 'Choosing of data storage directory canceled by user'; 
 handles.statusbar = statusbar(handles.MainWindow,statusStr);
 end
 
@@ -235,7 +265,7 @@ set(handles.EditBcgLoc,'String',str);                                       %dis
 handles.metricdata.bgImage = bgImage;
 else
 %modify string to display in statusbar
-statusStr = 'Choosing of Background image cancelled.'; 
+statusStr = 'Choosing of Background image canceled.'; 
 handles.statusbar = statusbar(handles.MainWindow,statusStr);
 end
 % Update handles structure
@@ -256,6 +286,11 @@ if isfield(handles.metricdata,'storDir') == 0                               %if 
     msgbox('You must choose storDir before loading images','modal');
     uiwait(gcf);
     storDir = PushChooseDir_Callback(hObject, eventdata, handles);
+    if storDir == 0
+        set(handles.statusbar,'Text',...
+            'Choosing of data storage directory canceled by user');
+        return
+    end
     % set gui visible output
     if numel(storDir) <= 45
         str   = storDir;
@@ -283,7 +318,13 @@ selectmode  = 'on';
 if isfield(handles.metricdata,'bgImage') == 0                               %check if bgImage is already loaded, if not, choose it
     msgbox('Choose background image','modal');uiwait(gcf);
     [bgName bgDir] = uigetfile(FilterSpec,DlgTitle1,start_path);
-    bgImage        = imread([bgDir '/' bgName]);
+    if bgName ~= 0
+        bgImage        = imread([bgDir '/' bgName]);
+    else
+        set(handles.statusbar,'Text',...
+            'Choosing of background image canceled by user');
+        return
+    end
     % set gui visible output
     if numel(bgDir) <= 45
         str   = storDir;
@@ -342,7 +383,7 @@ handles.metricdata.subsImDir   = subsImDir;                                 %loc
 handles.prgmcontrol.loadIM = 0;                                             %0 ... OK, 1 ... warnings, 2 ... errors (for now without use)
 else
 %modify string to display in statusbar
-statusStr = 'Loading images cancelled.'; 
+statusStr = 'Loading images canceled by user'; 
 handles.statusbar = statusbar(handles.MainWindow,statusStr);
 end
 % Update handles structure
@@ -386,7 +427,45 @@ function EditStorDir_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of EditStorDir as text
 %        str2double(get(hObject,'String')) returns contents of EditStorDir as a double
 
-handles.metricdata.storDir = str2double(get(hObject,'String'));             %get value from editable textfield
+storDir = get(hObject,'String');                                            %get storage directory from editable textfield
+nameList= {'Subtracted' 'Height' 'Profile' 'Speed' 'Width' 'Correlation' ...%names of the directories for saving outputs
+    'Plots'};
+nameSubs= {{'Smoothed'} [] [] [] [] [] []};                                 %names of subdirectories for every folder
+
+if exist(storDir,'dir') == 0
+    mkdir(storDir);                                                         %if user specified directory doesnt exist, create it
+end
+d         = dir(storDir);                                                   %create list of subdirectories in storDir
+isub      = [d(:).isdir];                                                   %returns logical vector
+nameFolds = {d(isub).name};                                                 %get list of names of folders
+nameFolds(ismember(nameFolds,{'.','..'})) = [];                             %remove . and .. from the list
+% create subdirectories
+parfor i = 1:numel(nameList)
+    if sum(strcmp(nameFolds,nameList{i})) == 0                              %folder of the nameList is not present into storDir
+        mkdir([storDir '/' nameList{i}]);                                   %create directory
+        for j = 1:numel(nameSubs{i})
+            mkdir([storDir '/' nameList{i} '/' nameSubs{i}{j}]);            %and all subdirectories
+        end
+    elseif isempty(nameSubs{i}) == 0                                        %check if there are any subdirectories required in the checked dir.
+        d         = dir([storDir '/' nameList{i}]);                         %create list of subdirectories in checked dir
+        isub      = [d(:).isdir];                                           %returns logical vector
+        namesFolds = {d(isub).name};                                        %get list of names of folders
+        namesFolds(ismember(namesFolds,{'.','..'})) = [];                   %remove . and .. from the list
+        for j = numel(nameSubs{i})                                          %for every created subfolder
+            if sum(strcmp(namesFolds,nameSubs{i}{j})) == 0                  %if the subdirectory is not present in current dir
+                mkdir([storDir '/' nameList{i} '/' nameSubs{i}{j}]);        %create it
+            end
+        end
+    end
+end
+
+handles.metricdata.storDir = storDir;
+
+statusStr = ['Data storage directory ' storDir...
+    ' loaded. Subdirectories are ready.'];
+set(handles.statusbar,'Text',statusStr);                                    %set statusbar
+
+
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
@@ -528,21 +607,23 @@ function PushDefEdg_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% set default values for fields in Image Processing
-handles.prgmcontrol.autoEdges = 2;                                          %default - completely automatic program execution
-set(handles.PopupIMProc,'Value',1);
-minVal = get(handles.CheckCuvettes,'Min');                                  %default - no graphic output
-set(handles.CheckCuvettes,'Value',minVal);
-minVal = get(handles.CheckPlate,'Min'); 
-set(handles.CheckPlate,'Value',minVal);
-handles.metricdata.GREdges    = [0 0];                                      %default - dont want any graphics
-% default values for hough transform
-handles.metricdata.hpTr     = [];                                           %do not need to set up default values - they are present in the prgm
-handles.metricdata.numPeaks = [];
-handles.metricdata.fG       = [];
-handles.metricdata.mL       = [];
-% default values for image processing
-handles.metricdata.IMProcPars = {0.3300 200 35 25 0.4000 0 'Prewitt'};
+% obtain data
+[newData{1} newData{2}] =...                                                %save outputs in newData cell
+    initializeGUI(hObject, eventdata, handles,'imp');                       %call initialize function for image processing data
+
+% merge structures
+oldData = {handles.metricdata handles.prgmcontrol};                         %create cell of old data
+
+parfor i = 1:numel(newData)
+    fNamesNew = fieldnames(newData{i});                                     %get list of field names for new data structure
+    for j = 1:numel(fNamesNew)                                              %for all the fields in newData{i} structure
+        oldData{i}.(fNamesNew{j}) = newData{i}.(fNamesNew{j});              %replace same field in oldData or make field with corr. name
+    end
+end
+
+% extract resulting variables
+handles.metricdata = oldData{1};
+handles.prgmcontrol= oldData{2};
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -655,7 +736,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-%% Checkbuttons - Image Processing
+%% Checkboxes - Image Processing
 
 % --- Executes on button press in CheckCuvRegrGR.
 function CheckCuvettes_Callback(hObject, eventdata, handles)
@@ -665,7 +746,7 @@ function CheckCuvettes_Callback(hObject, eventdata, handles)
 
 % Hint: get(hObject,'Value') returns toggle state of CheckCuvRegrGR
 
-handles.metricdata.GREdges(1) = get(hObject,'Value');                       %see if checkbox is checked
+handles.prgmcontrol.GREdges(1) = get(hObject,'Value');                      %see if checkbox is checked
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -680,7 +761,7 @@ function CheckPlate_Callback(hObject, eventdata, handles)
 
 % Hint: get(hObject,'Value') returns toggle state of CheckPlate
 
-handles.metricdata.GREdges(2) = get(hObject,'Value');                       %see if checkbox is checked
+handles.prgmcontrol.GREdges(2) = get(hObject,'Value');                       %see if checkbox is checked
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -697,19 +778,7 @@ function PopupIMProc_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from PopupIMProc
 
 contents = cellstr(get(hObject,'String'));
-selected = contents{get(hObject,'Value')};                                  %get selected value from popmenu
-
-% save selected value to handles
-switch selected
-    case 'Force-automatic'
-        handles.prgmcontrol.autoEdges = 3;                                  % 3 ... automatically skiping not specified edges
-    case 'Automatic'
-        handles.prgmcontrol.autoEdges = 2;                                  % 2 ... completely automatic finding
-    case 'Semi-automatic'
-        handles.prgmcontrol.autoEdges = 1;                                  % 1 ... ask in case of problem
-    case 'Manual'
-        handles.prgmcontrol.autoEdges = 0;                                  % 0 ... ask every time
-end
+handles.prgmcontrol.autoEdges = contents{get(hObject,'Value')};             %get selected value from popmenu
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -916,10 +985,13 @@ function PlotSetts_SelectionChangeFcn(hObject, eventdata, handles)
 switch get(eventdata.NewValue,'Tag') % Get Tag of selected object.
     case 'RadioShowPlots'
         handles.prgmcontrol.GR.regime = 0;                                  %only show plots
+        set(handles.PopupGrFormat,'Enable','off');                          %if I am only showing pictures, the saving format doesnt matter
     case 'RadioSavePlots'
         handles.prgmcontrol.GR.regime = 1;                                  %only save plots
+        set(handles.PopupGrFormat,'Enable','on');
     case 'RadioShowSavePlots'
         handles.prgmcontrol.GR.regime = 2;                                  %show and save plots
+        set(handles.PopupGrFormat,'Enable','on');
 end
 
 % Update handles structure
@@ -940,6 +1012,11 @@ if isfield(handles.metricdata,'EdgCoord') == 0                              %if 
         msgbox(['There are no edges of cuvettes'...
             ' and plate specified'],'modal');uiwait(gcf);
 else                                                                        %otherwise call the rivuletProcessing function
+    % set up listboxes in postprocessing
+    set(handles.ListProfiles,'Value',1,'String','Preparing data')
+    set(handles.ListOtherData,'Value',1,'String','Preparing data');
+    
+    % calculate outputs
     handles.metricdata.OUT = rivuletProcessing(handles);
     
     % create lists for listboxes - list with profiles
@@ -999,38 +1076,23 @@ function PushSetDefRiv_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% set defaults values for fields in rivutel processing
-% program controls
-handles.prgmcontrol.GR.regr     = 0;                                        %no graphics at all
-handles.prgmcontrol.GR.contour  = 0;
-handles.prgmcontrol.GR.profcompl= 0;
-handles.prgmcontrol.GR.profcut  = 0;
-handles.prgmcontrol.GR.regime   = 1;                                        %want only to save images
-handles.prgmcontrol.GR.format   = 'png';                                    %default format for graphics saving
-set(handles.PopupLiqType,'Value',1);                                        %select 1 choice
-%
-minVal = get(handles.CheckCuvRegrGR,'Min');                                 %uncheck checkboxes
-set(handles.CheckCuvRegrGR,'Value',minVal);
-minVal = get(handles.CheckRivTopGR,'Min');                                  %uncheck checkboxes
-set(handles.CheckRivTopGR,'Value',minVal);
-minVal = get(handles.CheckCompProfGR,'Min');                                %uncheck checkboxes
-set(handles.CheckCompProfGR,'Value',minVal);
-minVal = get(handles.CheckMeanCutsGR,'Min');                                %uncheck checkboxes
-set(handles.CheckMeanCutsGR,'Value',minVal);
-% set default values for mandaroty variables
-handles.metricdata.Treshold     = 0.1;                                      %set value
-set(handles.EditTreshold, 'String', handles.metricdata.Treshold);           %fill in the field
-handles.metricdata.FSensitivity = 10;
-set(handles.EditFSensitivity, 'String', handles.metricdata.FSensitivity);
-% default values for rivulet processing optional parameters
-handles.metricdata.RivProcPars = {[0.15 0.30] 60 [1.93 0.33 6 2.25 80]... 
-    2 5 0};
-% popup menu
-handles.metricdata.fluidData = fluidDataFcn('DC 5');                        %set vaules into handles
-set(handles.PopupLiqType,'Value',2);                                        %select 2 choice
+% obtain data
+[newData{1} newData{2}] =...                                                %save outputs in newData cell
+    initializeGUI(hObject, eventdata, handles,'rvp');                       %call initialize function for rivulet processing data
 
-handles.statusbar = statusbar(handles.MainWindow,...
-        'Default rivulet processing parameters were set');
+% merge structures
+oldData = {handles.metricdata handles.prgmcontrol};                         %create cell of old data
+
+parfor i = 1:numel(newData)
+    fNamesNew = fieldnames(newData{i});                                     %get list of field names for new data structure
+    for j = 1:numel(fNamesNew)                                              %for all the fields in newData{i} structure
+        oldData{i}.(fNamesNew{j}) = newData{i}.(fNamesNew{j});              %replace same field in oldData or make field with corr. name
+    end
+end
+
+% extract resulting variables
+handles.metricdata = oldData{1};
+handles.prgmcontrol= oldData{2};
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
@@ -1215,72 +1277,110 @@ function CheckShowDataPlots_Callback(hObject, eventdata, handles)
 
 %% Auxiliary functions
 function [metricdata prgmcontrol] = ...
-    initializeGUI(hObject,eventdata,handles)
+    initializeGUI(hObject,eventdata,handles,dataPart)
 %
 % function for gui inicialization, to be executed just before progGui is
 % made visible
 
-% set default values for Preprocessing
-set(handles.EditStorDir,'String',['No outputs storage directory is'...      %field the edit boxes
+% INPUT variables
+% hObject,eventdata,handles ... default inputs
+% dataPart  ... which part of data am I expecting
+%               'all' if the function is called from opening function
+%               'imp' if the function is called to set defaults for image
+%                     processing
+%               'rvp' if the function is called to set defaults for rivulet
+%                     data processing
+
+switch dataPart
+    case 'all'
+        imp = 1; rvp = 1;                                                   % i want all availible data
+    case 'imp'
+        imp = 1; rvp = 0;                                                   %only image processing defaults
+    case 'rvp'
+        imp = 0; rvp = 1;                                                   %only rivulet processing defaults
+end
+
+if imp == 1 && rvp == 1                                                     %this is to be set only when initializing gui
+% specify metricdata for preprocessing
+% Specify root folder for program execution (must contain all the used
+% functions)
+handles.metricdata.rootDir = pwd;
+handles.prgmcontrol.DNTLoadIM = 1;                                          %by default, i dont want to store all image data in handles
+% fill the edit boxes
+set(handles.EditStorDir,'String',['No outputs storage directory is'...      %fill the edit boxes
     ' selected.']);
 set(handles.EditBcgLoc,'String','No background is loaded.');
 set(handles.EditIMLoc,'String','No images are loaded.');
-maxVal = get(handles.CheckDNL,'Max');                                       %uncheck checkbox
-set(handles.CheckDNL,'Value',maxVal);
-handles.prgmcontrol.DNTLoadIM = maxVal;                                     %by default, i dont want to store all image data in handles
+% modify checkbuttons
+set(handles.CheckDNL,'Value',handles.prgmcontrol.DNTLoadIM);
+end
 
+if imp == 1
 % set default values for fields in Image Processing
-handles.prgmcontrol.autoEdges = 3;                                          %default - completely automatic program execution
-minVal = get(handles.CheckCuvettes,'Min');                                  %default - no graphic output
-set(handles.CheckCuvettes,'Value',minVal);
-minVal = get(handles.CheckPlate,'Min'); 
-set(handles.CheckPlate,'Value',minVal);
-handles.metricdata.GREdges    = [0 0];                                      %default - dont want any graphics
-% default values for image processing
+% set values
+handles.prgmcontrol.autoEdges = 'Force-automatic';                          %default - completely automatic program execution
+handles.prgmcontrol.GREdges   = [0 0];
+% modify popup menu
+contents = cellstr(get(handles.PopupIMProc,'String'));                      %get the stringcell of options in popup menu
+indSel   = find(strcmp(contents,handles.prgmcontrol.autoEdges)~=0);         %get position of selected value
+set(handles.PopupIMProc,'Value',indSel);                                    %set value for image processing popup
+% set checkboxes
+set(handles.CheckCuvettes,'Value',handles.prgmcontrol.GREdges(1));
+set(handles.CheckPlate,'Value',handles.prgmcontrol.GREdges(2));
+% default values for image processing additional parameters
 handles.metricdata.IMProcPars = {0.3300 200 35 25 0.4000 0 'Prewitt'};
+end
 
-% set defaults values for fields in rivutel processing
-% program controls
+if rvp == 1
+% set defaults values for fields in Rivulet processing
+% program controls - set values
 handles.prgmcontrol.GR.regr     = 0;                                        %no graphics at all
 handles.prgmcontrol.GR.contour  = 0;
 handles.prgmcontrol.GR.profcompl= 0;
 handles.prgmcontrol.GR.profcut  = 0;
 handles.prgmcontrol.GR.regime   = 1;
 handles.prgmcontrol.GR.format   = 'png';                                    %default format for graphics saving
-set(handles.PopupLiqType,'Value',1);                                        %select 1 choice
-%
-%
-minVal = get(handles.CheckCuvRegrGR,'Min');                                 %uncheck checkboxes
-set(handles.CheckCuvRegrGR,'Value',minVal);
-minVal = get(handles.CheckRivTopGR,'Min');                                  %uncheck checkboxes
-set(handles.CheckRivTopGR,'Value',minVal);
-minVal = get(handles.CheckCompProfGR,'Min');                                %uncheck checkboxes
-set(handles.CheckCompProfGR,'Value',minVal);
-minVal = get(handles.CheckMeanCutsGR,'Min');                                %uncheck checkboxes
-set(handles.CheckMeanCutsGR,'Value',minVal);
-minVal = get(handles.RadioShowPlots,'Min');
-set(handles.RadioShowPlots,'Value',minVal);
-maxVal = get(handles.RadioSavePlots,'Max');
-set(handles.RadioSavePlots,'Value',maxVal);
-minVal = get(handles.RadioShowSavePlots,'Min');
-set(handles.RadioShowSavePlots,'Value',minVal);
-% metricdata
-% set default values for mandaroty variables
-handles.metricdata.Treshold     = 0.1;                                      %set value
-set(handles.EditTreshold, 'String', handles.metricdata.Treshold);           %fill in the field
-handles.metricdata.FSensitivity = 10;
-set(handles.EditFSensitivity, 'String', handles.metricdata.FSensitivity);
-% default values for rivulet processing optional parameters
-handles.metricdata.RivProcPars = {[0.15 0.30] 60 [1.93 0.33 6 2.25 80]... 
-    2 5 0};
-% set data for the liquid
-angle = handles.metricdata.RivProcPars{2};
-handles.metricdata.fluidData = fluidDataFcn('DC 5',angle);                  %set vaules into handles
-set(handles.PopupLiqType,'Value',2);                                        %select 2 choice
+% program control - make changes to gui
+% popup menu - format of the saved plots
+contents = cellstr(get(handles.PopupGrFormat,'String'));                    %get the stringcell of options in popup menu
+indSel   = find(strcmp(contents,handles.prgmcontrol.GR.format)~=0);         %get position of selected value
+set(handles.PopupGrFormat,'Value',indSel);                                  %select appropriate choice
+% checkboxes - which graphs are to be plotted
+set(handles.CheckCuvRegrGR,'Value',handles.prgmcontrol.GR.regr);
+set(handles.CheckRivTopGR,'Value',handles.prgmcontrol.GR.contour);
+set(handles.CheckCompProfGR,'Value',handles.prgmcontrol.GR.profcompl);
+set(handles.CheckMeanCutsGR,'Value',handles.prgmcontrol.GR.profcut);
+% radiobuttons - how the graphs are to be shown/saved
+buttonHandlesCell = {handles.RadioShowPlots handles.RadioSavePlots ...      %create cell with button handles
+    handles.RadioShowSavePlots};
+for i = 1:3                                                                 %check radiobuttons in dependece of value stored in ...GR.regime
+    if handles.prgmcontrol.GR.regime == i-1
+        Val = get(buttonHandlesCell{i},'Max');
+    else
+        Val = get(buttonHandlesCell{i},'Min');
+    end
+    set(buttonHandlesCell{i},'Value',Val);
+end
+       
 
-% Specify root folder for program execution (must contain all the used
-% functions)
-handles.metricdata.rootDir = pwd;
+% metricdata
+% additional rivulet processing parameters
+handles.metricdata.RivProcPars = {[0.15 0.30] 60 [1.93 0.33 6 2.25 80]...   % PlateSize, angle, cuvettes regr. pars, polDeg, nCuts, VolGasFlow
+    2 5 0};
+% mandatory input fields - set values
+angle = handles.metricdata.RivProcPars{2};                                  %plate inclination angle
+string= 'DC 5';
+handles.metricdata.fluidData = fluidDataFcn(string,angle);                  %set vaules into handles
+handles.metricdata.Treshold     = 0.1;                                      %set value
+handles.metricdata.FSensitivity = 10;
+% mandatory input fields - fill edit boxes
+set(handles.EditTreshold, 'String', handles.metricdata.Treshold);           %fill in the field
+set(handles.EditFSensitivity, 'String', handles.metricdata.FSensitivity);
+% mandatory input fields - modify popup menu
+contents = cellstr(get(handles.PopupLiqType,'String'));                     %get the stringcell of options in popup menu
+indSel   = find(strcmp(contents,string)~=0);                                %get position of selected value
+set(handles.PopupLiqType,'Value',indSel);                                   %select appropriate choice
+end
 
 metricdata = handles.metricdata;
 prgmcontrol= handles.prgmcontrol;
@@ -1289,6 +1389,8 @@ guidata(handles.MainWindow, handles);
 
 
 %% Menus
+
+%% File menu
 % --------------------------------------------------------------------
 function FileMenu_Callback(hObject, eventdata, handles)
 % hObject    handle to FileMenu (see GCBO)
@@ -1355,6 +1457,7 @@ function QuitPrgm_Callback(hObject, eventdata, handles)
 close(handles.MainWindow);                                                  %call closing function
 
 
+%% Elements edges finding menu
 % --------------------------------------------------------------------
 function findEdgesMenu_Callback(hObject, eventdata, handles)
 % hObject    handle to findEdgesMenu (see GCBO)
@@ -1537,7 +1640,7 @@ set(handles.statusbar,'Text',['Approximate plate edges position was '...
 guidata(handles.MainWindow, handles);
 
 
-
+%% Data processing menu
 % --------------------------------------------------------------------
 function rivProcMenu_Callback(hObject, eventdata, handles)
 % hObject    handle to rivProcMenu (see GCBO)
@@ -1567,11 +1670,52 @@ function ShowExpPars_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-changeRPPars('onlyshow',handles.metricdata.RivProcPars);                  %call gui for changing parameters with loaded current
+changeRPPars('onlyshow',handles.metricdata.RivProcPars);                    %call gui for changing parameters with loaded current
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
+% --------------------------------------------------------------------
+function SaveRPPars_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveRPPars (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+if isempty(handles.metricdata.RivProcPars) == 0
+    RivProcPars = handles.metricdata.RivProcPars;
+    uisave('RivProcPars','RivProcPars')
+else
+    msgbox('You must specify RivProcPars at first','modal');uiwait(gcf);
+end
+
+set(handles.statusbar,'Text',...
+    'Rivulet processing parameters were saved into .mat file');
+
+
+% --------------------------------------------------------------------
+function LoadRPPars_Callback(hObject, eventdata, handles)
+% hObject    handle to LoadRPPars (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+uiopen('load');                                                             %open dialog for loading variable
+if exist('RivProcPars','var') == 0
+    msgbox(['You can use this option only to load RivProcPars saved by'...
+        '"save RivProcPars into .mat file" option from program menu.'],...
+        'modal');uiwait(gcf);
+    set(handles.statusbar,'Text',...
+        'Loading RivProcPars from file failed.');
+else
+    handles.metricdata.RivProcPars = RivProcPars;
+    set(handles.statusbar,'Text',...
+        ['User defined variables were loaded from file.'...
+        ' RivProcPars is prepared for rivulet processing.']);
+end
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+%% Postprocessing menu
 
 % --------------------------------------------------------------------
 function PostProcMenu_Callback(hObject, eventdata, handles)

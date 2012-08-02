@@ -65,11 +65,17 @@ end
 
 handles.metricdata = initializeGUI(hObject,eventdata,handles);              %if there are not any parameters to show, load defaults
 
+set(hObject,'CloseRequestFcn',@my_closereq)                                 %set custom closerequest function
+
 % Update handles structure
 guidata(hObject, handles);
 
 % UIWAIT makes changeIMPars wait for user response (see UIRESUME)
 uiwait(handles.figure1);
+
+% My own closereq fcn -> to avoid set output even if gui is close by Alt+F4
+function my_closereq(src,evnt)
+uiresume(gcf)
 
 
 % --- Outputs from this function are returned to the command line.

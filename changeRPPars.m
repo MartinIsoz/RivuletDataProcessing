@@ -81,13 +81,17 @@ end
 
 handles.metricdata = initializeGUI(hObject,eventdata,handles);              %call initialization function
 
+set(hObject,'CloseRequestFcn',@my_closereq)                                 %set custom closerequest function
+
 % Update handles structure
 guidata(hObject, handles);
 
 % UIWAIT makes changeIMPars wait for user response (see UIRESUME)
 uiwait(handles.figure1);
 
-
+% My own closereq fcn -> to avoid set output even if gui is close by Alt+F4
+function my_closereq(src,evnt)
+uiresume(gcf)
 
 % --- Outputs from this function are returned to the command line.
 function varargout = changeRPPars_OutputFcn(hObject, eventdata, handles) 
@@ -157,7 +161,7 @@ function PushCancelClose_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % assign the output cell
-handles.output = [];                                                        %set the output as empty matrix
+handles.output = [];
 
 % Update handles structure
 guidata(hObject, handles);

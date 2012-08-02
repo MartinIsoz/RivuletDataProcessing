@@ -9,6 +9,7 @@ function showOtherDataUITable(data,NameStr,type,plots)
 % NameStr.. name for the opened figure
 % type  ... type to decide if it is descriptive output or correlation to be
 %           shown 0 ... correlation, 1 ... description
+% plots ... 0/1, if user want the data to be plotable
 
 hFig = figure;                                                              %open figure window
 set(hFig,'NumberTitle', 'off');
@@ -60,12 +61,20 @@ if plots == 1
     % create axes in space set up by axesPosVec
     hAxes = axes('OuterPosition',axesPosVec);                               %create axes in left space
     if type == 0
-        hPlot = plot(hAxes,data(:,4),data(:,end),'r-o');
+        hPlot1 = plot(hAxes,data(:,4),data(:,end),'ro');                     %plot all data as red circles
+        hold on
+        uniqueFlowRates  = unique(data(:,4));                               %get all unique dimensionless flow rates
+        meanIFArea       = zeros(1,numel(uniqueFlowRates));                 %preallocate variable for mean values
+        for i = 1:numel(uniqueFlowRates)
+            meanIFArea(i) = mean(data(uniqueFlowRates(i) == data(:,4),end));%calculate mean IF area for unique flow rate
+        end
+        hPlot2 = plot(hAxes,uniqueFlowRates,meanIFArea,'g','LineWidth',2);   %add trend line to the graph
         title(['\bf Interfacial area as fun. of '...
             'dimensionless flow rate'],'FontSize',13);
         xlabel('dimensionless flow rate, [-]');
         ylabel('interfacial area of the rivulet, [m^2]');
-        set(hPlot,'MarkerSize',10,'MarkerFaceColor','y');
+        set(hPlot1,'MarkerSize',10,'MarkerFaceColor','y');
+        legend(hPlot2,'Mean values - Trend line')
     else
         % Create an invisible marker plot of the data and save handles
         % to the lineseries objects; use this to simulate data brushing.
@@ -75,6 +84,7 @@ if plots == 1
             'HandleVisibility', 'off',...
             'Visible', 'off');
         xlabel('distance from the top of the plate, [m]');
+        xlim([0 0.30])
         ylabel('output data values');
         title('\bf Output data','FontSize',13)
         set(hTable,'CellSelectionCallback',@hTableSelectionCallback,...     %set CellSelectionCallback for the table
@@ -90,13 +100,13 @@ function hTableSelectionCallback(hTable,eventdata)
 % if a row/vector is selected, it will be ploted in axes
 
 % hmkrs are handles to lines
-set(hmkrs, 'Visible', 'off') % turn them off to begin
+set(hmkrs, 'Visible', 'off')                                                % turn them off to begin
 
 % Get the list of currently selected table cells
-sel = eventdata.Indices;     % Get selection indices (row, col)
+sel = eventdata.Indices;                                                    % Get selection indices (row, col)
 % Noncontiguous selections are ok
-selcols = unique(sel(:,2));  % Get all selected data col IDs
-table = get(hTable,'Data'); % Get copy of uitable data
+selcols = unique(sel(:,2));                                                 % Get all selected data col IDs
+table = get(hTable,'Data');                                                 % Get copy of uitable data
 if max(selcols) > numel(table(1,:)) - 3
     errordlg({['Flow rates and distance from the top of the plate are '...
         'not plotable.'] 'Please select different columns'})
@@ -107,6 +117,7 @@ else
         xvals = sel(:,1);
         xvals(sel(:,2) ~= col) = [];
         yvals = table(xvals, col)';
+        xvals = data(xvals,end);                                            %select x-values from data table - distance from the top of the plate
         % Create Z-vals = 1 in order to plot markers above lines
         zvals = col*ones(size(xvals));
         % Plot markers for xvals and yvals using a line object
