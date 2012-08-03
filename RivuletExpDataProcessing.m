@@ -1019,6 +1019,19 @@ else                                                                        %oth
     % calculate outputs
     handles.metricdata.OUT = rivuletProcessing(handles);
     
+    % saving output into cell for use in postprocessing
+    nExp = handles.prgmcontrol.nExp;                                        %number of the experiment (times that calculate was ran)
+    handles.metricdata.Availible{nExp} = handles.metricdata.OUT;            %saving outputs
+    handles.prgmcontrol.nExp = nExp+1;                                      %increase counter
+    % create ID for experiment
+    contents = cellstr(get(handles.PopupLiqType,'String'));                 %get selected liquid type
+    liqType = contents{get(handles.PopupLiqType,'Value')};
+    gasFlow = mat2str(handles.metricdata.RivProcPars{6});                   %get value of volumetric flow rate of gas
+    angle   = mat2str(handles.metricdata.RivProcPars{2});                   %get value of plate inclination angle
+    time    = datestr(now,'dd_mm_yy-HH_MM_SS');
+    ID      = [liqType '_' gasFlow '_' angle '_' time];                     %set ID string
+    handles.metricdata.Availible{nExp}.ID = ID;
+    
     % create lists for listboxes - list with profiles
     liststr = cell(1,numel(handles.metricdata.imNames));
     for i = 1:numel(liststr)
@@ -1306,6 +1319,7 @@ if imp == 1 && rvp == 1                                                     %thi
 % functions)
 handles.metricdata.rootDir = pwd;
 handles.prgmcontrol.DNTLoadIM = 1;                                          %by default, i dont want to store all image data in handles
+handles.prgmcontrol.nExp   = 1;                                             %set experiments counter
 % fill the edit boxes
 set(handles.EditStorDir,'String',['No outputs storage directory is'...      %fill the edit boxes
     ' selected.']);
