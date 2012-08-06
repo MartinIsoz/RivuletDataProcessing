@@ -52,7 +52,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 %    saved
 %11. Calculate results (this calls function rivuletProcessing with
 %   specified parameters)
-%-postprocessing-----------------------------------------------------------
+%-postprocmenu-----------------------------------------------------------
 %12. Set defaults - sets default variable values for rivulet data
 %   processing
 %13. Save vars to base (calls function save_to_base)
@@ -86,7 +86,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 % Edit the above text to modify the response to help
 % RivuletExpDataProcessing
 
-% Last Modified by GUIDE v2.5 02-Aug-2012 10:57:38
+% Last Modified by GUIDE v2.5 06-Aug-2012 17:02:51
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -1012,14 +1012,14 @@ if isfield(handles.metricdata,'EdgCoord') == 0                              %if 
         msgbox(['There are no edges of cuvettes'...
             ' and plate specified'],'modal');uiwait(gcf);
 else                                                                        %otherwise call the rivuletProcessing function
-    % set up listboxes in postprocessing
+    % set up listboxes in postprocmenu
     set(handles.ListProfiles,'Value',1,'String','Preparing data')
     set(handles.ListOtherData,'Value',1,'String','Preparing data');
     
     % calculate outputs
     handles.metricdata.OUT = rivuletProcessing(handles);
     
-    % saving output into cell for use in postprocessing
+    % saving output into cell for use in postprocmenu
     nExp = handles.prgmcontrol.nExp;                                        %number of the experiment (times that calculate was ran)
     handles.metricdata.Availible{nExp} = handles.metricdata.OUT;            %saving outputs
     handles.prgmcontrol.nExp = nExp+1;                                      %increase counter
@@ -1030,6 +1030,9 @@ else                                                                        %oth
     angle   = mat2str(handles.metricdata.RivProcPars{2});                   %get value of plate inclination angle
     time    = datestr(now,'dd_mm_yy-HH_MM_SS');
     ID      = [liqType '_' gasFlow '_' angle '_' time];                     %set ID string
+    handles.metricdata.Availible{nExp}.imNames = handles.metricdata.imNames;%set image names/measurement descriptions
+    handles.metricdata.Availible{nExp}.plateSize = ...                      %save also plateSize of current experiment
+        handles.metricdata.RivProcPars{1};
     handles.metricdata.Availible{nExp}.ID = ID;
     
     % create lists for listboxes - list with profiles
@@ -1729,7 +1732,7 @@ end
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
-%% Postprocessing menu
+%% postprocmenu menu
 
 % --------------------------------------------------------------------
 function PostProcMenu_Callback(hObject, eventdata, handles)
@@ -1764,4 +1767,59 @@ for i = 1:numel(fileNames)                                                  %for
     else
         figure;imshow([fileDir '/' fileNames{i}]);
     end
+end
+
+
+% --------------------------------------------------------------------
+function SaveProcessedData_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveProcessedData (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+if isfield(handles.metricdata,'Availible') == 1
+    Availible = handles.metricdata.Availible;
+    uisave('Availible','Processed_data');
+    set(handles.statusbar,'Text',...
+        'Processed data were saved into .mat file');
+else
+    msgbox('There are no availible processed data yet','modal');uiwait(gcf);
+    set(handles.statusbar,'Text',...
+    'No data were saved into .mat file');
+end
+
+
+% --------------------------------------------------------------------
+function LoadProcessedData_Callback(hObject, eventdata, handles)
+% hObject    handle to LoadProcessedData (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+uiopen('load');                                                             %open dialog for loading variable
+if exist('Availible','var') == 0
+    msgbox(['You can use this option only to load Processed data saved by'...
+        '"Save all processed data into .mat file" option from program menu.'],...
+        'modal');uiwait(gcf);
+    set(handles.statusbar,'Text',...
+        'Loading Availible from file failed.');
+else
+    handles.metricdata.RivProcPars = RivProcPars;
+    set(handles.statusbar,'Text',...
+        ['User defined variables were loaded from file.'...
+        ' Availible is prepared for postprocessing.']);
+end
+
+% Update handles structure
+guidata(handles.MainWindow, handles);
+
+
+% --------------------------------------------------------------------
+function OpenPostProcTool_Callback(hObject, eventdata, handles)
+% hObject    handle to OpenPostProcTool (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+if isfield(handles.metricdata,'Availible') == 1
+    postProcPlotting(handles.metricdata.Availible);
+else
+    msgbox('There are no availible processed data yet','modal');uiwait(gcf);
 end
