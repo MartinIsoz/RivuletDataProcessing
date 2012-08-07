@@ -1191,6 +1191,8 @@ function PushShowOtherData_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+plateSize = handles.metricdata.RivProcPars{1};                              %extract plateSize for current experiment
+
 if isfield(handles.prgmcontrol,'showOther') == 0
     msgbox('You must choose the data to be shown','modal');
     uiwait(gcf);
@@ -1207,7 +1209,7 @@ else
                 NameStr = [fieldsCell{i} '_' tmpVar{end}{j}];               %create i-th list string
                 if isempty(showOther(showOther == k)) == 0                  %data are chosen to be shown
                     plots = get(handles.CheckShowDataPlots,'Value');        %does user want plots?
-                    showOtherDataUITable(tmpVar{j},NameStr,1,plots);        %show uitable with description option, without plots
+                    showOtherDataUITable(tmpVar{j},NameStr,1,plots,plateSize);%show uitable with description option, without plots
                 end
                 k = k+1;                                                    %increase counter
             end
@@ -1215,7 +1217,7 @@ else
             NameStr = fieldsCell{i};                                        %if fields is class double, there are no subfields
             if isempty(showOther(showOther == k)) == 0                      %data are chosen to be shown
                 plots = get(handles.CheckShowDataPlots,'Value');            %does user want plots?
-                showOtherDataUITable(tmpVar,NameStr,0,plots);               %show uitable with correlation options
+                showOtherDataUITable(tmpVar,NameStr,0,plots,plateSize);     %show uitable with correlation options
             end
             k = k+1;                                                        %increase counter
         end

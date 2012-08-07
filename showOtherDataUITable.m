@@ -1,4 +1,4 @@
-function showOtherDataUITable(data,NameStr,type,plots)
+function showOtherDataUITable(data,NameStr,type,plots,plateSize)
 %
 % simple function for showing data selected in quick outputs overview
 % in uitable. it was exported from the main code because of possibility of
@@ -84,7 +84,7 @@ if plots == 1
             'HandleVisibility', 'off',...
             'Visible', 'off');
         xlabel('distance from the top of the plate, [m]');
-        xlim([0 0.30])
+        xlim([0 plateSize(2)]);                                             %set limits of x-axes
         ylabel('output data values');
         title('\bf Output data','FontSize',13)
         set(hTable,'CellSelectionCallback',@hTableSelectionCallback,...     %set CellSelectionCallback for the table
