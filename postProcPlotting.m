@@ -58,7 +58,8 @@ TextMsrt = uicontrol(hFig,'Style','text',...                                %cre
 
 % create pushbuttons
 PushPlot = uicontrol(hFig,'Style','pushbutton','Tag','PushPlot',...
-    'String','Plot Selected','Callback',@PushPlot_Callback);
+    'String','Plot Selected','Callback',@PushPlot_Callback,...
+    'Enable','off');                                                        %at first disable this button
 % create checkbox
 CheckLink= uicontrol(hFig,'Style','checkbox','Tag','CheckLink',...
     'String','Link plot with table');
@@ -82,6 +83,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         set(ListData,'Max',1,'String',strCellDT);                           %fill in list box and allow selection of all the strings
         set(ListData,'Enable','on');                                        %enable filled list for chosing
         set(ListMsrt,'Enable','off','Value',[]);                            %disable list which is yet to be filled
+        % disable plot button until the data are selected
+        set(PushPlot,'Enable','off');
         % updating application data
         appdata.metricdata.strCellDT = strCellDT;                           %assign variables to appdata
         appdata.prgmcontrol.selGR    = selGR;
@@ -97,17 +100,22 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         if numel(selDT) == 1 && comp == 0                                   %check for length of the selection for strcmp
             if strcmp(strCellDT{selDT},'Profiles') == 1                     %actualize listbox selection to show compatible data
                 strCellNDT = strCellDT(strcmp(strCellDT,'Profiles')==1);    %reduce only to profiles
+                % at the moment, this plot are not linkable with table
+                set(CheckLink,'Enable','off');
+                % update appdata
                 appdata.prgmcontrol.comp = 1;                               %store info about choosing compatible data
                 appdata.prgmcontrol.shTable = 'Profiles';                   %store info about choosed data
                 guidata(hObject,appdata);
             elseif strcmp(strCellDT{selDT},'IFACorr') == 1
                 strCellNDT = strCellDT(strcmp(strCellDT,'IFACorr')==1);     %reduce only to interfacial area correlation data
+                % update appdata
                 appdata.prgmcontrol.comp = 1;                               %store info about choosing compatible data
                 appdata.prgmcontrol.shTable = 'IFACorr';                    %store info about choosed data
                 guidata(hObject,appdata);
             else
                 strCellNDT = strCellDT(strcmp(strCellDT,'Profiles') == 0&...%get rid of profiles and IFACorr
                     strcmp(strCellDT,'IFACorr') == 0);
+                % update appdata
                 appdata.prgmcontrol.comp = 1;                               %store info about choosing compatible data
                 appdata.prgmcontrol.shTable = 'Other';                      %store info about choosed data
                 guidata(hObject,appdata);
@@ -150,6 +158,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                             'IFACorr' separators(2)];
                         stInd(j+1) = stInd(j) + 1;                          %only IFACorr in the group, dont need the last listbox
                         fillIFACorrUITable(TableData,dataSH);
+                        set(PushPlot,'Enable','on');                        %the data are plotable now
                     case 'Other'                                            %mSpeed, rivWidth and/or rivHeight are to be shown
                         Msrt = dataSH{j}{end};                              %get list of regimes saved into 'other' variables
                         strCellMS = [strCellMS strCellGR(k) separators(1)...
@@ -230,7 +239,11 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
             case 'Other'
                 fillOtherUITable(TableData,dataSH);
         end
+        % enable PushPlot button
+        set(PushPlot,'Enable','on');                                        %data are plottable now
+        % update and fill appdata
         appdata.prgmcontrol.GR = GR;                                        %save indexes of selected data into groups into appdata
+        appdata.prgmcontrol.selMS = selMS;                                  %save real indexes of selected
         guidata(hFig,appdata);                                              %update appdata
     end
     function PushPlot_Callback(hObject,~,~)
@@ -238,6 +251,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         shTable = appdata.prgmcontrol.shTable;
         selGR   = appdata.prgmcontrol.selGR;                                %selected data groups
         selDT   = appdata.prgmcontrol.selDT;                                %selected data in groups
+        selMS   = appdata.prgmcontrol.selMS;                                %indexes of selected data
+        GR = appdata.prgmcontrol.GR;                                        %indexes of the data into groups
         % extract data
         plateSize = appdata.metricdata.plateSize;                           %matrix with plate sizes
         Data = get(TableData,'UserData');                                   %get data from the table
@@ -259,21 +274,26 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         clear('Children');
         % decode the ID string
         rdblCellStr = cell(1,numel(selGR));                                 %create empty var
-        for j = 1:numel(selGR)
-            tmpVar = regexp(Availible{selGR(j)}.ID,'_','split');            %cut the string between '_'
+        k           = 1;l = 1;                                              %auxiliary indexes
+        for j = 1:numel(selMS)
+            if l > numel(GR{k})                                             %distinct to which groups are the data appartening
+                k = k+1;
+                l = 1;
+            else
+                l = l+1;
+            end
+            tmpVar = regexp(Availible{selGR(k)}.ID,'_','split');            %cut the string between '_'
             tmpVar = tmpVar(1:3);                                           %take only usefull data (liquid type, gas vol.flow and plt. incl. an.)
             tmpVar{1} = ['Liq. tp.: ' tmpVar{1}];                           %liquid type
             tmpVar{2} = ['V_g = ' tmpVar{2} ' m3/s'];                       %volumetric gas flow
             tmpVar{3} = ['\alpha = ' tmpVar{3} '\circ{}'];                  %plate inclination angle
             rdblCellStr{j} = [tmpVar{1} 10 ...
                 tmpVar{2} 10 ...
-                tmpVar{3}];                                                 %append string to legend
+                tmpVar{3}] ;                                                %append string to legend
         end
         switch shTable
             case 'Profiles'
                 set(hPlFig,'Name','Mean prof. in cuts');                    %set name of the plot
-                hPlAxes = axes('OuterPosition',[0 0 1 1],...                %create axes filling all the space
-                    'Tag','hPlAxes');
                 if get(CheckLink,'Value') == 1
                     set(TableData,'CellSelectionCallback',...
                         @hTableProfilesSelectionCallback);
@@ -283,19 +303,32 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 dTopsC= appdata.metricdata.dTopsC;
                 % create net of subplots
                 nSubPl= numel(dTopsC);                                      %number of sublots is number of common columns
-                % find breaks into data and set up colors
-                indPlt= find(dTopsU==dTopsC(1));
-                indPlt = [2*indPlt-1 2*indPlt];                         %there are 2*numel(dTopsU) columns
-                tmpVar = Data(:,indPlt);                                %reduce data
-                tmpVar = reshape(tmpVar(tmpVar~=0),[],size(tmpVar,2));  %strip off 0
-                brks   = [1 find(diff(tmpVar(:,1))<0)'+1 numel(tmpVar(:,1))];%new group starts
-                color  = rand(numel(brks)-1,3);
+                % set up colors
+                color  = distinguishable_colors(numel(selMS));              %create matrix of distinguishable colors
                 % fill in the subplots
+                mod2    = mod(nSubPl,2);                                    %modulo after dividing by 2 (number of empty spaces in second row)
+                if mod2 ~= 0                                                %if there is left space in the second row
+                    totWidth = 1;                                           %it will be used for legend
+                else                                                        %otherwise,
+                    totWidth= 0.8;                                          %use only 0.8 of hor space, leave the rest for legend
+                end
+                widthPl = totWidth/(ceil(nSubPl/2));                        %width of 1 plot
+                heightPl= 0.5;                                              %height of 1 plot, 2 rows
+                l       = -1;                                               %auxiliary indexe for horizontal ax. placing
+                spV     = 0.5;                                              %space from the bottom of the figure
                 for j = 1:nSubPl
-                    hPlAxes(j) = subplot(2,ceil(nSubPl/2),j);
+                    if j == ceil(nSubPl/2)+1;                               %end of the first row
+                        l  =  0;
+                        spV=  0;
+                    else
+                        l = l+1;
+                    end
+                    hPlAxes(j) = axes('OuterPosition',...
+                        [l*widthPl spV widthPl heightPl]);
                     hold(hPlAxes(j),'on');                                  %set the plot to hold
-                    title(hPlAxes(j),...
-                        ['\bf Cut at ' mat2str(dTopsC(j)) ' mm']);
+                    hTtl = title(hPlAxes(j),...
+                        ['Cut at ' mat2str(dTopsC(j)) ' mm']);
+                    set(hTtl,'FontSize',13,'FontWeight','bold')             %modify title properties
                     xlabel(hPlAxes(j),'plate width coordinate, [m]');
                     ylabel(hPlAxes(j),'rivulet height, [m]');
                     % select data to plot
@@ -305,12 +338,35 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     tmpVar = reshape(tmpVar(tmpVar~=0),[],size(tmpVar,2));  %strip off 0
                     brks   = [1 find(diff(tmpVar(:,1))<0)'+1 numel(tmpVar(:,1))];%new group starts
                     for k  = 1:numel(brks)-1
-                        plot(tmpVar(brks(k):brks(k+1)-1,1),...
+                        plot(hPlAxes(j),tmpVar(brks(k):brks(k+1)-1,1),...
                             tmpVar(brks(k):brks(k+1)-1,2),'Color',color(k,:),...
                             'LineWidth',2)
-                        xlim([0 plateSize(1)]);                             %width of the plate is the x-coordinate
+                        xlim(hPlAxes(j),[0 plateSize(1)]);                  %width of the plate is the x-coordinate
                     end
                 end
+                % create legend, I need to help myself with little hack
+                % using ghost figure
+                lgStr = cell(1,numel(selMS));
+                parfor j = 1:numel(selMS)                                   %create legend for each chosen picture
+                    lgStr{j} = ['Sel. ' num2str(j) 10 rdblCellStr{j}];
+                end
+                if mod2 ~= 0                                                %if there is left space, use it for legend
+                    hGhostAx = axes('OuterPosition',...                     %create ghost axes
+                        [(l+1)*widthPl spV widthPl heightPl],...
+                        'Visible','off','Units','Normal');
+                else                                                        %otherwise use saved space
+                    hGhostAx = axes('OuterPosition',...
+                        [totWidth 0 1-totWidth 1],...
+                        'Visible','off');
+                end
+                hold(hGhostAx,'on');
+                for j  = 1:numel(brks)-1
+                    plot(hGhostAx,tmpVar(brks(j):brks(j+1)-1,1),...
+                        tmpVar(brks(j):brks(j+1)-1,2),'Color',color(j,:),...
+                        'Visible','off','LineWidth',2);                     %invisible plots in invisible axes
+                end
+                legend(hGhostAx,lgStr',...
+                    'OuterPosition',get(hGhostAx,'Position'));              %create legend for ghost axes
             case 'IFACorr'
                 set(hPlFig,'Name','IFACorr data');                          %set name of the plot
                 hPlAxes   = axes('OuterPosition',[0 0.1 1 0.9],...          %create axes with space for popupmenu
@@ -330,15 +386,16 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     'Position',[0.3 0.01 0.4 0.08],'Value',1);              %create popup menu for choosing x axes
                 brks = [1 find(diff(Data(:,4))<0)'+1 numel(Data(:,4))];     %indexes of new data starts (diff in dimless fl. rate < 0)
                 hold(hPlAxes,'on');
-                color = zeros(numel(brks)-1,3);                             %allocate matrix for used colors
+                color = distinguishable_colors(numel(brks)-1);              %allocate matrix for used colors and fill it with colors
                 for j = 1:numel(brks)-1
-                    color(j,:) = rand(1,3);                                 %create random color and store it
                     hPlot(j) = plot(hPlAxes,Data(brks(j):brks(j+1),4),...
                         Data(brks(j):brks(j+1),end),'^');
-                    set(hPlot(j),'Color',color(j,:));
+                    set(hPlot(j),'Color',color(j,:),'MarkerFaceColor',...
+                        color(j,:));
                 end
-                title(hPlAxes,['\bf Interfacial area as fun. of '...
-                    'dimensionless liq. flow rate'],'FontSize',13);
+                hTtl = title(hPlAxes,['Interfacial area as fun. of '...
+                    'dimensionless liq. flow rate']);
+                set(hTtl,'FontSize',13,'FontWeight','bold')                 %modify title properties
                 xlabel(hPlAxes,'dimensionless flow rate, [-]');
                 ylabel(hPlAxes,'interfacial area of the rivulet, [m^2]');
                 set(hPlot,'MarkerSize',10);
@@ -356,18 +413,17 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 appdata.metricdata.color=color;
                 guidata(hFig,appdata);                                      %update application data
             case 'Other'
-                GR = appdata.prgmcontrol.GR;                                %indexes of the data into groups
                 switch selDT                                                %switch selected data
                     case 1                                                  %switch figure title and labels
-                        ttlStr = ['\bf Mean speed of liquid as function'...
+                        ttlStr = ['Mean speed of liquid as function'...
                             ' of distance from the top of the plate'];
                         ylbStr = 'Speed, [m/s]';
                     case 2
-                        ttlStr = ['\bf Rivulet width as function'...
+                        ttlStr = ['Rivulet width as function'...
                             ' of distance from the top of the plate'];
                         ylbStr = 'Width, [m]';
                     case 3
-                        ttlStr = ['\bf Rivulet height as function'...
+                        ttlStr = ['Rivulet height as function'...
                             ' of distance from the top of the plate'];
                         ylbStr = 'Height, [m]';
                 end
@@ -380,33 +436,25 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     set(TableData,'CellSelectionCallback',...
                         @hTableOtherSelectionCallback);
                 end
-                brks = [1 find(diff(Data(:,end))<0)'+1 numel(Data(:,end))]; %indexes of new data starts (diff in distances from top < 0)
+                brks = [1 find(diff(Data(:,end))<0)'+1 numel(Data(:,end))+1];%indexes of new data starts (diff in distances from top < 0)
                 % create leged entries (ID strings of data groups)
                 legendCellStr = {};
                 flRates       = Data(:,8);                                  %get present dimless flow rates
                 flRates       = flRates(flRates~=0);                        %get rid of zeros
-                k             = 1;                                          %auxiliary index, distinction between data groups
-                l             = 1;                                          %auxiliary index
-                color = zeros(numel(brks)-1,3);                             %allocate matrix for used colors
+                color = distinguishable_colors(numel(brks)-1);              %allocate matrix for used colors and fill in with colors
                 hold(hPlAxes,'on');
                 for j = 1:numel(brks)-1                                     %for all selected dimless flow rates
-                    if l > numel(GR{k})                                     %distinct to which groups are the data appartening
-                        k = k+1;
-                        l = 1;
-                    else
-                        l = l+1;
-                    end
-                    color(j,:) = rand(1,3);
                     legendCellStr{j} =...
                         ['M = ' num2str(flRates(j),'%3.1f') 10 ...          %compose a legend entry
-                        rdblCellStr{k}];
-                    hPlot(j,:) = plot(hPlAxes,Data(brks(j):brks(j+1),end),...%plot datagroup
-                        Data(brks(j):brks(j+1),1:end-3),'^');
+                        rdblCellStr{j}];
+                    hPlot(j,:) = plot(hPlAxes,Data(brks(j):brks(j+1)-1,end),...%plot datagroup
+                        Data(brks(j):brks(j+1)-1,1:end-3),'^');
                     set(hPlot(j,:),'Color',color(j,:),...                   %color the plot
                         'MarkerFaceColor',color(j,:));                      %fill the marker faces with the same color
-                    set(hPlot(j,end-2),'Visible','off');                    %hide the zeros column
+                    set(hPlot(j,[end-2 end]),'Visible','off');              %hide the zeros column and the standard deviation column
+                    set(hPlot(j,end-1),'LineStyle','-','Marker','none');    %plot mean values with trendline
                 end
-                hLegend = legend(hPlot(:,1),legendCellStr,...               %set up legend
+                hLegend = legend(hPlot(:,1),legendCellStr,...               %set up legend, number of groups == number of columns
                     'Location','EastOutside',...
                     'Interpreter','tex');
                 % modifying the plot
@@ -414,10 +462,12 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 xlabel(hPlAxes,'Distance from the top of the plate, [m]');  %set xlabel (common to all)
                 xlim(hPlAxes,[0 max(plateSize(:,2))])                       %set xLim as the biggest plate length
                 ylabel(hPlAxes,ylbStr);                                     %set y label
-                title(hPlAxes,ttlStr,'FontSize',13);                        %set title of the figure
+                hTtl = title(hPlAxes,ttlStr);                               %set title of the figure
+                set(hTtl,'FontSize',13,'FontWeight','bold')                 %modify title properties
                 % save handles into appdata
                 appdata.handles.hPlFig = hPlFig;
                 appdata.handles.hPlAxes= hPlAxes;
+                assignin('base','hPlAxes',hPlAxes);
                 appdata.handles.hPlot  = hPlot;
                 appdata.handles.hLegend= hLegend;
                 % save breakpoints into appdata
@@ -447,12 +497,12 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         switch xAxes
             case 'Dimensionless liquid flow rate'
                 indX = 4;                                                   %column index of x-data in table
-                ttlStr = ['\bf Interfacial area as fun. of '...
+                ttlStr = ['Interfacial area as fun. of '...
                     'dimensionless liq. flow rate'];
                 xlblStr= 'dimensionless liq. flow rate, [-]';
             case 'Volumetric gas flow rate'
                 indX = 6;                                                   %column index of x-data in table
-                ttlStr = ['\bf Interfacial area as fun. of '...
+                ttlStr = ['Interfacial area as fun. of '...
                     'volumetric gas flow rate'];
                 xlblStr= 'volumetric gas flow rate, [m^3/s]';
         end
@@ -461,9 +511,10 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         for j = 1:numel(brks)-1
             hPlot(j)   = plot(hPlAxes,Data(brks(j):brks(j+1),indX),...
                 Data(brks(j):brks(j+1),end),'^');
-            set(hPlot(j),'Color',color(j,:));
+            set(hPlot(j),'Color',color(j,:),'MarkerFaceColor',...
+                color(j,:));
         end
-        title(hPlAxes,ttlStr,'FontSize',13);
+        title(hPlAxes,ttlStr,'FontSize',13,'FontWeight','bold');
         xlabel(hPlAxes,xlblStr);
         ylabel(hPlAxes,'interfacial area of the rivulet, [m^2]');
         set(hPlot,'MarkerSize',10);
@@ -481,8 +532,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         set(TableData,'CellSelectionCallback',[]);
         delete(hObject);
     end
-    function hTableProfilesSelectionCallback(hTable,eventdata)
-    end
+    function hTableProfilesSelectionCallback(~,~)
+    end                        %not used at the time
     function hTableIFACorrSelectionCallback(hTable,eventdata)               %function for table selection callback of the IFACorr
         %extract handles from appdata
         appdata = guidata(hFig);
@@ -527,6 +578,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         appdata = guidata(hFig);
         %extract handles
         hPlot   = appdata.handles.hPlot;                                    %handles for plotted lines, matrix nGR x (nMsrmts + 6)
+        hPlAxes = appdata.handles.hPlAxes;                                  %handles for axes
         % extract values from appdata
         brks    = appdata.metricdata.brks;                                  %index of new group starts
         color   = appdata.metricdata.color;                                 %used colors
@@ -544,6 +596,22 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
             errordlg({['Flow rates and distance from the top of the plate are '...
                 'not plotable.'] 'Please select different columns'})
         else
+            % update title string
+            hTtl = get(hPlAxes,'Title');                                    %get handles for title
+            ttlStr=lower(get(hTtl,'String'));                               %get string, convert it to lowercase
+            if numel(selcols(selcols==size(table,2)-3))==numel(selcols)     %if only selected column is the 1 with standard deviations
+                if strcmp('std',ttlStr(1:3))==0                             %if its not yet set
+                    ttlStr = ['Std. dev. of the ' ttlStr];
+                    set(hTtl,'String',ttlStr);                              %update string
+                end
+            else                                                            %other columns are selected
+                if strcmp('std',ttlStr(1:3))==1                             %check if it was tempered with the title
+                    lftOut = numel('std. dev. of the ');                    %number of characters to left out
+                    ttlStr = ttlStr(lftOut+1:end);                          %get rid of the added sentence
+                    ttlStr(1)= upper(ttlStr(1));                            %make the first letter uppercase
+                    set(hTtl,'String',ttlStr);                              %update string
+                end
+            end
             %Get vectors of x,y values for each column in the selection;
             for jdx = 1:1:numel(selcols)
                 for idx = 1:numel(brks)-1                                   %there is numel(brks)-1 line series
@@ -554,11 +622,12 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     % Create Z-vals = 1 in order to plot markers above lines
                     zvals = col*ones(size(xvals));
                     % Plot markers for xvals and yvals using a line object
-                    set(hPlot(idx,col), 'Visible', 'on',...
-                        'XData', xvals,...
+                    set(hPlot(idx,col), 'Visible', 'on',...                 %make markers visible
+                        'XData', xvals,...                                  %set up data
                         'YData', yvals,...
                         'ZData', zvals,...
-                        'Color',color(idx,:))
+                        'Color',color(idx,:),...                            %set colors according to legend
+                        'LineStyle','none','Marker','^');                   %unify line properties
                 end
             end
         end
@@ -800,4 +869,158 @@ end
 set(hTable,'ColumnName',ColNames,'Data',DataClr,'ColumnWidth',{100},...
     'UserData',Data);
     
+end
+
+%% Distinguishable colors - downloaded function
+function colors = distinguishable_colors(n_colors,bg,func)
+% DISTINGUISHABLE_COLORS: pick colors that are maximally perceptually distinct
+%
+% When plotting a set of lines, you may want to distinguish them by color.
+% By default, Matlab chooses a small set of colors and cycles among them,
+% and so if you have more than a few lines there will be confusion about
+% which line is which. To fix this problem, one would want to be able to
+% pick a much larger set of distinct colors, where the number of colors
+% equals or exceeds the number of lines you want to plot. Because our
+% ability to distinguish among colors has limits, one should choose these
+% colors to be "maximally perceptually distinguishable."
+%
+% This function generates a set of colors which are distinguishable
+% by reference to the "Lab" color space, which more closely matches
+% human color perception than RGB. Given an initial large list of possible
+% colors, it iteratively chooses the entry in the list that is farthest (in
+% Lab space) from all previously-chosen entries. While this "greedy"
+% algorithm does not yield a global maximum, it is simple and efficient.
+% Moreover, the sequence of colors is consistent no matter how many you
+% request, which facilitates the users' ability to learn the color order
+% and avoids major changes in the appearance of plots when adding or
+% removing lines.
+%
+% Syntax:
+%   colors = distinguishable_colors(n_colors)
+% Specify the number of colors you want as a scalar, n_colors. This will
+% generate an n_colors-by-3 matrix, each row representing an RGB
+% color triple. If you don't precisely know how many you will need in
+% advance, there is no harm (other than execution time) in specifying
+% slightly more than you think you will need.
+%
+%   colors = distinguishable_colors(n_colors,bg)
+% This syntax allows you to specify the background color, to make sure that
+% your colors are also distinguishable from the background. Default value
+% is white. bg may be specified as an RGB triple or as one of the standard
+% "ColorSpec" strings. You can even specify multiple colors:
+%     bg = {'w','k'}
+% or
+%     bg = [1 1 1; 0 0 0]
+% will only produce colors that are distinguishable from both white and
+% black.
+%
+%   colors = distinguishable_colors(n_colors,bg,rgb2labfunc)
+% By default, distinguishable_colors uses the image processing toolbox's
+% color conversion functions makecform and applycform. Alternatively, you
+% can supply your own color conversion function.
+%
+% Example:
+%   c = distinguishable_colors(25);
+%   figure
+%   image(reshape(c,[1 size(c)]))
+%
+% Example using the file exchange's 'colorspace':
+%   func = @(x) colorspace('RGB->Lab',x);
+%   c = distinguishable_colors(25,'w',func);
+
+% Copyright 2010-2011 by Timothy E. Holy
+
+% Parse the inputs
+if (nargin < 2)
+    bg = [1 1 1];  % default white background
+else
+    if iscell(bg)
+        % User specified a list of colors as a cell aray
+        bgc = bg;
+        for i = 1:length(bgc) %#ok<FORPF>
+            bgc{i} = parsecolor(bgc{i});
+        end
+        bg = cat(1,bgc{:});
+    else
+        % User specified a numeric array of colors (n-by-3)
+        bg = parsecolor(bg);
+    end
+end
+
+% Generate a sizable number of RGB triples. This represents our space of
+% possible choices. By starting in RGB space, we ensure that all of the
+% colors can be generated by the monitor.
+n_grid = 30;  % number of grid divisions along each axis in RGB space
+x = linspace(0,1,n_grid);
+[R,G,B] = ndgrid(x,x,x);
+rgb = [R(:) G(:) B(:)];
+if (n_colors > size(rgb,1)/3)
+    error('You can''t readily distinguish that many colors');
+end
+
+% Convert to Lab color space, which more closely represents human
+% perception
+if (nargin > 2)
+    lab = func(rgb);
+    bglab = func(bg);
+else
+    C = makecform('srgb2lab');
+    lab = applycform(rgb,C);
+    bglab = applycform(bg,C);
+end
+
+% If the user specified multiple background colors, compute distances
+% from the candidate colors to the background colors
+mindist2 = inf(size(rgb,1),1);
+for i = 1:size(bglab,1)-1 %#ok<FORPF>
+    dX = bsxfun(@minus,lab,bglab(i,:)); % displacement all colors from bg
+    dist2 = sum(dX.^2,2);  % square distance
+    mindist2 = min(dist2,mindist2);  % dist2 to closest previously-chosen color
+end
+
+% Iteratively pick the color that maximizes the distance to the nearest
+% already-picked color
+colors = zeros(n_colors,3);
+lastlab = bglab(end,:);   % initialize by making the "previous" color equal to background
+for i = 1:n_colors
+    dX = bsxfun(@minus,lab,lastlab); % displacement of last from all colors on list
+    dist2 = sum(dX.^2,2);  % square distance
+    mindist2 = min(dist2,mindist2);  % dist2 to closest previously-chosen color
+    [~,index] = max(mindist2);  % find the entry farthest from all previously-chosen colors
+    colors(i,:) = rgb(index,:);  % save for output
+    lastlab = lab(index,:);  % prepare for next iteration
+end
+end
+
+function c = parsecolor(s)
+if ischar(s)
+    c = colorstr2rgb(s);
+elseif isnumeric(s) && size(s,2) == 3
+    c = s;
+else
+    error('MATLAB:InvalidColorSpec','Color specification cannot be parsed.');
+end
+end
+
+function c = colorstr2rgb(c)
+% Convert a color string to an RGB value.
+% This is cribbed from Matlab's whitebg function.
+% Why don't they make this a stand-alone function?
+rgbspec = [1 0 0;0 1 0;0 0 1;1 1 1;0 1 1;1 0 1;1 1 0;0 0 0];
+cspec = 'rgbwcmyk';
+k = find(cspec==c(1));
+if isempty(k)
+    error('MATLAB:InvalidColorString','Unknown color string.');
+end
+if k~=3 || length(c)==1,
+    c = rgbspec(k,:);
+elseif length(c)>2,
+    if strcmpi(c(1:3),'bla')
+        c = [0 0 0];
+    elseif strcmpi(c(1:3),'blu')
+        c = [0 0 1];
+    else
+        error('MATLAB:UnknownColorString', 'Unknown color string.');
+    end
+end
 end

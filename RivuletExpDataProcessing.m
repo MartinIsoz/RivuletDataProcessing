@@ -86,7 +86,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 % Edit the above text to modify the response to help
 % RivuletExpDataProcessing
 
-% Last Modified by GUIDE v2.5 06-Aug-2012 17:02:51
+% Last Modified by GUIDE v2.5 08-Aug-2012 14:40:10
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -1462,7 +1462,7 @@ else
     handles.metricdata = metricdata;
     handles.prgmcontrol= prgmcontrol;
     handles.statusbar = statusbar(handles.MainWindow,...
-        'Loading variables from file failed.');
+        'Variables were loaded into workspace.');
 end
 
 % Update handles structure
@@ -1771,6 +1771,14 @@ for i = 1:numel(fileNames)                                                  %for
     end
 end
 
+% --------------------------------------------------------------------
+function ShowAvProcData_Callback(hObject, eventdata, handles)
+% hObject    handle to ShowAvProcData (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+showProcData('handles',handles);
+
 
 % --------------------------------------------------------------------
 function SaveProcessedData_Callback(hObject, eventdata, handles)
@@ -1804,7 +1812,7 @@ if exist('Availible','var') == 0
     set(handles.statusbar,'Text',...
         'Loading Availible from file failed.');
 else
-    handles.metricdata.RivProcPars = RivProcPars;
+    handles.metricdata.Availible = Availible;
     set(handles.statusbar,'Text',...
         ['User defined variables were loaded from file.'...
         ' Availible is prepared for postprocessing.']);

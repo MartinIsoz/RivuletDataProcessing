@@ -43,7 +43,6 @@ function changeIMPars_OpeningFcn(hObject, eventdata, handles, varargin)
 handles.output = hObject;
 
 % Initialize gui
-% Initialize gui
 if(nargin > 3)
     for index = 1:2:(nargin-3),
         if nargin-3==index, break, end
