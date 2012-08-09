@@ -96,7 +96,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         appdata = guidata(hObject);                                         %get app data
         strCellDT = appdata.metricdata.strCellDT;
         comp      = appdata.prgmcontrol.comp;                               %are the compatible data selected yet
-        selDT = get(hObject,'Value');                                       %get selected value(s)
+        selDT     = get(hObject,'Value');                                   %get selected value(s)
         if numel(selDT) == 1 && comp == 0                                   %check for length of the selection for strcmp
             if strcmp(strCellDT{selDT},'Profiles') == 1                     %actualize listbox selection to show compatible data
                 strCellNDT = strCellDT(strcmp(strCellDT,'Profiles')==1);    %reduce only to profiles
@@ -159,6 +159,11 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         stInd(j+1) = stInd(j) + 1;                          %only IFACorr in the group, dont need the last listbox
                         fillIFACorrUITable(TableData,dataSH);
                         set(PushPlot,'Enable','on');                        %the data are plotable now
+                        % initialize fields needed by PushPlot
+                        selGR = appdata.prgmcontrol.selGR;
+                        appdata.prgmcontrol.selMS    = selGR;               %initialization of the next selected indexes (needed for PushPlot)
+                        appdata.prgmcontrol.GR       =...
+                            cellstr(num2str(numel(selGR),1));               %needed for making legend strings
                     case 'Other'                                            %mSpeed, rivWidth and/or rivHeight are to be shown
                         Msrt = dataSH{j}{end};                              %get list of regimes saved into 'other' variables
                         strCellMS = [strCellMS strCellGR(k) separators(1)...
@@ -252,7 +257,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         selGR   = appdata.prgmcontrol.selGR;                                %selected data groups
         selDT   = appdata.prgmcontrol.selDT;                                %selected data in groups
         selMS   = appdata.prgmcontrol.selMS;                                %indexes of selected data
-        GR = appdata.prgmcontrol.GR;                                        %indexes of the data into groups
+        GR      = appdata.prgmcontrol.GR;                                   %indexes of the data into groups
         % extract data
         plateSize = appdata.metricdata.plateSize;                           %matrix with plate sizes
         Data = get(TableData,'UserData');                                   %get data from the table
@@ -275,6 +280,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         % decode the ID string
         rdblCellStr = cell(1,numel(selGR));                                 %create empty var
         k           = 1;l = 1;                                              %auxiliary indexes
+        assignin('base','Availible',Availible)
         for j = 1:numel(selMS)
             if l > numel(GR{k})                                             %distinct to which groups are the data appartening
                 k = k+1;
@@ -467,7 +473,6 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 % save handles into appdata
                 appdata.handles.hPlFig = hPlFig;
                 appdata.handles.hPlAxes= hPlAxes;
-                assignin('base','hPlAxes',hPlAxes);
                 appdata.handles.hPlot  = hPlot;
                 appdata.handles.hLegend= hLegend;
                 % save breakpoints into appdata

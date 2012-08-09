@@ -150,7 +150,6 @@ else
     set(handles.ListData,'String',strCellAV,'Max',numel(strCellAV));        %update listbox
     handles.metricdata.Availible = Availible;
 end
-assignin('base','Availible',Availible)
 set(handles.PushSaveAll,'Enable','on');                                     %enable buttons
 set(handles.PushSaveSel,'Enable','on');
 set(handles.PushClearSel,'Enable','on');
