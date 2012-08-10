@@ -10,19 +10,25 @@ function showOtherDataUITable(data,NameStr,type,plots,plateSize)
 % type  ... type to decide if it is descriptive output or correlation to be
 %           shown 0 ... correlation, 1 ... description
 % plots ... 0/1, if user want the data to be plotable
+%
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         09. 08. 2012
+%
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
+% See also RIVULETEXPDATAPROCESSING
 
 hFig = figure;                                                              %open figure window
 set(hFig,'NumberTitle', 'off');
 
-PosVec = get(0,'MonitorPosition');                                          %get sizes of the monitors
-PosVec = PosVec(1,:);                                                       %display maximized windows on primary monitor
-
 if type == 0
     if plots == 0
-        set(hFig,'Units','Pixels','Position',[0 0 700 750],...              %correlations are in long columns
+        set(hFig,'Units','Pixels','Position',[10 30 700 750],...            %correlations are in long columns
             'Name',NameStr);
     else
-        set(hFig,'Units','Pixels','Position',PosVec,...                     %for plots use almost all the space on the main screen
+        set(hFig,'Units','Pixels','Position',[10 30 1100 700],...           %for plots use bigger part of the screen
             'Name',NameStr);
     end
     ColNames = {'Surface tension,|[N/m]',...                                %set up ColNames for correlation data
@@ -31,10 +37,10 @@ if type == 0
         'Vol. gas flow|rate, [m3/s]','Riv. surface|area, [m2]'};
 else
     if plots == 0
-        set(hFig,'Units','Pixels','Position',[0 0 950 200],...              %for description, there are more columns than rows
+        set(hFig,'Units','Pixels','Position',[10 30 950 200],...             %for description, there are more columns than rows
             'Name',NameStr);
     else
-        set(hFig,'Units','Pixels','Position',PosVec,...                     %for plots use almost all the space on the main screen
+        set(hFig,'Units','Pixels','Position',[10 30 1100 700],...           %for plots use bigger part of the screen
             'Name',NameStr);
     end
     ColNames = 1:numel(data(1,1:end-6));                                    %last six columns are auxiliary variables to be named

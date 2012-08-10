@@ -1,6 +1,6 @@
 function postProcPlotting(Availible)
 %
-%   function postProcPlotting(OUT)
+%   function postProcPlotting(Availible)
 %
 % function for plotting calculated data (just for basic data overview).
 % there is automatically created simple gui that offers user to plot
@@ -9,6 +9,15 @@ function postProcPlotting(Availible)
 % 
 % INPUT variables
 % Availible   ... cell of structures obtained from rivuletProcessing.m
+%
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         09. 08. 2012
+%
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
+% See also RIVULETEXPDATAPROCESSING SHOWPROCDATA
 
 
 %% GUI preparation

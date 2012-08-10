@@ -5,6 +5,13 @@ function varargout = changeIMPars(varargin)
 % called from menu of the main program (RivuletExpDataProcessin.m).
 % This function returns cell of optional parameters for findEdges function.
 %
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         17. 07. 2012
+%
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
 % See also RIVULETEXPDATAPROCESSING FINDEDGES EDGE HOUGH IM2BW
 
 % Edit the above text to modify the response to help changeIMPars

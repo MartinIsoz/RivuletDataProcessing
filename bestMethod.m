@@ -52,10 +52,10 @@ nExp    = numel(DUIM2BW)*numel(method);                                     %num
 % weight vector
 % NaN are more important than outliers. in plate, the NaN are always in
 % pairs
-weights = [4 1 4 1 2 1];                                                    %weight vector for construction of objective function
+weights = [0 0 0 0 2 1];                                                    %weight vector for construction of objective function
 
 % forcing completely automatic run of findEdges
-handles.prgmcontrol.autoEdges = 3;
+handles.prgmcontrol.autoEdges = 'Force-automatic';
 % disabling graphics
 handles.metricdata.GREdges = [0 0];
 

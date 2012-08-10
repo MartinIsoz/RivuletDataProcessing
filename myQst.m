@@ -5,6 +5,23 @@ function varargout = myQst(varargin)
 %
 % choice = myQst('autstr',stringCell);
 %
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         17. 07. 2012
+%
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
+% note: this function should be rewritten so that in doesn't need the .fig
+% file (the GUI is quite simple and it shouldnt be to difficult)
+%
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         17. 07. 2012
+%
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
 % See also RIVULETEXPDATAPROCESSING MODIFYFUNCTION
 
 % Edit the above text to modify the response to help myQst

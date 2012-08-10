@@ -91,11 +91,6 @@ function EdgCoord = findEdges(handles)
 % xH   ... right edge of the plate
 % yH   ... bottom edge of the plate
 %
-% nMan          ... number of manually selected edges. If the completely
-%                   manual mode is selected (AUTO == 0), this value is Inf.
-%                   Otherwise, it is number of forced manual inputs due to
-%                   algorithm failure
-%
 % Author:       Martin Isoz
 % Organisation: ICT Prague / TU Bergakademie Freiberg
 % Date:         11. 07. 2012
@@ -194,6 +189,8 @@ EdgCoord = zeros(nImages,10);                                        %OUTPUT var
 % precessed images
 se      = strel('disk',12);                                                 %morphological structuring element
 if isfield(handles.metricdata,'AppPlatePos') == 0                           %approximate plate edges are not yet specified
+    handles.statusbar = statusbar(handles.MainWindow,...                    %update the statusbar
+        'Waiting for user response');
     options.Interpreter = 'tex';
     options.WindowStyle = 'modal';
     msgbox({['Please specify approximate position of the'...
@@ -208,7 +205,6 @@ if isfield(handles.metricdata,'AppPlatePos') == 0                           %app
     tmpIM   = imtophat(tmpIM,se);
     tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                %enhance contrasts
     tmpIM   = im2bw(tmpIM,0.16);                                            %conversion to black and white
-    set(handles.statusbar,'Text','Waiting for user response');              %update statusbar
     figure;imshow(tmpIM);                                                   %show image to work with
     cutMat  = round(ginput(2));close(gcf);                                  %let the user specify approximate position of the plate
     cutLeft = cutMat(1,1);cutRight = cutMat(2,1);
@@ -228,16 +224,16 @@ edgYB   = cutBottom - cutTop - edgYT;                                       %...
 % preallocation of variables
 strCell = {'left vertical' 'top horizontal'...                              %names of the plate edges
                    'right vertical' 'bottom horizontal'};
-% forced manual entries counter iniciation
-nMan    = 0;
 %% Main cycle of the program
 for i = 1:nImages                                                           %for each image
 % Update statusbar
 handles.statusbar = statusbar(handles.MainWindow,...
     'Finding elements edges on image %d of %d (%.1f%%)',...                 %updating statusbar
     i,nImages,100*i/nImages);
-set(handles.statusbar.ProgressBar,...
-    'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
+handles.statusbar.ProgressBar.setVisible(true);                             %showing and updating progressbar
+handles.statusbar.ProgressBar.setMinimum(0);
+handles.statusbar.ProgressBar.setMaximum(nImages);
+handles.statusbar.ProgressBar.setValue(i);
     % Find cuvettes on the image
     if DNTLoadIM == 1                                                       %if the images are not loaded, i need to get the image from directory
         tmpIM = imread([subsImDir '/' imNames{i}]);                         %load image from directory with substracted images
@@ -524,13 +520,11 @@ if AUTO ~= 0                                                                %if 
         set(handles.statusbar,'Text','Waiting for user response')           %update statusbar
         tmpPars   = [edgXL edgXR edgYT edgYB epsX epsY i];                  %contruct vector of parameters for plotLines 
         coordVec  = plotLines(tmpIM,lines,tmpPars);coordVec = coordVec';    %call the function for manual edge selection
-        nMan      = nMan + 1;                                               %increase force manual entries counter
     end
 else                                                                        %case of completely manual edges choosing
     tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];                        %contruct vector of parameters for plotLines 
     coordVec= plotLines(tmpIM,lines,tmpPars);                               %call the function for manual edge selection
     clear tmpPars
-    nMan    = Inf;                                                          %if manual mode is selected, return Inf as forced man. entr. counter
 end
     % saving data into OUTPUT variable
     EdgCoord(i,7:end) = coordVec + trnVec;                                  %need to add the cutted values

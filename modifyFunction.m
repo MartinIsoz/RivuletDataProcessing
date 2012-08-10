@@ -28,6 +28,15 @@ function EdgCoord = modifyFunction(metricdata)
 %               names is used for loading images from subsImDir
 % subsImDir ... if daten is not present, images specified by imNames are
 %               loaded from this directory
+%
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         17. 07. 2012
+%
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
+% See also FINDEDGES CONTROLFUNCTION
 
 % check if it is necessary to run the function
 if isempty(metricdata.prbMsg) == 1                                          %no problem, than return

@@ -1,24 +1,27 @@
 function varargout = showProcData(varargin)
 % SHOWPROCDATA M-file for showProcData.fig
-%      SHOWPROCDATA, by itself, creates a new SHOWPROCDATA or raises the existing
-%      singleton*.
 %
-%      H = SHOWPROCDATA returns the handle to a new SHOWPROCDATA or the handle to
-%      the existing singleton*.
+% M-file for handling the GUI for showing data availible for
+% postprocessing. It is to be called from Postprocessing menu of the main
+% program (RivuletExpDataProcessing.m).
 %
-%      SHOWPROCDATA('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in SHOWPROCDATA.M with the given input arguments.
+% At the begining, the list with current availible data is show (the ID
+% string of the data are displayed). User can load other data, save the
+% current data and start the postprocessing tool with the data selected in
+% the list.
 %
-%      SHOWPROCDATA('Property','Value',...) creates a new SHOWPROCDATA or raises the
-%      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before showProcData_OpeningFcn gets called.  An
-%      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to showProcData_OpeningFcn via varargin.
+% ID string of each data is composed in the following way:
+% liquid type_gasFlow_inclinationAngle_date (in the format
+% DD_MM_YY-HH_MM_SS)
 %
-%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      instance to run (singleton)".
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         08. 08. 2012
 %
-% See also: GUIDE, GUIDATA, GUIHANDLES
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
+% See also: RIVULETEXPDATAPROCESSING, POSTPROCPLOTTING
 
 % Edit the above text to modify the response to help showProcData
 

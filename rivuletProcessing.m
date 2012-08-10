@@ -1,7 +1,6 @@
 function OUT = rivuletProcessing(handles)
 %
-%   function rivuletProcessing(daten,Treshold,FilterSensitivity,EdgCoord,...
-%       GR,files,fluidData,storDir,rootDir,[plateSize,nCuts,filmTh,RegrPlate])
+%   function rivuletProcessing(handles)
 %
 % My modification of Andres function for evaluation of rivulet-LIF images
 % Required parameters:
@@ -106,6 +105,13 @@ function OUT = rivuletProcessing(handles)
 %    these mean values
 % 8. save the results
 %
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         17. 07. 2012
+%
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
 % See also FINDEDGES FLUIDDATAFCN RIVULETEXPDATAPROCESSING SAVE_TO_BASE
 %
 
@@ -187,7 +193,7 @@ if DNTLoadIM == 0                                                           %are
     parfor i = 1:nImages
         tmpCell(i) = {[smImDir '/' files{i}]};                              %create second argument for cell function 
     end
-    set(handles.statusbar.ProgressBar,'Visible','off');
+    handles.statusbar.ProgressBar.setVisible(false);                        %hide progressbar
     set(handles.statusbar,'Text','Saving smoothed images');
     cellfun(@imwrite,YProfilPlatte,tmpCell);                                %write images into smoothed folder (under original names)
 else                                                                        %otherwise, i need to do this image from image...
@@ -197,8 +203,10 @@ else                                                                        %oth
             ['Converting grayscale values into distaces ',...
             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
             i,nImages,100*i/nImages);
-        set(handles.statusbar.ProgressBar,...
-            'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
+        handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
+        handles.statusbar.ProgressBar.setMinimum(0);
+        handles.statusbar.ProgressBar.setMaximum(nImages);
+        handles.statusbar.ProgressBar.setValue(i);
         tmpIM = {imread([subsImDir '/' files{i}])};                         %load image from substracted directory and save it as cell
         tmpIM = ImConv(tmpIM,EdgCoord,filmTh,RegressionPlate,...            %convert it to distances
             GR.regr,GR.regime,GR.format,storDir,rootDir,i);
@@ -217,8 +225,10 @@ if GR.contour == 1 || GR.regime == 1                                        %if 
             ['Creating profiles and/or contour plots ',...
             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
             i,nImages,100*i/nImages);
-        set(handles.statusbar.ProgressBar,...
-            'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
+        handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
+        handles.statusbar.ProgressBar.setMinimum(0);
+        handles.statusbar.ProgressBar.setMaximum(nImages);
+        handles.statusbar.ProgressBar.setValue(i);
         if DNTLoadIM == 1
             load([tmpfDir '/' files{i}(1:end-4) '.mat']);                   %if images are not present in handles, load them from tmpfDir
         else
@@ -301,8 +311,10 @@ if DNTLoadIM == 1
         handles.statusbar = statusbar(handles.MainWindow,...
             'Calculating interfacial area of rivulet %d of %d (%.1f%%)',... %updating statusbar
             i,nImages,100*i/nImages);
-        set(handles.statusbar.ProgressBar,...
-            'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
+        handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
+        handles.statusbar.ProgressBar.setMinimum(0);
+        handles.statusbar.ProgressBar.setMaximum(nImages);
+        handles.statusbar.ProgressBar.setValue(i);
         load([tmpfDir '/' files{i}(1:end-4) '.mat']);                       %if images are not present in handles, load them from tmpfDir
         IFArea(i)= RivSurf({tmpIM'},Treshold,plateSize);                    %I need to transpose tmpIM -> coherence with YProfilPlatte
     end
@@ -323,8 +335,10 @@ if DNTLoadIM == 1
         handles.statusbar = statusbar(handles.MainWindow,...
             'Calculating mean profiles for image %d of %d (%.1f%%)',...     %updating statusbar
             i,nImages,100*i/nImages);
-        set(handles.statusbar.ProgressBar,...
-            'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
+        handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
+        handles.statusbar.ProgressBar.setMinimum(0);
+        handles.statusbar.ProgressBar.setMaximum(nImages);
+        handles.statusbar.ProgressBar.setValue(i);
         load([tmpfDir '/' files{i}(1:end-4) '.mat']);                       %if images are not present in handles, load them from tmpfDir
         [YProfilPlatte(i),XProfilPlatte]=cutRiv({tmpIM'},nCuts,plateSize,...%call with calculation variables
             GR.profcut,GR.regime,GR.format,storDir,rootDir,i);              %auxiliary variables for graphics and data manipulation
@@ -341,7 +355,7 @@ end
 % only for the mean profiles - these 2 calculations can be put together in
 % 1 function and called separately
 
-set(handles.statusbar.ProgressBar,'Visible','off');                         %update statusbar
+handles.statusbar.ProgressBar.setVisible(false);                            %update statusbar
 set(handles.statusbar,'Text','Calculating output data of the program');
 [~,RivWidth2,RivHeight2,minLVec,minRVec] =...                               %calculates the mean widths of the rivulet and return indexes of
     RivSurf(YProfilPlatte,Treshold,plateSize);                              %the "edges" of the rivulet + calculates max height of each part of
@@ -357,8 +371,10 @@ for i = 1:numel(YProfilPlatte)
     handles.statusbar = statusbar(handles.MainWindow,...
         'Calculating mean speed in cuts for image %d of %d (%.1f%%)',...    %updating statusbar
         i,nImages,100*i/nImages);
-    set(handles.statusbar.ProgressBar,...
-        'Visible','on', 'Minimum',0, 'Maximum',nImages, 'Value',i);
+    handles.statusbar.ProgressBar.setVisible(true);                         %showing and updating progressbar
+    handles.statusbar.ProgressBar.setMinimum(0);
+    handles.statusbar.ProgressBar.setMaximum(nImages);
+    handles.statusbar.ProgressBar.setValue(i);
     for j = 1:size(RivWidth2,2)
         SurfMat = trapz(XProfilPlatte(minLVec(i,j):minRVec(i,j)),...        %rows - number of images, columns - number of cuts
             YProfilPlatte{i}(minLVec(i,j):minRVec(i,j),j)*1e-3);            %again, conversion mm -> m
@@ -368,7 +384,7 @@ end
 
 %% Saving results in text files
 
-set(handles.statusbar.ProgressBar,'Visible','off');
+handles.statusbar.ProgressBar.setVisible(false);                            %hiding the progressbar
 set(handles.statusbar,'Text','Saving data into text files');
 
 % 1. Smoothed/averaged profiles

@@ -1,24 +1,20 @@
 function varargout = changeRPPars(varargin)
 % CHANGERPPARS M-file for changeRPPars.fig
-%      CHANGERPPARS, by itself, creates a new CHANGERPPARS or raises the existing
-%      singleton*.
 %
-%      H = CHANGERPPARS returns the handle to a new CHANGERPPARS or the handle to
-%      the existing singleton*.
+% M-file for handling gui for changing rivulet processing parameters. To be
+% called from Data processing menu of the main program
+% (RivuletExpDataProcessing.m). This function returns cell of optional
+% parameters for rivuletProcessing function.
 %
-%      CHANGERPPARS('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in CHANGERPPARS.M with the given input arguments.
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         17. 07. 2012
 %
-%      CHANGERPPARS('Property','Value',...) creates a new CHANGERPPARS or raises the
-%      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before changeRPPars_OpeningFcn gets called.  An
-%      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to changeRPPars_OpeningFcn via varargin.
+% License: This code is published under MIT License, please do not abuse
+% it.
 %
-%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      instance to run (singleton)".
+% See also RIVULETEXPDATAPROCESSING RIVULETPROCESSING
 %
-% See also: GUIDE, GUIDATA, GUIHANDLES
 
 % Edit the above text to modify the response to help changeRPPars
 
@@ -67,8 +63,8 @@ if(nargin > 3)
             handles.metricdata.Length   = tmpVar{1}(2);
             handles.metricdata.Angle    = tmpVar{2};
             handles.metricdata.HfThS    = tmpVar{3}(1);
-            handles.metricdata.HfThB    = tmpVar{3}(2);
-            handles.metricdata.LfThS    = tmpVar{3}(3);
+            handles.metricdata.HfThB    = tmpVar{3}(3);
+            handles.metricdata.LfThS    = tmpVar{3}(2);
             handles.metricdata.LfThB    = tmpVar{3}(4);
             handles.metricdata.CuvWidth = tmpVar{3}(5);
             handles.metricdata.PolDeg   = tmpVar{4};
@@ -89,12 +85,15 @@ guidata(hObject, handles);
 % UIWAIT makes changeIMPars wait for user response (see UIRESUME)
 uiwait(handles.figure1);
 
-% My own closereq fcn -> to avoid set output even if gui is close by Alt+F4
-function my_closereq(src,evnt)
+% --- Executes on attempt to close GUI
+function my_closereq(~,~)
+%this function just resumes GUI execution on close. otherwise there would
+%be and error if the window would be closed for example by Alf+F4 or the
+%cross (from window manager)
 uiresume(gcf)
 
 % --- Outputs from this function are returned to the command line.
-function varargout = changeRPPars_OutputFcn(hObject, eventdata, handles) 
+function varargout = changeRPPars_OutputFcn(~, ~, handles) 
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -109,10 +108,9 @@ delete(handles.figure1);
 %% Pushbuttons
 
 % --- Executes on button press in PushOK.
-function PushOK_Callback(hObject, eventdata, handles)
-% hObject    handle to PushOK (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushOK_Callback(hObject, ~, handles) %#ok<DEFNU>
+% by pressing this button the output is created and GUI is resumed (output
+% is stored into handles.output and exported to the called function)
 
 %extract handles.metricdata
 Width   = handles.metricdata.Width;
@@ -143,10 +141,8 @@ uiresume(handles.figure1);
 
 
 % --- Executes on button press in PushDef.
-function PushDef_Callback(hObject, eventdata, handles)
-% hObject    handle to PushDef (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushDef_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+% by pressing this button, the default values are loaded into GUI
 
 % reinitialize gui
 handles.metricdata = initializeGUI(hObject,eventdata,handles);
@@ -155,10 +151,8 @@ guidata(hObject, handles);
 
 
 % --- Executes on button press in PushCancelClose.
-function PushCancelClose_Callback(hObject, eventdata, handles)
-% hObject    handle to PushCancelClose (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushCancelClose_Callback(hObject, ~, handles) %#ok<DEFNU>
+% button that allows user to exit the function without modifying any values
 
 % assign the output cell
 handles.output = [];

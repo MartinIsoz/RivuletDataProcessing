@@ -7,16 +7,34 @@ function varargout = RivuletExpDataProcessing(varargin)
 % inclined plate in TU Bergakademie Freiberg
 %
 %==========================================================================
+% MENU SHORTCUTS:
+%-File---------------------------------------------------------------------
+% Ctrl+S    ... Save all variables into .mat file
+% Ctrl+O    ... Load metricdata and prgmcontrol variables from .mat file
+% Ctlr+Q    ... Quit program
+%
+%-Elements-edges-finding---------------------------------------------------
+% Ctrl+I    ... Modify image processing parameters
+% Ctrl+B    ... Try to find the best image processing method
+%
+%-Data-processing----------------------------------------------------------
+% Ctrl+M    ... Modify rivulet processing parameters
+% Ctrl+E    ... Show current rivulet processing parameters
+%
+%-Postprocessing-----------------------------------------------------------
+% Ctrl+A    ... Show availible processed data
+% Ctrl+P    ... Open postprocessing tool
+%
+%==========================================================================
 % USER GUIDE:
 %-preprocessing------------------------------------------------------------
 % 1. Choose directory for storing output data (storDir)
-% 2. Load background image and images to process
+% 2. Load background image and images to be processed
 %-finding-edges-of-cuvettes-and-plate--------------------------------------
 % 3. Select how much automatic should the finding of edges be
+%   Force-autom.. program doesnt interact with user even if it cannot
+%                 estimate some of the edges
 %   Automatic ... program writes out warnings but do not interact with user
-%                 !! add control of standard deviation of found sizes of 
-%                    the plate -> std(X) > maxTol => force user
-%                    interaction !!
 %   Semi-autom... if there should be warning output, asks for user
 %                 interaction
 %   Manual    ... asks for manual specification of edges for each plate
@@ -28,12 +46,14 @@ function varargout = RivuletExpDataProcessing(varargin)
 %   At the time, the images will be only shown as control of how
 %   succesfully were found the edges)
 % 6. Find edges of the plate and cuvettes (executes function findEdges with
-%    collected parameters)
+%    collected parameters, output of findEdges is controlled by
+%    controlFunction and user can alternate results through
+%    modifyFunction).
 %-rivulet-data-processing--------------------------------------------------
 % 7. Set the value of treshold to distinguish between rivulet and the rest
 %   of the plate and FilterSensitivity for getting rid of the noises in
 %   images.
-% 8. Choose on which liquid was experiment conducted
+% 8. Choose on which liquid was the experiment conducted
 %   This liquid has to be in database. To add it, edit file fluidDataFcn.
 %   In this point are loaded liquid data from file fluidDataFcn
 % 9. Optional - change optional parameters for the program execution
@@ -46,8 +66,6 @@ function varargout = RivuletExpDataProcessing(varargin)
 %             ... thicknesses of the film in calibration cuvettes
 %             ... degree of polynomial to use in cuvette regression
 %             ... width of cuvette in pixels (default 80)
-%   !! If you want to change 1 of the parametres for conversion of
-%   greyscale values into distances, you MUST fill out all the fields !!
 %10. Optional - set which graphs should be plotted and how there should be
 %    saved
 %11. Calculate results (this calls function rivuletProcessing with
@@ -59,16 +77,16 @@ function varargout = RivuletExpDataProcessing(varargin)
 %   Outputs all variables to base workspace (accessible from command
 %   window). All user defined variables are in handles.metricdata and user
 %   defined program controls (mainly graphics) are in handles.prgmcontrol
-%   !! restructurilize handles.metricdata and handles.prgmcontrol with
-%   better distinction between controls and data variables !!
 %14. Clear vars clears all the user specified variables and reinitialize
 %   GUI
+%15. Check the results in "Quick outputs overview", for more detailed
+%   control use postprocessing tool in the Postprocessing menu
 %==========================================================================
 % DEMANDS OF THE PROGRAM
 % -Program was written in MATLAB R2010a, but shoud be variable with all
 % MATLAB versions later than R2009a (implementation of ~ character)
-% -Until now (17.07.2012) program was tested only on images from DC10
-% measurements
+% -Program was tested under MATLAB R2010a on 64b linux machine and under
+% MATLAB R2012a on 32b windows xp machine
 % -For succesfull program execution there has to be following files in the
 % root folder of the program:
 % 1. RivuletExpDataProcessing.m/.fig (main program files)
@@ -81,10 +99,10 @@ function varargout = RivuletExpDataProcessing(varargin)
 % Organisation: ICT Prague / TU Bergakademie Freiberg
 % Date:         17. 07. 2012
 %
-% See also: FINDEDGES FLUIDDATAFCN RIVULETPROCESSING SAVE_TO_BASE
-
-% Edit the above text to modify the response to help
-% RivuletExpDataProcessing
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
+% See also FINDEDGES RIVULETPROCESSING
 
 % Last Modified by GUIDE v2.5 08-Aug-2012 14:40:10
 
@@ -132,10 +150,10 @@ set(hObject,'CloseRequestFcn',@my_closereq)
 guidata(hObject, handles);
 
 
-% My own closereq fcn -> to avoid closing with close command
-function my_closereq(src,evnt)
+% --- Executes on attempt to close GUI
+function my_closereq(~,~)
 % User-defined close request function 
-% to display a question dialog box 
+% to display a question dialog box and ask if the figure should be closed
 selection = questdlg('Close Rivulet data processing program?',...
     'Close Request Function',...
     'Yes','No','Yes');
@@ -148,7 +166,7 @@ end
 
 
 % --- Outputs from this function are returned to the command line.
-function varargout = progGUI_OutputFcn(hObject, eventdata, handles) 
+function varargout = progGUI_OutputFcn(hObject, ~, handles) 
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -167,10 +185,16 @@ guidata(hObject, handles);                                                  %i n
 %% PushButtons - Preprocessing
 
 % --- Executes on button press in PushChooseDir.
-function storDir = PushChooseDir_Callback(hObject, eventdata, handles)
-% hObject    handle to PushChooseDir (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function storDir = PushChooseDir_Callback(~, ~, handles)
+% function for chosing the storage directory for the program outputs, this
+% function saves the path to the storage directory into
+% handles.metricdata.storDir and the path to subtracted images (where
+% background was subtracted from the experimental images to the
+% handles.metricdata.subsImDir.
+%
+% function also check the existing subdirectories of the chosen directory
+% and if they dont exist, it creates all the subdirectories needed for the
+% program execution
 
 % choosing directory to store outputs
 start_path = '~/Documents/Freiberg/EvalExp';                                %start path for choosing directory (only for my machine)
@@ -234,10 +258,13 @@ end
 guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in PushLoadBg.
-function PushLoadBg_Callback(hObject, eventdata, handles)
-% hObject    handle to PushLoadBg (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushLoadBg_Callback(~, ~, handles) %#ok<DEFNU>
+% function for loading the background image into the handles.metricdata
+% structure. 
+%
+% Rq: background image is kept into the structures for all the
+% program execution timem but i should check, if and where it is really
+% needed
 
 % predefined input for uigetfile
 FilterSpec  = '*.tif';
@@ -273,10 +300,11 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushLoadIM.
-function daten = PushLoadIM_Callback(hObject, eventdata, handles)
-% hObject    handle to PushLoadIM (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function daten = PushLoadIM_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+% function for loading images to be processed and for subtracting the
+% background from them. this functions needs for run specified storDir and
+% background image, so if they are not yet loaded/chosen, the function asks
+% for them.
 
 % imNames   ... cell of strings, selected filenames
 % imDir     ... string, path to the directory with images
@@ -356,12 +384,14 @@ for i = 1:numel(imNames)
     handles.statusbar = statusbar(handles.MainWindow,...
         'Loading and subtracting background from image %d of %d (%.1f%%)',...%updating statusbar
         i,numel(imNames),100*i/numel(imNames));
-    set(handles.statusbar.ProgressBar,...
-        'Visible','on', 'Minimum',0, 'Maximum',numel(imNames), 'Value',i);
+    handles.statusbar.ProgressBar.setVisible(true);                         %showing and updating progressbar
+    handles.statusbar.ProgressBar.setMinimum(0);
+    handles.statusbar.ProgressBar.setMaximum(numel(imNames));
+    handles.statusbar.ProgressBar.setValue(i);
 end
 
 % modify gui visible outputs
-set(handles.statusbar.ProgressBar,'Visible','off');                         %made progresbar invisible again
+handles.statusbar.ProgressBar.setVisible(false);                            %made progresbar invisible again
 set(handles.statusbar,...                                                   %update statusbar
     'Text','Images were succesfully loaded and substratced');
 if numel(imDir) <= 45
@@ -391,10 +421,10 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushClearIM.
-function PushClearIM_Callback(hObject, eventdata, handles)
-% hObject    handle to PushClearIM (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushClearIM_Callback(~, ~, handles) %#ok<DEFNU>
+% function for clearing currently loaded images. it clears the images or
+% image infor from the current handles as well as the background image and
+% it updates concerned editable fields
 
 if isfield(handles.metricdata,'bgImage') == 1                               %field metricdata.bgImage exists
     handles.metricdata = rmfield(handles.metricdata,'bgImage');
@@ -419,13 +449,12 @@ guidata(handles.MainWindow, handles);
 %% Editable fields - Preprocessing
 
 
-function EditStorDir_Callback(hObject, eventdata, handles)
-% hObject    handle to EditStorDir (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditStorDir as text
-%        str2double(get(hObject,'String')) returns contents of EditStorDir as a double
+function EditStorDir_Callback(hObject, ~, handles) %#ok<DEFNU>
+% editable field that shows current chosen storDir and also allows user to
+% set it manually from the keyboard by writing full or relative path to it.
+%
+% if the way is setted up manually, this function checks out the existence
+% of the specified folder and eventually creates the subfolders
 
 storDir = get(hObject,'String');                                            %get storage directory from editable textfield
 nameList= {'Subtracted' 'Height' 'Profile' 'Speed' 'Width' 'Correlation' ...%names of the directories for saving outputs
@@ -471,77 +500,62 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditStorDir_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditStorDir (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function EditStorDir_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting up properties of the EditStorDir editable field
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 
 
-function EditBcgLoc_Callback(hObject, eventdata, handles)
-% hObject    handle to EditBcgLoc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditBcgLoc as text
-%        str2double(get(hObject,'String')) returns contents of EditBcgLoc as a double
-
-%!! this textfield is not editable !!
-
-% Update handles structure
-guidata(handles.MainWindow, handles);
+function EditBcgLoc_Callback(~, ~, ~) %#ok<DEFNU>
+% uneditable text field used for showing the location of chosen background
+% image
 
 
 % --- Executes during object creation, after setting all properties.
-function EditBcgLoc_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditBcgLoc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function EditBcgLoc_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting up properties of the EditBcgLoc editable field
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 
 
-function EditIMLoc_Callback(hObject, eventdata, handles)
-% hObject    handle to EditIMLoc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditIMLoc as text
-%        str2double(get(hObject,'String')) returns contents of EditIMLoc as a double
-
-%!! this textfield is not editable !!
+function EditIMLoc_Callback(~, ~, ~) %#ok<DEFNU>
+% uneditable text field used for showing the location of processed images
 
 
 % --- Executes during object creation, after setting all properties.
-function EditIMLoc_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditIMLoc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function EditIMLoc_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting up properties of the EditIMLoc editable field
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 %% Checkboxes - Preprocessing
 
 % --- Executes on button press in CheckDNL.
-function CheckDNL_Callback(hObject, eventdata, handles)
-% hObject    handle to CheckDNL (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function CheckDNL_Callback(hObject, ~, handles) %#ok<DEFNU>
+% checkbox for controlling if the user wants to load all the processed
+% images into the handles structure. If users computer has a lot of
+% availible RAM memory and slow HDD, it is good to load all into the
+% handles, otherwise, it is more efficient to load the images for every
+% operation one by one
+%
+% by default, images are not loaded into the handles.metricdata
 
 % Hint: get(hObject,'Value') returns toggle state of CheckDNL
 
@@ -553,17 +567,16 @@ guidata(handles.MainWindow, handles);
 
 %% Pushbuttons - Image Processing
 
-
 % --- Executes on button press in PushFindEdg.
-function [EdgCoord daten] =...
-    PushFindEdg_Callback(hObject, eventdata, handles)
-% hObject    handle to PushFindEdg (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushFindEdg_Callback(~, ~, handles) %#ok<DEFNU>
+% pushbutton that summons all the preset parameters and calls the findEdges
+% function for EdgCoord specification. After the EdgCoord matrix is created
+% and saved into the handles.metricdata structure, it is controlled by the
+% controlFunction and the results are shown to user using modifyFunction.
+% After that user can modify the found values.
 
 % check if there all required data are present
-stmt1 = isfield(handles.metricdata,'imNames');                              %are there loaded images?
-if stmt1 == 0                                                               %if not, force user to load them
+if isfield(handles.metricdata,'imNames') == 0                               %check if there are loaded images
     msgbox('First, you must load images','modal');uiwait(gcf);
     return
 end
@@ -588,10 +601,9 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushClearEdg.
-function PushClearEdg_Callback(hObject, eventdata, handles)
-% hObject    handle to PushClearEdg (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushClearEdg_Callback(~, ~, handles) %#ok<DEFNU>
+% by pressing this button, the EdgCoord matrix is cleared from the
+% handles.metricdata structure
 
 handles.metricdata = rmfield(handles.metricdata,'EdgCoord');
 
@@ -602,10 +614,12 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushDefEdg.
-function PushDefEdg_Callback(hObject, eventdata, handles)
-% hObject    handle to PushDefEdg (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushDefEdg_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+% if this button is pressed, default image processing parameters are
+% loaded. This means that initializeGUI function is called with option to
+% return only image processing parameters and then the old and the new
+% metricdata and prgmcontrol structures are merged with rewriting of
+% colliding old values
 
 % obtain data
 [newData{1} newData{2}] =...                                                %save outputs in newData cell
@@ -628,121 +642,12 @@ handles.prgmcontrol= oldData{2};
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
-%% Editable fields - Image Processing
-
-function EdithpTr_Callback(hObject, eventdata, handles)
-% hObject    handle to EdithpTr (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EdithpTr as text
-%        str2double(get(hObject,'String')) returns contents of EdithpTr as a double
-
-handles.metricdata.hpTr = str2double(get(hObject,'String'));                %get value from editable textfield
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EdithpTr_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EdithpTr (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function EditnumPeaks_Callback(hObject, eventdata, handles)
-% hObject    handle to EditnumPeaks (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditnumPeaks as text
-%        str2double(get(hObject,'String')) returns contents of EditnumPeaks as a double
-
-handles.metricdata.numPeaks = str2double(get(hObject,'String'));            %get value from editable textfield
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditnumPeaks_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditnumPeaks (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function EditfG_Callback(hObject, eventdata, handles)
-% hObject    handle to EditfG (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditfG as text
-%        str2double(get(hObject,'String')) returns contents of EditfG as a double
-
-handles.metricdata.fG = str2double(get(hObject,'String'));                  %get value from editable textfield
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditfG_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditfG (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function EditmL_Callback(hObject, eventdata, handles)
-% hObject    handle to EditmL (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditmL as text
-%        str2double(get(hObject,'String')) returns contents of EditmL as a double
-
-handles.metricdata.mL = str2double(get(hObject,'String'));                  %get value from editable textfield
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function EditmL_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditmL (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
 %% Checkboxes - Image Processing
 
 % --- Executes on button press in CheckCuvRegrGR.
-function CheckCuvettes_Callback(hObject, eventdata, handles)
-% hObject    handle to CheckCuvRegrGR (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function CheckCuvettes_Callback(hObject, ~, handles) %#ok<DEFNU>
+% checkbox for controlling if the user wants to display graphs from
+% cuvettes finding
 
 % Hint: get(hObject,'Value') returns toggle state of CheckCuvRegrGR
 
@@ -754,10 +659,9 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in CheckPlate.
-function CheckPlate_Callback(hObject, eventdata, handles)
-% hObject    handle to CheckPlate (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function CheckPlate_Callback(hObject, ~, handles) %#ok<DEFNU>
+% checkbox for controlling if the user wants to display graphs from plate
+% edges finding
 
 % Hint: get(hObject,'Value') returns toggle state of CheckPlate
 
@@ -769,13 +673,14 @@ guidata(handles.MainWindow, handles);
 %% Popupmenu - Image Processing
 
 % --- Executes on selection change in PopupIMProc.
-function PopupIMProc_Callback(hObject, eventdata, handles)
-% hObject    handle to PopupIMProc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns PopupIMProc contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from PopupIMProc
+function PopupIMProc_Callback(hObject, ~, handles) %#ok<DEFNU>
+% popup menu for choosing the level of automaticity of the findEdges
+% function execution. Availible options are 'Manual', 'Semi-automatic',
+% 'Automatic' and 'Force-automatic'. The default option is
+% 'Force-automatic'.
+%
+% Differences between options are explained in the main function
+% (RivuletExpDataProcessing.m) help file
 
 contents = cellstr(get(hObject,'String'));
 handles.prgmcontrol.autoEdges = contents{get(hObject,'Value')};             %get selected value from popmenu
@@ -785,26 +690,23 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function PopupIMProc_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to PopupIMProc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function PopupIMProc_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting up properties of the PopupIMProc popup list
 
 % Hint: popupmenu controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 %% Editable fields - Rivulet processing
 
-function EditTreshold_Callback(hObject, eventdata, handles)
-% hObject    handle to EditTreshold (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditTreshold as text
-%        str2double(get(hObject,'String')) returns contents of EditTreshold as a double
+function EditTreshold_Callback(hObject, ~, handles) %#ok<DEFNU>
+% field for specifying the treshold (liquid layer height) for differencing
+% between the rivulet and the noise on the plate, the value is inserted
+% into mm and the default value is 0.1 (but anything between 0.05 and 0.1
+% would be OK)
 
 handles.metricdata.Treshold = str2double(get(hObject,'String'));            %treshold for distinguish between the rivulet and resto of the plate
 
@@ -813,26 +715,24 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditTreshold_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditTreshold (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function EditTreshold_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting up properties of EditTreshold editable field
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 
 
-function EditFSensitivity_Callback(hObject, eventdata, handles)
-% hObject    handle to EditFSensitivity (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditFSensitivity as text
-%        str2double(get(hObject,'String')) returns contents of EditFSensitivity as a double
+function EditFSensitivity_Callback(hObject, ~, handles) %#ok<DEFNU>
+% field for specifying the filter sensitivity to be used when getting rid
+% of the noise on the experimental pictures, it is used when the predefined
+% 2D filter is created by the MATLAB function fspecial. The default (and
+% unchangeable) type of the filter is 'disk' and the default value of
+% filterSensitivity is 10
 
 handles.metricdata.FSensitivity = str2double(get(hObject,'String'));        %filter sensitivity for noise cancelation
 
@@ -841,27 +741,29 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditFSensitivity_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditFSensitivity (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function EditFSensitivity_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for set up properties of EditFSensitivity editable field
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 %% Popup menu - Rivulet processing
 
 % --- Executes on selection change in PopupLiqType.
-function PopupLiqType_Callback(hObject, eventdata, handles)
-% hObject    handle to PopupLiqType (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns PopupLiqType contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from PopupLiqType
+function PopupLiqType_Callback(hObject, ~, handles) %#ok<DEFNU>
+% popup menu that allows user to select between different liquid types used
+% during the experiments. This menu calls function fluidDataFcn with
+% specified liquid and plate inclination angles parameters and saves
+% obtained fluidData into the handles.metricdata structure.
+%
+% fluidData is vector containing gravitational acceleration, g, viscosity,
+% surface tension and density of the liquid and the calibration parameters
+% for the pumpe rotameter (these parameters are used into calculating the
+% dimensionless and volumetric flows of the liquid)
 
 contents = cellstr(get(hObject,'String'));
 selected = contents{get(hObject,'Value')};                                  %get selected value from popmenu
@@ -876,25 +778,23 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function PopupLiqType_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to PopupLiqType (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function PopupLiqType_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting up propertios of the PopupLiqType popup menu
 
 % Hint: popupmenu controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 % --- Executes on selection change in PopupGrFormat.
-function PopupGrFormat_Callback(hObject, eventdata, handles)
-% hObject    handle to PopupGrFormat (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns PopupGrFormat contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from PopupGrFormat
+function PopupGrFormat_Callback(hObject, ~, handles) %#ok<DEFNU>
+% through this menu, user can specify in which format he wants to save
+% plots generated during the rivuletProcessing function execution.
+%
+% availible formats are: 'png','fig','eps' and 'tif'
+% default format is 'png'
 
 contents = cellstr(get(hObject,'String'));
 selected = contents{get(hObject,'Value')};                                  %get selected value from popmenu
@@ -906,14 +806,13 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function PopupGrFormat_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to PopupGrFormat (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function PopupGrFormat_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting up properties of PopupGRFormat popup list
 
 % Hint: popupmenu controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
@@ -921,10 +820,9 @@ end
 %% Checkboxes - Rivulet processing
 
 % --- Executes on button press in CheckCompProfGR.
-function CheckCuvRegrGR_Callback(hObject, eventdata, handles)
-% hObject    handle to CheckCuvRegrGR (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function CheckCuvRegrGR_Callback(hObject, ~, handles) %#ok<DEFNU>
+% checkbox for controlling if the user wants to generate graphics from the
+% cuvette regression. By default, no plots are generated.
 
 % Hint: get(hObject,'Value') returns toggle state of CheckCuvRegrGR
 
@@ -934,10 +832,9 @@ handles.prgmcontrol.GR.regr = get(hObject,'Value');
 guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in CheckRivTopGR.
-function CheckRivTopGR_Callback(hObject, eventdata, handles)
-% hObject    handle to CheckRivTopGR (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function CheckRivTopGR_Callback(hObject, ~, handles) %#ok<DEFNU>
+% checkbox for controlling if the user wants to generates contour plots of
+% the rivulet from top view. By default, no plots are generated.
 
 % Hint: get(hObject,'Value') returns toggle state of CheckRivTopGR
 
@@ -947,10 +844,11 @@ handles.prgmcontrol.GR.contour = get(hObject,'Value');
 guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in CheckCompProfGR.
-function CheckCompProfGR_Callback(hObject, eventdata, handles)
-% hObject    handle to CheckCompProfGR (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function CheckCompProfGR_Callback(hObject, ~, handles) %#ok<DEFNU>
+% checkbox for controlling if the user wants to generate plots of the
+% complete rivulet profiles. By default, no plots are generated. Generation
+% of the complete rivulet profiles plots is also the most time consuming
+% part of the function
 
 % Hint: get(hObject,'Value') returns toggle state of CheckCompProfGR
 
@@ -960,10 +858,10 @@ handles.prgmcontrol.GR.profcompl = get(hObject,'Value');
 guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in CheckMeanCutsGR.
-function CheckMeanCutsGR_Callback(hObject, eventdata, handles)
-% hObject    handle to CheckMeanCutsGR (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function CheckMeanCutsGR_Callback(hObject, ~, handles) %#ok<DEFNU>
+% checkbox for controlling if the user wants to generate plots from mean
+% profiles of the rivulets into the made cuts. By default no plots are
+% generated.
 
 % Hint: get(hObject,'Value') returns toggle state of CheckMeanCutsGR
 
@@ -974,7 +872,15 @@ guidata(handles.MainWindow, handles);
 
 %% Radiobuttons - Rivulets processing (uibuttongroup)
 % --- Executes when selected object is changed in PlotSetts.
-function PlotSetts_SelectionChangeFcn(hObject, eventdata, handles)
+function PlotSetts_SelectionChangeFcn(~, eventdata, handles) %#ok<DEFNU>
+% uibuttongroup for specifying the handling of generated plots, by default
+% the plots are only saved, but user can chose between only showing the
+% plots, only saving the plots and both showing and saving the plots.
+%
+% If the plots are shown, for larger datasets, quite high number of windows
+% would be opened.
+%
+% uibuttongroup hints:
 % hObject    handle to the selected object in PlotSetts 
 % eventdata  structure with the following fields (see UIBUTTONGROUP)
 %	EventName: string 'SelectionChanged' (read only)
@@ -1001,16 +907,26 @@ guidata(handles.MainWindow, handles);
 %% Pushbuttons - Rivulet processing
 
 % --- Executes on button press in PushCalculate.
-function PushCalculate_Callback(hObject, eventdata, handles)
-% hObject    handle to PushCalculate (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushCalculate_Callback(~, ~, handles) %#ok<DEFNU>
+% pushbutton that summons up all the parameters and calls the function
+% rivuletProcessing.m
+%
+% at first, it is checked if all required fields are specified (EdgCoord
+% and images), then the rivuletProcessing function is called
+
+% the output of rivuletProcessing is stored into
+% handles.metricdata.Availible cell and the number of evaluated experiments
+% is increased by 1 (handles.prgmcontrol.nExp)
 
 % check if there all required data are present
 % I. are the edges of the plate and cuvettes found
 if isfield(handles.metricdata,'EdgCoord') == 0                              %if EdgeCoord is not present, lets find it
-        msgbox(['There are no edges of cuvettes'...
-            ' and plate specified'],'modal');uiwait(gcf);
+    msgbox(['There are no edges of cuvettes'...
+        ' and plate specified'],'modal');uiwait(gcf);
+    return
+elseif isfield(handles.metricdata,'imNames') == 0
+    msgbox('There are no loaded images','modal');uiwait(gcf);
+    return
 else                                                                        %otherwise call the rivuletProcessing function
     % set up listboxes in postprocmenu
     set(handles.ListProfiles,'Value',1,'String','Preparing data')
@@ -1087,10 +1003,13 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushSetDefRiv.
-function PushSetDefRiv_Callback(hObject, eventdata, handles)
-% hObject    handle to PushSetDefRiv (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushSetDefRiv_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+% by pressing this pushbutton, the default parameters for the
+% rivuletProcessing are loaded and any user set values are rewritten
+% (initializeGUI function is called with option to return only the rivulet
+% processing parameters and then the returned and the current metricdata
+% and prgmcontrol fields are merged with rewriting any conflicting values
+% by the new ones)
 
 % obtain data
 [newData{1} newData{2}] =...                                                %save outputs in newData cell
@@ -1115,10 +1034,10 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushSaveToBase.
-function PushSaveToBase_Callback(hObject, eventdata, handles)
-% hObject    handle to PushSaveToBase (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushSaveToBase_Callback(hObject, eventdata, handles) %#ok<INUSL,DEFNU>%the variables are used 'indirectly'
+% by pressing this button, all the variables (hObject,eventdata and
+% handles) are saved (assigned) to the 'base' workspace. please note that
+% this option will not work with the compiled version of the program
 
 save_to_base(1)                                                             %save all variables to base workspace
 
@@ -1127,10 +1046,9 @@ handles.statusbar = statusbar(handles.MainWindow,...
 
 
 % --- Executes on button press in PushClearALL.
-function PushClearALL_Callback(hObject, eventdata, handles)
-% hObject    handle to PushClearALL (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushClearALL_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+% when this button is pressed, all the user defined variables are cleared
+% both from the metricdata and prgmcontrol structures
 
 handles = rmfield(handles,'metricdata');                                    %remove all user-defined data
 handles = rmfield(handles,'prgmcontrol');
@@ -1147,10 +1065,9 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushClosePlots.
-function PushClosePlots_Callback(hObject, eventdata, handles)
-% hObject    handle to PushClosePlots (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushClosePlots_Callback(~, ~, handles) %#ok<DEFNU>
+% function for closing all the figure windows except of the main program
+% (its handle is currently made invisible)
 
 set(handles.MainWindow,'HandleVisibility','off');                              %dont want to close the main program
 close all                                                                   %close every other figure
@@ -1159,10 +1076,11 @@ set(handles.MainWindow,'HandleVisibility','on');
 %% Pushbuttons - Outputs overview
 
 % --- Executes on button press in PushShowProfiles.
-function PushShowProfiles_Callback(hObject, eventdata, handles)
-% hObject    handle to PushShowProfiles (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushShowProfiles_Callback(~, ~, handles) %#ok<DEFNU>
+% pressing this button opens uitable with rivulet profiles data for each
+% selected item in the ListProfiles listbox. Please note that opening more
+% profiles at the time can cause apparition of inconveniently high number
+% of figure windows
 
 if isfield(handles.prgmcontrol,'showProf') == 0
     msgbox('You must choose the profiles to be shown','modal');
@@ -1186,10 +1104,14 @@ else
 end
 
 % --- Executes on button press in PushShowOtherData.
-function PushShowOtherData_Callback(hObject, eventdata, handles)
-% hObject    handle to PushShowOtherData (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushShowOtherData_Callback(~, ~, handles) %#ok<DEFNU>
+% pushbutton for showing the mSpeed, RivHeight, RivWidth and IFACorr
+% variables. if the checkbox CheckShowDataPlots is checked, in the created
+% window are present also axes linked to the shown uitable. otherwise, only
+% the uitable is opened.
+%
+% handling of the uitable is solved by outside function
+% showOtherDataUITable
 
 plateSize = handles.metricdata.RivProcPars{1};                              %extract plateSize for current experiment
 
@@ -1228,13 +1150,11 @@ end
 %% Listboxes - Outputs overview
 
 % --- Executes on selection change in ListProfiles.
-function ListProfiles_Callback(hObject, eventdata, handles)
-% hObject    handle to ListProfiles (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns ListProfiles contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from ListProfiles
+function ListProfiles_Callback(hObject, ~, handles) %#ok<DEFNU>
+% listbox for showing availible data for Quick outputs overview. In this
+% list are present the data only for profiles from the last data
+% evaluation. for more detailed of data or for comparing different
+% measurements, user must open the postprocessing tool from the menus
 
 handles.prgmcontrol.showProf = get(hObject,'Value');                        %save indexes of selected
 
@@ -1244,25 +1164,23 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function ListProfiles_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to ListProfiles (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function ListProfiles_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting properties of ListProfiles listbox
 
 % Hint: listbox controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 % --- Executes on selection change in ListOtherData.
-function ListOtherData_Callback(hObject, eventdata, handles)
-% hObject    handle to ListOtherData (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns ListOtherData contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from ListOtherData
+function ListOtherData_Callback(hObject, ~, handles) %#ok<DEFNU>
+% listbox for showing availible data for Quick outputs overview. In this
+% list are present the data only for mSpeed, RivHeight, RivWidth and
+% IFACorr from the last data evaluation. for more detailed of data or for
+% comparing different measurements, user must open the postprocessing tool
+% from the menus
 
 handles.prgmcontrol.showOther = get(hObject,'Value');                       %save indexes of selected
 
@@ -1271,35 +1189,32 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function ListOtherData_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to ListOtherData (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function ListOtherData_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting properties of ListOtherData listbox
 
 % Hint: listbox controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 %% Checkboxes - Outputs overview
 
 % --- Executes on button press in CheckShowDataPlots.
-function CheckShowDataPlots_Callback(hObject, eventdata, handles)
-% hObject    handle to CheckShowDataPlots (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of CheckShowDataPlots
+function CheckShowDataPlots_Callback(~, ~, ~) %#ok<DEFNU>
+% checkbox for controlling the output of PushShowOtherData. if it is
+% checked, there is plot show, else there is showed only uitable. this
+% callback does nothing at the time
 
 
-%% Auxiliary functions
+%% Initialization function
 function [metricdata prgmcontrol] = ...
-    initializeGUI(hObject,eventdata,handles,dataPart)
+    initializeGUI(~,~,handles,dataPart)
 %
 % function for gui inicialization, to be executed just before progGui is
 % made visible
-
+%
 % INPUT variables
 % hObject,eventdata,handles ... default inputs
 % dataPart  ... which part of data am I expecting
@@ -1411,16 +1326,18 @@ guidata(handles.MainWindow, handles);
 
 %% File menu
 % --------------------------------------------------------------------
-function FileMenu_Callback(hObject, eventdata, handles)
-% hObject    handle to FileMenu (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function FileMenu_Callback(~, ~, ~) %#ok<DEFNU>
+% file menu header, actually doesn't have any fucntion
+%
+% Shortcut: --
 
 % --------------------------------------------------------------------
-function SaveBase_Callback(hObject, eventdata, handles)
-% hObject    handle to SaveBase (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function SaveBase_Callback(~, ~, handles) %#ok<DEFNU>
+% function for saving all the variables into main workspace, wont work into
+% compiled version
+%
+% Shortcut: --
+
 save_to_base(1);                                                            %save all variables into base workspace
 set(handles.statusbar,'Text','All variables were saved into base workspace');
 
@@ -1429,13 +1346,13 @@ guidata(handles.MainWindow, handles);
 
 
 % --------------------------------------------------------------------
-function SaveFile_Callback(hObject, eventdata, handles)
-% hObject    handle to SaveFile (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function SaveFile_Callback(~, ~, handles) %#ok<DEFNU>
+% function that save all the program execution variables into .mat file
+%
+% Shortcut: Ctrl+S
 
-metricdata = handles.metricdata;
-prgmcontrol= handles.prgmcontrol;
+metricdata = handles.metricdata; %#ok<NASGU>                                %these variables are used "indirectly"
+prgmcontrol= handles.prgmcontrol; %#ok<NASGU>
 
 strCell = {'metricdata' 'prgmcontrol'};
 
@@ -1446,10 +1363,15 @@ set(handles.statusbar,'Text',...
 
 
 % --------------------------------------------------------------------
-function LoadFile_Callback(hObject, eventdata, handles)
-% hObject    handle to LoadFile (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function LoadFile_Callback(~, ~, handles) %#ok<DEFNU>
+% menu entry that loads variables saved by SaveFile_Callback function and
+% merges them with the existing data. If there are the fields with the same
+% names in both old and new data, old value is rewritten
+%
+% Shortcut: Ctrl+O
+
+% Remarque: at the time, this doesn't fill the fields accordingly to loaded
+% parameters. This should be implemented
 
 uiopen('load');                                                             %open dialog for loading variable
 if exist('metricdata','var') == 0 || exist('prgmcontrol','var') == 0
@@ -1459,8 +1381,23 @@ if exist('metricdata','var') == 0 || exist('prgmcontrol','var') == 0
     handles.statusbar = statusbar(handles.MainWindow,...
         'Loading variables from file failed.');
 else
-    handles.metricdata = metricdata;
-    handles.prgmcontrol= prgmcontrol;
+    
+    % obtain data
+    newData{1} = metricdata;                                                %save loaded as cell of structures
+    newData{2} = prgmcontrol;
+    % merge structures
+    oldData = {handles.metricdata handles.prgmcontrol};                     %create cell of old data
+    
+    parfor i = 1:numel(newData)
+        fNamesNew = fieldnames(newData{i});                                 %get list of field names for new data structure
+        for j = 1:numel(fNamesNew)                                          %for all the fields in newData{i} structure
+            oldData{i}.(fNamesNew{j}) = newData{i}.(fNamesNew{j});          %replace same field in oldData or make field with corr. name
+        end
+    end
+    
+    % extract resulting variables
+    handles.metricdata = oldData{1};
+    handles.prgmcontrol= oldData{2};
     handles.statusbar = statusbar(handles.MainWindow,...
         'Variables were loaded into workspace.');
 end
@@ -1469,29 +1406,30 @@ end
 guidata(handles.MainWindow, handles);
 
 % --------------------------------------------------------------------
-function QuitPrgm_Callback(hObject, eventdata, handles)
-% hObject    handle to QuitPrgm (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function QuitPrgm_Callback(~, ~, handles) %#ok<DEFNU>
+% simple quitting command, call close request function
+%
+% Shortcut: Ctrl+Q
 close(handles.MainWindow);                                                  %call closing function
 
 
 %% Elements edges finding menu
 % --------------------------------------------------------------------
-function findEdgesMenu_Callback(hObject, eventdata, handles)
-% hObject    handle to findEdgesMenu (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function findEdgesMenu_Callback(~, ~, ~) %#ok<DEFNU>
+% Element edges finding menu header, doesn't have any function
+%
+% Shortcut: --
 
 
 % --------------------------------------------------------------------
-function SaveEdgCoord_Callback(hObject, eventdata, handles)
-% hObject    handle to SaveEdgCoord (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function SaveEdgCoord_Callback(~, ~, handles) %#ok<DEFNU>
+% function for saving actual EdgCoord variable into the .mat file for later
+% use.
+%
+% Shortcut: --
 
 if isfield(handles.metricdata,'EdgCoord') == 1
-    EdgCoord = handles.metricdata.EdgCoord;
+    EdgCoord = handles.metricdata.EdgCoord; %#ok<NASGU>
     uisave('EdgCoord','EdgCoord')
 else
     msgbox('You must specify EdgCoord at first','modal');uiwait(gcf);
@@ -1502,10 +1440,11 @@ set(handles.statusbar,'Text',...
 
 
 % --------------------------------------------------------------------
-function LoadEdgCoord_Callback(hObject, eventdata, handles)
-% hObject    handle to LoadEdgCoord (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function LoadEdgCoord_Callback(~, ~, handles) %#ok<DEFNU>
+% function for loading EdgCoord matrix from the .mat file. The file has to
+% be saved by SaveEdgCoord_Callback
+%
+% Shortcut: --
 
 uiopen('load');                                                             %open dialog for loading variable
 if exist('EdgCoord','var') == 0
@@ -1526,10 +1465,11 @@ guidata(handles.MainWindow, handles);
 
 
 % --------------------------------------------------------------------
-function ModIMPars_Callback(hObject, eventdata, handles)
-% hObject    handle to ModIMPars (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function ModIMPars_Callback(~, ~, handles) %#ok<DEFNU>
+% function that call changeIMPars.m with no inputs => user is allowed to
+% modify parameters and at the begining, the default parameters are shown
+%
+% Shortcut: Ctrl+I
 
 IMProcPars = changeIMPars;                                                  %call gui for changing parameters
 
@@ -1542,22 +1482,21 @@ end
 guidata(handles.MainWindow, handles);
 
 % --------------------------------------------------------------------
-function ShowIMPars_Callback(hObject, eventdata, handles)
-% hObject    handle to ShowIMPars (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function ShowIMPars_Callback(~, ~, handles) %#ok<DEFNU>
+% function that call changeIMPars.m with 'onlyshow' option => user is no
+% allowed to modify the parameters and current parameters are shown
 
 changeIMPars('onlyshow',handles.metricdata.IMProcPars);                     %call gui for changing parameters with loaded current
 
 
 % --------------------------------------------------------------------
-function SaveIMPars_Callback(hObject, eventdata, handles)
-% hObject    handle to SaveIMPars (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function SaveIMPars_Callback(~, ~, handles) %#ok<DEFNU>
+% function for saving IMProcPars into .mat file for later use
+%
+% Shortcut: --
 
 if isempty(handles.metricdata.IMProcPars) == 0
-    IMProcPars = handles.metricdata.IMProcPars;
+    IMProcPars = handles.metricdata.IMProcPars; %#ok<NASGU>                 %this variable is used "indirectly"
     uisave('IMProcPars','IMProcPars')
 else
     msgbox('You must specify IMProcPars at first','modal');uiwait(gcf);
@@ -1568,10 +1507,11 @@ set(handles.statusbar,'Text',...
 
 
 % --------------------------------------------------------------------
-function LoadIMPars_Callback(hObject, eventdata, handles)
-% hObject    handle to LoadIMPars (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function LoadIMPars_Callback(~, ~, handles) %#ok<DEFNU>
+% function for loading IMProcPars saved by SaveIMPars_Callback. This
+% rewrites current IMProcPars variable with loaded values
+%
+% Shortcut: --
 
 uiopen('load');                                                             %open dialog for loading variable
 if exist('IMProcPars','var') == 0
@@ -1591,15 +1531,29 @@ end
 guidata(handles.MainWindow, handles);
 
 % --------------------------------------------------------------------
-function BestMethod_Callback(hObject, eventdata, handles)
-% hObject    handle to BestMethod (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function BestMethod_Callback(~, ~, handles) %#ok<DEFNU>
+% from this menu entry is called function bestMethod.m for specifying the
+% best image processing parameters (IMProcPars).
+% the original IMProcPars are rewritten new values => user is asked if he
+% wants to save the actual parameters before running bestMethod function
+%
+% Shortcut: Ctrl+B
 
 % check if there all required data are present
 if isfield(handles.metricdata,'imNames') == 0                               %are there loaded images?                                                               %if not, force user to load them
     msgbox('First, you must load images','modal');uiwait(gcf);
     return
+end
+choice = questdlg({'Actual IMProcPars will be rewritten.'...                %ask user if he wants to save actual parameters
+    'Do you want to save before proceeding?'},...
+    'Save original', ...
+    'Yes','No','No');
+% Handle response
+switch choice
+    case 'Yes'
+        IMProcPars = handles.metricdata.IMProcPars; %#ok<NASGU>             %this variable is used "indirectly"
+        uisave('IMProcPars','IMProcPars')
+    case 'No'                                                               %do nothing
 end
 
 handles.metricdata.IMProcPars = ...                                         %call method for finding best image processing method
@@ -1610,10 +1564,13 @@ guidata(handles.MainWindow, handles);
 
 
 % --------------------------------------------------------------------
-function SpecAppPlatePos_Callback(hObject, eventdata, handles)
-% hObject    handle to SpecAppPlatePos (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function SpecAppPlatePos_Callback(~, ~, handles) %#ok<DEFNU>
+% function that allows user to specify approximate plate position on photos
+% outside of the findEdges function. This is usefull when the user wants to
+% run findEdges more times at the row because specyfying the approximate
+% plate position each time can be annoying
+%
+% Shortcut: --
 
 % extracting needed values from handles
 if isfield(handles.metricdata,'daten') == 1                                 %see if there are images saved into handles
@@ -1661,17 +1618,19 @@ guidata(handles.MainWindow, handles);
 
 %% Data processing menu
 % --------------------------------------------------------------------
-function rivProcMenu_Callback(hObject, eventdata, handles)
-% hObject    handle to rivProcMenu (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function rivProcMenu_Callback(~, ~, ~) %#ok<DEFNU>
+% Data processing menu header, this doesn't do anything
+%
+% Shortcut: --
 
 
 % --------------------------------------------------------------------
-function ModExpPars_Callback(hObject, eventdata, handles)
-% hObject    handle to ModExpPars (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function ModExpPars_Callback(~, ~, handles) %#ok<DEFNU>
+% function for calling changeRPPars.m without any specification => at the
+% begining, the default values are loaded and user is allowed to change
+% them
+%
+% Shortcut: Ctrl+M
 
 RivProcPars = changeRPPars;                                                 %call gui for changing parameters
 
@@ -1684,24 +1643,23 @@ end
 guidata(handles.MainWindow, handles);
 
 % --------------------------------------------------------------------
-function ShowExpPars_Callback(hObject, eventdata, handles)
-% hObject    handle to ShowExpPars (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function ShowExpPars_Callback(~, ~, handles) %#ok<DEFNU>
+% function that calls changeRPPars.m with specification 'onlyshow' =>
+% current values of RivProcPars are loaded at the GUI initialization and
+% user is not allowed to modify them
+%
+% Shortcut: Ctrl+E
 
 changeRPPars('onlyshow',handles.metricdata.RivProcPars);                    %call gui for changing parameters with loaded current
 
-% Update handles structure
-guidata(handles.MainWindow, handles);
-
 % --------------------------------------------------------------------
-function SaveRPPars_Callback(hObject, eventdata, handles)
-% hObject    handle to SaveRPPars (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function SaveRPPars_Callback( ~, ~, handles) %#ok<DEFNU>
+% function for saving current RivProcPars into .mat file for later use
+%
+% Shortcut: ..
 
 if isempty(handles.metricdata.RivProcPars) == 0
-    RivProcPars = handles.metricdata.RivProcPars;
+    RivProcPars = handles.metricdata.RivProcPars; %#ok<NASGU>               %this variable is used "indirectly"
     uisave('RivProcPars','RivProcPars')
 else
     msgbox('You must specify RivProcPars at first','modal');uiwait(gcf);
@@ -1712,10 +1670,11 @@ set(handles.statusbar,'Text',...
 
 
 % --------------------------------------------------------------------
-function LoadRPPars_Callback(hObject, eventdata, handles)
-% hObject    handle to LoadRPPars (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function LoadRPPars_Callback(~, ~, handles) %#ok<DEFNU>
+% function for loading RivProcPars from .mat file, saved by
+% SaveRPPars_Callback. Current RivProcPars are rewritten with new values
+%
+% Shortcut: --
 
 uiopen('load');                                                             %open dialog for loading variable
 if exist('RivProcPars','var') == 0
@@ -1737,17 +1696,21 @@ guidata(handles.MainWindow, handles);
 %% postprocmenu menu
 
 % --------------------------------------------------------------------
-function PostProcMenu_Callback(hObject, eventdata, handles)
-% hObject    handle to PostProcMenu (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PostProcMenu_Callback(~, ~, ~) %#ok<DEFNU>
+% Postprocessing menu header, doesn't do anything
+%
+% Shortcut: --
 
 
 % --------------------------------------------------------------------
-function ShowGenPlots_Callback(hObject, eventdata, handles)
-% hObject    handle to ShowGenPlots (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function ShowGenPlots_Callback(~, ~, handles) %#ok<DEFNU>
+% function that allows user to open images created during the program
+% executin (after pressing the "Calculate" button).
+%
+% if the .fig files are loaded, they are opened using openfig. for the
+% other formats, imshow is used instead
+%
+% Shortcut: --
 
 FilterSpec  = {'*.fig';'*.png;*.eps;*.tif'};
 DlgTitle   = 'Select figures to load';
@@ -1772,22 +1735,25 @@ for i = 1:numel(fileNames)                                                  %for
 end
 
 % --------------------------------------------------------------------
-function ShowAvProcData_Callback(hObject, eventdata, handles)
-% hObject    handle to ShowAvProcData (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function ShowAvProcData_Callback(~, ~, handles) %#ok<DEFNU>
+% this function calls showProcData.m with current data availible for
+% postprocessing. from the raised GUI is possible to start postprocessing
+% tool or load other data from .mat files
+%
+% Shortcut: Ctrl+A
 
 showProcData('handles',handles);
 
 
 % --------------------------------------------------------------------
-function SaveProcessedData_Callback(hObject, eventdata, handles)
-% hObject    handle to SaveProcessedData (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function SaveProcessedData_Callback(~, ~, handles) %#ok<DEFNU>
+% this function allows user to save outputs from the rivuletProcessing.m
+% into .mat file for later use in postprocessing tool
+%
+% Shortcut: --
 
 if isfield(handles.metricdata,'Availible') == 1
-    Availible = handles.metricdata.Availible;
+    Availible = handles.metricdata.Availible; %#ok<NASGU>                   %this variable is used "indirectly"
     uisave('Availible','Processed_data');
     set(handles.statusbar,'Text',...
         'Processed data were saved into .mat file');
@@ -1799,12 +1765,41 @@ end
 
 
 % --------------------------------------------------------------------
-function LoadProcessedData_Callback(hObject, eventdata, handles)
-% hObject    handle to LoadProcessedData (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function LoadProcessedData_Callback(~, ~, handles) %#ok<DEFNU>
+% function for loading output data saved by SaveProcessedData_Callback
+% the loaded data are merged into existing handles.metricdata.Availible
+% cell. If there are two sets of data with the same ID, current values are
+% replaced by loaded ones
 
 uiopen('load');                                                             %open dialog for loading variable
+if exist('Availible','var') == 0
+    msgbox(['You can use this option only to load Processed data saved by'...
+        '"Save all processed data into .mat file" option from program menu.'],...
+        'modal');uiwait(gcf);
+    set(handles.statusbar,'Text',...
+        'Loading Availible from file failed.');
+else
+    if isfield(handles.metricdata,'Availible') == 0                         %if this field doesnt exist, create empty matrix
+        handles.metricdata.Availible = [];
+    end
+    Availible = [handles.metricdata.Availible Availible];                   %#ok<NODEF> %append new data to the structure
+    strCellAV = cell(1,numel(Availible));
+    k         = 1;                                                          %auxiliary indexing variable
+    for i = 1:numel(Availible)
+        if sum(strcmp(strCellAV,Availible{i}.ID))==0                        %if the same ID isn't present
+            strCellAV{k} = Availible{i}.ID;                                 %create string with availible data names from handles
+            Availible{k} = Availible{i};                                    %resave availible onto k-th position
+            k            = k+1;
+        end
+    end
+    strCellAV = strCellAV(cellfun(@isempty,strCellAV)==0);                  %strip off empty fields
+    Availible = Availible(cellfun(@isempty,Availible)==0);
+    set(handles.ListData,'String',strCellAV,'Max',numel(strCellAV));        %update listbox
+    handles.metricdata.Availible = Availible;
+    set(handles.statusbar,'Text',...
+        ['User defined variables were loaded from file.'...
+        ' Availible is prepared for postprocessing.']);
+end
 if exist('Availible','var') == 0
     msgbox(['You can use this option only to load Processed data saved by'...
         '"Save all processed data into .mat file" option from program menu.'],...
@@ -1823,10 +1818,11 @@ guidata(handles.MainWindow, handles);
 
 
 % --------------------------------------------------------------------
-function OpenPostProcTool_Callback(hObject, eventdata, handles)
-% hObject    handle to OpenPostProcTool (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function OpenPostProcTool_Callback(~, ~, handles) %#ok<DEFNU>
+% function that calls postProcPlotting.m (postprocessing tool) with output
+% data currently present into the handles.metricdata.Availible cell
+%
+% Shortcut: Ctrl+P
 
 if isfield(handles.metricdata,'Availible') == 1
     postProcPlotting(handles.metricdata.Availible);

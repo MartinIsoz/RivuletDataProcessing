@@ -29,6 +29,15 @@ function [state prbMsg sumMsg] = controlFunction(EdgCoord)
 % prbMsg    ... structure containing indexes of rows (images)
 %               where was found something odd
 % sumMsg    ... summary message for the found problems
+%
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         17. 07. 2012
+%
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
+% See also FINDEDGES MODIFYFUNCTION
 
 nCol = size(EdgCoord,2);                                                    %number of columns in the input matrix (10)
 k    = 1;                                                                   %auxiliary indexing variable for prbMsg
