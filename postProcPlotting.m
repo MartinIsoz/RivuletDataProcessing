@@ -43,7 +43,7 @@ separators = {'-------' ' '};                                               %sep
 % create listboxes and their titles
 ListGroup  = uicontrol(hFig, 'Style','listbox',...                          %create listbox for avalible data
     'String',strCellGR,'Callback',@ListGroup_Callback,...
-    'Tag','ListGroup','Max',numel(strCellGR));                              %enable multiselect in listboxes
+    'Tag','ListGroup','Max',numel(strCellGR));                              %#ok<*NASGU> %enable multiselect in listboxes
 TextGroup = uicontrol(hFig,'Style','text',...                               %create text string
     'HorizontalAlignment','left',...
     'String','Choose data group:',...
@@ -94,6 +94,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         set(ListMsrt,'Enable','off','Value',[]);                            %disable list which is yet to be filled
         % disable plot button until the data are selected
         set(PushPlot,'Enable','off');
+        set(CheckLink,'Enable','on');                                       %CheckLink may be disabled by chosing profiles, enable it here
         % updating application data
         appdata.metricdata.strCellDT = strCellDT;                           %assign variables to appdata
         appdata.prgmcontrol.selGR    = selGR;
@@ -135,7 +136,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         end
         % fill in table accordingly to selected data
         strCellDT = appdata.metricdata.strCellDT;
-        if comp == 1                                                        %this case occurs if there are only compatible data present in listbox
+        if comp == 1                                                        %this case occurs if there are only compatible data present in lstbx
             selGR = appdata.prgmcontrol.selGR;                              %selected groups
             plateSize = zeros(numel(selGR),2);                              %preallocate variable for plateSizes
             for j = 1:numel(selGR)                                          %for all selected groups
@@ -289,7 +290,6 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         % decode the ID string
         rdblCellStr = cell(1,numel(selGR));                                 %create empty var
         k           = 1;l = 1;                                              %auxiliary indexes
-        assignin('base','Availible',Availible)
         for j = 1:numel(selMS)
             if l > numel(GR{k})                                             %distinct to which groups are the data appartening
                 k = k+1;
@@ -399,31 +399,45 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     'Units','Normal',...
                     'Callback',@PopUpXAxsCorr_Callback,...
                     'Position',[0.3 0.01 0.4 0.08],'Value',1);              %create popup menu for choosing x axes
-                brks = [1 find(diff(Data(:,4))<0)'+1 numel(Data(:,4))];     %indexes of new data starts (diff in dimless fl. rate < 0)
+                brks = [1 find(diff(Data(:,4))<0)'+1 numel(Data(:,4))+1];   %indexes of new data starts (diff in dimless fl. rate < 0)
                 hold(hPlAxes,'on');
                 color = distinguishable_colors(numel(brks)-1);              %allocate matrix for used colors and fill it with colors
                 for j = 1:numel(brks)-1
-                    hPlot(j) = plot(hPlAxes,Data(brks(j):brks(j+1),4),...
-                        Data(brks(j):brks(j+1),end),'^');
-                    set(hPlot(j),'Color',color(j,:),'MarkerFaceColor',...
+                    % prepare data (calculate mean values and std() )
+                    tmpVar = Data(brks(j):brks(j+1)-1,[4 end]);             %resave current part of data as tmpVar
+                    uniqueFlR= unique(tmpVar(:,1));                         %unique dimensionless flow rates
+                    meanIFArea=zeros(numel(uniqueFlR),1);                   %preallocate variables
+                    stdDevIFA= meanIFArea;
+                    for k = 1:numel(uniqueFlR)
+                        meanIFArea(k) = mean(tmpVar(...                     %select data with the one flow rate
+                            uniqueFlR(k) == tmpVar(:,1),2));                %calculate mean IF area for unique flow rates
+                        stdDevIFA(k)  = std(tmpVar(...                      %select data with the one flow rate
+                            uniqueFlR(k) == tmpVar(:,1),2));                %calculate standard deviation of these values
+                    end
+                    hPlot(j,1) = plot(hPlAxes,tmpVar(:,1),tmpVar(:,2),'^'); %plot measured values
+                    hPlot(j,2) = errorbar(hPlAxes,uniqueFlR,meanIFArea,...  %plot mean IF areas with errorbars
+                        stdDevIFA,'^-');
+                    set(hPlot(j,:),'Color',color(j,:),'MarkerFaceColor',... %set up colors
                         color(j,:));
                 end
+                set(hPlot(:,1),'Visible','off');                            %make everything except mean values invisible
                 hTtl = title(hPlAxes,['Interfacial area as fun. of '...
                     'dimensionless liq. flow rate']);
                 set(hTtl,'FontSize',13,'FontWeight','bold')                 %modify title properties
                 xlabel(hPlAxes,'dimensionless flow rate, [-]');
                 ylabel(hPlAxes,'interfacial area of the rivulet, [m^2]');
-                set(hPlot,'MarkerSize',10);
+                set(hPlot,'MarkerSize',7);
                 % create leged entries (ID strings of data groups)
-                hLegend = legend(hPlAxes,rdblCellStr,'Location','Best',...
+                hLegend = legend(hPlot(:,1),rdblCellStr,'Location','Best',...
                     'Interpreter','tex');
                 % save handles into appdata
                 appdata.handles.hPlFig = hPlFig;
                 appdata.handles.hPlAxes= hPlAxes;
                 appdata.handles.hPlot  = hPlot;
-                appdata.handles.hLegend= hLegend;
                 % save breakpoints into appdata
                 appdata.metricdata.brks= brks;
+                % save legend cell of strings
+                appdata.metricdata.rdblCellStr = rdblCellStr;
                 % save colors of lines into appdata
                 appdata.metricdata.color=color;
                 guidata(hFig,appdata);                                      %update application data
@@ -458,16 +472,21 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 flRates       = flRates(flRates~=0);                        %get rid of zeros
                 color = distinguishable_colors(numel(brks)-1);              %allocate matrix for used colors and fill in with colors
                 hold(hPlAxes,'on');
+                hPlot = zeros(numel(brks)-1,size(Data,2)-3);                %allocate space for the variable hPlot
                 for j = 1:numel(brks)-1                                     %for all selected dimless flow rates
                     legendCellStr{j} =...
                         ['M = ' num2str(flRates(j),'%3.1f') 10 ...          %compose a legend entry
                         rdblCellStr{j}];
-                    hPlot(j,:) = plot(hPlAxes,Data(brks(j):brks(j+1)-1,end),...%plot datagroup
-                        Data(brks(j):brks(j+1)-1,1:end-3),'^');
+                    hPlot(j,1:end-1) = plot(hPlAxes,...
+                        Data(brks(j):brks(j+1)-1,end),...                   %plot datagroup - measurements
+                        Data(brks(j):brks(j+1)-1,[1:end-5 end-3]),'^');     %skip the mean values
+                    hPlot(j,end) = errorbar(hPlAxes,...                     %plot mean values with errorbars setted up by std()
+                        Data(brks(j):brks(j+1)-1,end),...                   %x-axis, distances from the plate top (nCuts,1)
+                        Data(brks(j):brks(j+1)-1,end-4),...                 %y-axis, mean values (nCuts,1)
+                        Data(brks(j):brks(j+1)-1,end-3),'^-');              %errorbars, 2xstd, standard deviations (nCuts,1)
                     set(hPlot(j,:),'Color',color(j,:),...                   %color the plot
                         'MarkerFaceColor',color(j,:));                      %fill the marker faces with the same color
-                    set(hPlot(j,[end-2 end]),'Visible','off');              %hide the zeros column and the standard deviation column
-                    set(hPlot(j,end-1),'LineStyle','-','Marker','none');    %plot mean values with trendline
+                    set(hPlot(j,1:end-1),'Visible','off');                  %hide everything except mean values
                 end
                 hLegend = legend(hPlot(:,1),legendCellStr,...               %set up legend, number of groups == number of columns
                     'Location','EastOutside',...
@@ -500,8 +519,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         hPlAxes = appdata.handles.hPlAxes;                                  %handles for axes with plots
         hPlot   = appdata.handles.hPlot;                                    %handles for plotted lines
         hLegend = appdata.handles.hLegend;                                  %handles for legend of the plotted lines
-        lgstr   = get(hLegend,'UserData');                                  %get user data from legend - in lstrings are saved legend entries
-        lgstr   = lgstr.lstrings;
+        lgstr   = appdata.metricdata.rdblCellStr;                           %cell of strings to be displayed in legend
         % extract metricdata
         brks    = appdata.metricdata.brks;
         color   = appdata.metricdata.color;
@@ -523,16 +541,29 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         cla(hPlAxes);                                                       %clear axes for the new plot
         hold(hPlAxes,'on');
         for j = 1:numel(brks)-1
-            hPlot(j)   = plot(hPlAxes,Data(brks(j):brks(j+1),indX),...
-                Data(brks(j):brks(j+1),end),'^');
-            set(hPlot(j),'Color',color(j,:),'MarkerFaceColor',...
+            % prepare data (calculate mean values and std() )
+            tmpVar = Data(brks(j):brks(j+1)-1,[indX end]);                     %resave current part of data as tmpVar
+            uniqueFlR= unique(tmpVar(:,1));                                 %unique dimensionless flow rates
+            meanIFArea=zeros(numel(uniqueFlR),1);                           %preallocate variables
+            stdDevIFA= meanIFArea;
+            for k = 1:numel(uniqueFlR)
+                meanIFArea(k) = mean(tmpVar(...                             %select data with the one flow rate
+                    uniqueFlR(k) == tmpVar(:,1),2));                        %calculate mean IF area for unique flow rates
+                stdDevIFA(k)  = std(tmpVar(...                              %select data with the one flow rate
+                    uniqueFlR(k) == tmpVar(:,1),2));                        %calculate standard deviation of these values
+            end
+            hPlot(j,1) = plot(hPlAxes,tmpVar(:,1),tmpVar(:,2),'^');         %plot measured values
+            hPlot(j,2) = errorbar(hPlAxes,uniqueFlR,meanIFArea,...          %plot mean IF areas with errorbars
+                stdDevIFA,'^-');
+            set(hPlot(j,:),'Color',color(j,:),'MarkerFaceColor',...         %set up colors
                 color(j,:));
         end
+        set(hPlot(:,1),'Visible','off');                                    %make everything except mean values invisible
         title(hPlAxes,ttlStr,'FontSize',13,'FontWeight','bold');
         xlabel(hPlAxes,xlblStr);
         ylabel(hPlAxes,'interfacial area of the rivulet, [m^2]');
-        set(hPlot,'MarkerSize',10);
-        hLegend = legend(hPlAxes,lgstr,'Location','Best');
+        set(hPlot,'MarkerSize',7);
+        hLegend = legend(hPlot(:,1),lgstr,'Location','Best');
         % save handles into appdata
         appdata.handles.hPlFig = hPlFig;
         appdata.handles.hPlAxes= hPlAxes;
@@ -557,7 +588,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         brks    = appdata.metricdata.brks;                                  %indexes of starts of new datasets
         color   = appdata.metricdata.color;                                 %used colors
         % hPlot are handles to lines
-        set(hPlot, 'Visible', 'off')                                        %turn them off to begin
+        set(hPlot(:,1), 'Visible', 'off')                                   %set everything except mean values invisible
         
         % Get the list of currently selected table cells
         sel = eventdata.Indices;                                            %Get selection indices (row, col)
@@ -597,7 +628,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         brks    = appdata.metricdata.brks;                                  %index of new group starts
         color   = appdata.metricdata.color;                                 %used colors
         % hPlot are handles to lines
-        set(hPlot, 'Visible', 'off')                                        %turn them off to begin
+        set(hPlot(:,1:end-1), 'Visible', 'off')                             %turn invisible everything except the lines with mean values
         
         % Get the list of currently selected table cells
         sel = eventdata.Indices;                                            %Get selection indices (row, col)
@@ -606,26 +637,10 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         selrows = unique(sel(:,1));                                         %Get all selected data row IDs
         table = get(hTable,'UserData');                                     %Get copy of uitable data
         
-        if max(selcols) > numel(table(1,:)) - 3
-            errordlg({['Flow rates and distance from the top of the plate are '...
-                'not plotable.'] 'Please select different columns'})
+        if max(selcols) > numel(table(1,:)) - 6                             %if user wants to plot anything else than measurements
+            errordlg({'You can add to plot only different measuremets'...
+                'Please select different columns'})
         else
-            % update title string
-            hTtl = get(hPlAxes,'Title');                                    %get handles for title
-            ttlStr=lower(get(hTtl,'String'));                               %get string, convert it to lowercase
-            if numel(selcols(selcols==size(table,2)-3))==numel(selcols)     %if only selected column is the 1 with standard deviations
-                if strcmp('std',ttlStr(1:3))==0                             %if its not yet set
-                    ttlStr = ['Std. dev. of the ' ttlStr];
-                    set(hTtl,'String',ttlStr);                              %update string
-                end
-            else                                                            %other columns are selected
-                if strcmp('std',ttlStr(1:3))==1                             %check if it was tempered with the title
-                    lftOut = numel('std. dev. of the ');                    %number of characters to left out
-                    ttlStr = ttlStr(lftOut+1:end);                          %get rid of the added sentence
-                    ttlStr(1)= upper(ttlStr(1));                            %make the first letter uppercase
-                    set(hTtl,'String',ttlStr);                              %update string
-                end
-            end
             %Get vectors of x,y values for each column in the selection;
             for jdx = 1:1:numel(selcols)
                 for idx = 1:numel(brks)-1                                   %there is numel(brks)-1 line series
@@ -640,8 +655,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         'XData', xvals,...                                  %set up data
                         'YData', yvals,...
                         'ZData', zvals,...
-                        'Color',color(idx,:),...                            %set colors according to legend
-                        'LineStyle','none','Marker','^');                   %unify line properties
+                        'Color',color(idx,:));                              %set colors according to legend
                 end
             end
         end
@@ -771,7 +785,12 @@ end
 Data    = [];
 DataClr = [];
 dTopsB  = sort([dTopsU dTopsU]);
-color   = {'0000FF' '00C100'};
+rgb     = distinguishable_colors(cellfun(@numel,dataSH));                   %create matrix of distinguishable colors for each group
+parfor i = 1:size(rgb,1)                                                    %convert these colors into html
+    tmpHex    = dec2hex(round(255*rgb(i,:)));
+    html(i,:) = [tmpHex(1,:) tmpHex(2,:) tmpHex(3,:)];
+end
+l     = 1;                                                                  %auxiliary indexing variable for indexing colors
 for i = 1:numel(dataSH)                                                     %for all selected groups
     IndCol = zeros(numel(dTops{i}),2);
     for j = 1:numel(dTops{i})
@@ -786,11 +805,12 @@ for i = 1:numel(dataSH)                                                     %for
             size(tmpMat));
         for k = 1:numel(tmpMat)
             tmpMat(k) = strcat(['<html><span style="color: #' ...
-            color{mod(j+i,2)+1} '; font-weight: normal;">'], ...
+            html(l,:) '; font-weight: normal;">'], ...
             tmpMat(k), ...
             '</span></html>');
         end
         DataClr= [DataClr;tmpMat];
+        l      = l+1;                                                       %increase color selector
     end
 end
 set(hTable,'ColumnName',ColNames,'ColumnWidth',{110},...
@@ -808,8 +828,12 @@ ColNames = {'Surface tension,|[N/m]',...                                    %set
 % creating data matrix to show
 Data    = [];
 DataClr = [];
-color   = {'0000FF' '00C100'};
-for i = 1:numel(dataSH)
+rgb     = distinguishable_colors(numel(dataSH));                            %create matrix of distinguishable colors for each group
+parfor i = 1:size(rgb,1)                                                    %convert these colors into html
+    tmpHex    = dec2hex(round(255*rgb(i,:)));
+    html(i,:) = [tmpHex(1,:) tmpHex(2,:) tmpHex(3,:)];
+end
+for i = 1:numel(dataSH) %#ok<FORPF>
     % adding i-th dataset to data matrix to show
     Data = [Data;dataSH{i}];
     % coloring data matrix - each dataset has its own color
@@ -818,7 +842,7 @@ for i = 1:numel(dataSH)
     for j = 1:numel(tmpMat)
         tmpMat(j) = strcat(...                                              %modify format of the problematic value
             ['<html><span style="color: #' ...
-            color{mod(i,2)+1} '; font-weight: normal;">'], ...
+            html(i,:) '; font-weight: normal;">'], ...
             tmpMat(j), ...
             '</span></html>');
     end
@@ -852,19 +876,17 @@ ColNames = [ColNames {'' 'Mean|value' 'Standard|deviation'...               %add
     'Dimensionless|flow rate, [-]' 'Vol. gas flow|rate, [m3/s]',...
     'Distance from|plate top, [m]'}];
 % prepare data to be shown
-Data = [];
+Data    = [];
 DataClr = [];
-for i = 1:numel(dataSH) %#ok<FORPF>
+rgb     = distinguishable_colors(cellfun(@numel,dataSH));                   %create matrix of distinguishable colors for each group
+parfor i = 1:size(rgb,1)                                                    %convert these colors into html
+    tmpHex    = dec2hex(round(255*rgb(i,:)));
+    html(i,:) = [tmpHex(1,:) tmpHex(2,:) tmpHex(3,:)];
+end
+l     = 1;                                                                  %auxiliary indexing variable for indexing colors
+for i = 1:numel(dataSH) 
     nZeros = max(numMS) - numMS(i);                                         %number of zeros is difference between maximal and actual n of measur.
     for j = 1:numel(dataSH{i})
-        switch mod(i+j,3)+1                                                 %create colors for the data
-            case 1
-                color = 'FF0000';
-            case 2
-                color = '00C100';
-            case 3
-                color = '0000FF';
-        end
         tmpMat = [dataSH{i}{j}(:,1:numMS(i)) ...                            %current data + added zero columns
             zeros(nCuts(i),nZeros) dataSH{i}{j}(:,numMS(i)+1:end)];
         Data = [Data;tmpMat];                                               %add current data to Data
@@ -873,11 +895,12 @@ for i = 1:numel(dataSH) %#ok<FORPF>
         for k = 1:numel(tmpMat)
             tmpMat(k) = strcat(...                                          %modify format of the problematic value
                 ['<html><span style="color: #' ...
-                color '; font-weight: normal;">'], ...
+                html(l,:) '; font-weight: normal;">'], ...
                 tmpMat(k), ...
                 '</span></html>');
         end
         DataClr = [DataClr;tmpMat];
+        l = l+1;                                                            %increase color counter
     end
 end
 set(hTable,'ColumnName',ColNames,'Data',DataClr,'ColumnWidth',{100},...

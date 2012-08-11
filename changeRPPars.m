@@ -4,11 +4,13 @@ function varargout = changeRPPars(varargin)
 % M-file for handling gui for changing rivulet processing parameters. To be
 % called from Data processing menu of the main program
 % (RivuletExpDataProcessing.m). This function returns cell of optional
-% parameters for rivuletProcessing function.
+% parameters for rivuletProcessing function. Or it can be called with input
+% option 'onlyshow' and then, the current rivulet processing parameters are
+% displayed without possibility to modify them.
 %
 % Author:       Martin Isoz
 % Organisation: ICT Prague / TU Bergakademie Freiberg
-% Date:         17. 07. 2012
+% Date:         30. 07. 2012
 %
 % License: This code is published under MIT License, please do not abuse
 % it.

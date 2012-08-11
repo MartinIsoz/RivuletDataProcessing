@@ -46,10 +46,12 @@ else
 end
 % End initialization code - DO NOT EDIT
 
+%% Initialization functions
 
 % --- Executes just before showProcData is made visible.
-function showProcData_OpeningFcn(hObject, eventdata, handles, varargin)
+function showProcData_OpeningFcn(hObject, ~, handles, varargin)
 % This function has no output args, see OutputFcn.
+%
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -91,23 +93,22 @@ guidata(hObject, handles);
 
 
 % --- Outputs from this function are returned to the command line.
-function varargout = showProcData_OutputFcn(hObject, eventdata, handles) 
+function varargout = showProcData_OutputFcn(~, ~, handles) 
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+%
+% this function actually doesn't have any output at the time
 
 % Get default command line output from handles structure
 varargout{1} = handles.output;
 
-% --- Executes on selection change in ListData.
-function ListData_Callback(hObject, eventdata, handles)
-% hObject    handle to ListData (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+%% Listbox
 
-% Hints: contents = cellstr(get(hObject,'String')) returns ListData contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from ListData
+% --- Executes on selection change in ListData.
+function ListData_Callback(hObject, ~, handles) %#ok<DEFNU>
+% listbox to show currently avalible data for postprocessing
 
 handles.metricdata.selDT = get(hObject,'Value');                            %get selected data (indexes)
 
@@ -115,22 +116,21 @@ guidata(hObject,handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function ListData_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to ListData (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function ListData_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting properties of ListData listbox
 
 % Hint: listbox controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 % --- Executes on button press in PushLoad.
-function PushLoad_Callback(hObject, eventdata, handles)
-% hObject    handle to PushLoad (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushLoad_Callback(hObject, ~, handles) %#ok<DEFNU>
+% function for loading data from presaved processed_data .mat files. the
+% loaded data are merged with the currents. Current data with the same ID
+% strings as loaded are rewritten
 
 uiopen('load');                                                             %open dialog for loading variable
 if exist('Availible','var') == 0
@@ -160,22 +160,21 @@ set(handles.PushStartPostProc,'Enable','on');
 % Update handles structure
 guidata(hObject, handles);
 
+%% Pushbuttons
 
 % --- Executes on button press in PushSaveAll.
-function PushSaveAll_Callback(hObject, eventdata, handles)
-% hObject    handle to PushSaveAll (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushSaveAll_Callback(~, ~, handles) %#ok<DEFNU>
+% function for saving all the postprocessing (output) data currently
+% present in the listbox (and more importantly in the handles.metricdata)
 
-Availible = handles.metricdata.Availible;
+Availible = handles.metricdata.Availible; %#ok<NASGU>                       %this variable is used 'indirectly'
 uisave('Availible','Processed_data');
 
 
 % --- Executes on button press in PushClearSel.
-function PushClearSel_Callback(hObject, eventdata, handles)
-% hObject    handle to PushClearSel (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushClearSel_Callback(hObject, ~, handles) %#ok<DEFNU>
+% function for clearing selected data from the list. if there are no data
+% left, the pushbuttons using the data are disabled
 
 if isfield(handles.metricdata,'selDT') == 1
     selDT     = handles.metricdata.selDT;
@@ -186,6 +185,7 @@ if isfield(handles.metricdata,'selDT') == 1
         set(handles.PushSaveAll,'Enable','off');                            %disable useless buttons
         set(handles.PushSaveSel,'Enable','off');
         set(handles.PushClearSel,'Enable','off');
+        set(handles.PushStartPostProc,'Enable','off');
     else
         for i = 1:numel(Availible) %#ok<FORPF>
             strCellAV{i} = Availible{i}.ID;                                 %create string with availible data names from handles
@@ -205,14 +205,12 @@ guidata(hObject, handles);
 
 
 % --- Executes on button press in PushSaveSel.
-function PushSaveSel_Callback(hObject, eventdata, handles)
-% hObject    handle to PushSaveSel (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushSaveSel_Callback(~, ~, handles) %#ok<DEFNU>
+%function for saving selected data into the .mat file
 
 if isfield(handles.metricdata,'selDT') == 1
     selDT     = handles.metricdata.selDT;
-    Availible = handles.metricdata.Availible{selDT};                        %resave only selected data
+    Availible = handles.metricdata.Availible{selDT}; %#ok<NASGU>            %resave only selected data, var Availible is used indirectly
     uisave('Availible','Processed_data');
 else
     msgbox('Please select data first','modal');uiwait(gcf);
@@ -220,10 +218,9 @@ end
 
 
 % --- Executes on button press in PushStartPostProc.
-function PushStartPostProc_Callback(hObject, eventdata, handles)
-% hObject    handle to PushStartPostProc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushStartPostProc_Callback(~, ~, handles) %#ok<DEFNU>
+% button that stars the postprocessing tool with the selected data from
+% ListData listbox. if no data are selected, user is notified
 
 if isfield(handles.metricdata,'selDT')
     selDT = handles.metricdata.selDT;

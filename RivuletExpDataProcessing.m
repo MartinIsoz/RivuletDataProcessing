@@ -279,6 +279,9 @@ bgImage        = imread([bgDir '/' bgName]);
 % updating statusbar
 statusStr = ['Background image ' bgDir bgName...
     ' was succesfuly loaded.'];
+if ispc == 1                                                                %needed for compatibility of file path and sprintf
+    statusStr   = strrep(statusStr,'\','\\');
+end
 handles.statusbar = statusbar(handles.MainWindow,statusStr);
 % set gui visible output
 if numel(bgDir) <= 45
@@ -286,6 +289,7 @@ if numel(bgDir) <= 45
 else
     str   = ['...' bgDir(end-45:end)];
 end
+
 set(handles.EditBcgLoc,'String',str);                                       %display only 45 last characters or the whole string;
 
 % save variable into handle

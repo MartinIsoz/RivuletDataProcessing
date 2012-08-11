@@ -4,10 +4,13 @@ function varargout = changeIMPars(varargin)
 % M-file for handling gui for changing image processing parameters. To be
 % called from menu of the main program (RivuletExpDataProcessin.m).
 % This function returns cell of optional parameters for findEdges function.
+% Or it can be called with input option 'onlyshow' and then, the current
+% image processing parameters are displayed without possibility to modify
+% them.
 %
 % Author:       Martin Isoz
 % Organisation: ICT Prague / TU Bergakademie Freiberg
-% Date:         17. 07. 2012
+% Date:         26. 07. 2012
 %
 % License: This code is published under MIT License, please do not abuse
 % it.
@@ -37,14 +40,17 @@ else
 end
 % End initialization code - DO NOT EDIT
 
+%% Initialization functions
 
 % --- Executes just before changeIMPars is made visible.
 function changeIMPars_OpeningFcn(hObject, eventdata, handles, varargin)
-% This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 % varargin   command line arguments to changeIMPars (see VARARGIN)
+%
+% this function processes the input and decides if the edited values shoud
+% be returned to caller function
 
 % Choose default command line output for changeIMPars
 handles.output = hObject;
@@ -80,16 +86,18 @@ guidata(hObject, handles);
 uiwait(handles.figure1);
 
 % My own closereq fcn -> to avoid set output even if gui is close by Alt+F4
-function my_closereq(src,evnt)
+function my_closereq(~,~)
 uiresume(gcf)
 
 
 % --- Outputs from this function are returned to the command line.
-function varargout = changeIMPars_OutputFcn(hObject, eventdata, handles) 
+function varargout = changeIMPars_OutputFcn(~, ~, handles) 
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+%
+% this function specifyies the output of the main function
 
 % Get default command line output from handles structure
 varargout{1} = handles.output;
@@ -100,10 +108,9 @@ delete(handles.figure1);
 
 %% Pushbuttons
 % --- Executes on button press in PushOK.
-function PushOK_Callback(hObject, eventdata, handles)
-% hObject    handle to PushOK (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushOK_Callback(hObject, ~, handles) %#ok<DEFNU>
+% this functions reads all the variables values present into the GUI and
+% sends them into the changeIMPars_OutputFcn
 
 %extract handles.metricdata
 hpTr    = handles.metricdata.hpTr;
@@ -127,10 +134,8 @@ uiresume(handles.figure1);
 
 
 % --- Executes on button press in PushDef.
-function PushDef_Callback(hObject, eventdata, handles)
-% hObject    handle to PushDef (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushDef_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+% by pushing this button, default values are loaded into all GUI fields
 
 % reinitialize gui
 handles.metricdata = initializeGUI(hObject,eventdata,handles);
@@ -140,10 +145,9 @@ guidata(hObject, handles);
 
 
 % --- Executes on button press in PushCancelClose.
-function PushCancelClose_Callback(hObject, eventdata, handles)
-% hObject    handle to PushCancelClose (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function PushCancelClose_Callback(hObject, ~, handles) %#ok<DEFNU>
+% this functions handles the output if user cancels modification of
+% parameters. output is then set as empty matrix
 
 % assign the output cell
 handles.output = [];                                                        %set the output as empty matrix
@@ -158,13 +162,9 @@ uiresume(handles.figure1);
 
 %% Edit fields
 
-function EdithpTr_Callback(hObject, eventdata, handles)
-% hObject    handle to EdithpTr (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EdithpTr as text
-%        str2double(get(hObject,'String')) returns contents of EdithpTr as a double
+function EdithpTr_Callback(hObject, ~, handles) %#ok<DEFNU>
+% editable field that allows user to change treshold for the HOUGH
+% transform (input of the HOUGH function)
 
 handles.metricdata.hpTr = str2double(get(hObject,'String'));
 
@@ -173,26 +173,21 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EdithpTr_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EdithpTr (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function EdithpTr_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting properties of EdithpTr edit field
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 
 
-function EditnumPeaks_Callback(hObject, eventdata, handles)
-% hObject    handle to EditnumPeaks (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditnumPeaks as text
-%        str2double(get(hObject,'String')) returns contents of EditnumPeaks as a double
+function EditnumPeaks_Callback(hObject, ~, handles) %#ok<DEFNU>
+% function that allows user to change number of peaks to look for at image
+% transformed by HOUGH transform, input of the HOUGHPEAKS function
 
 handles.metricdata.numPeaks = str2double(get(hObject,'String'));
 
@@ -201,26 +196,21 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditnumPeaks_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditnumPeaks (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function EditnumPeaks_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting properties of the EditnumPeaks edit field
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 
 
-function EditfG_Callback(hObject, eventdata, handles)
-% hObject    handle to EditfG (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditfG as text
-%        str2double(get(hObject,'String')) returns contents of EditfG as a double
+function EditfG_Callback(hObject, ~, handles) %#ok<DEFNU>
+% function that allows user to change how big gaps between the lines with
+% the same 'rho' parameters should be filled. input of HOUGHLINES
 
 handles.metricdata.fG = str2double(get(hObject,'String'));
 
@@ -229,26 +219,21 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditfG_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditfG (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function EditfG_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting properties of EditfG edit field
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 
 
-function EditmL_Callback(hObject, eventdata, handles)
-% hObject    handle to EditmL (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditmL as text
-%        str2double(get(hObject,'String')) returns contents of EditmL as a double
+function EditmL_Callback(hObject, ~, handles) %#ok<DEFNU>
+% function that allows user to change minimal length of the line taken into
+% account. input of HOUGHLINES
 
 handles.metricdata.mL = str2double(get(hObject,'String'));
 
@@ -257,24 +242,18 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditmL_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditmL (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function EditmL_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting properties of the EditmL edit field
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
-function EditIm2BW_Callback(hObject, eventdata, handles)
-% hObject    handle to EditIm2BW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of EditIm2BW as text
-%        str2double(get(hObject,'String')) returns contents of EditIm2BW as a double
+function EditIm2BW_Callback(hObject, ~, handles) %#ok<DEFNU>
+% function allowing user to change the treshold for IM2BW function
 
 handles.metricdata.im2bwTr = str2double(get(hObject,'String'));
 
@@ -283,26 +262,21 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditIm2BW_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to EditIm2BW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function EditIm2BW_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for changing properties of the EditIm2BW edit field
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 %% Pop up menu
 % --- Executes on selection change in PopupEdgeMethod.
-function PopupEdgeMethod_Callback(hObject, eventdata, handles)
-% hObject    handle to PopupEdgeMethod (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns PopupEdgeMethod contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from PopupEdgeMethod
+function PopupEdgeMethod_Callback(hObject, ~, handles) %#ok<DEFNU>
+% popup menu that allows user to change method used for elements edges
+% finding on the processed picture. input of the EDGE function
 
 contents = cellstr(get(hObject,'String'));
 handles.metricdata.method =  contents{get(hObject,'Value')};
@@ -312,25 +286,23 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function PopupEdgeMethod_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to PopupEdgeMethod (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
+function PopupEdgeMethod_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+% function for setting properties of the PopupEdgeMethod popup menu
 
 % Hint: popupmenu controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+if ispc && isequal(get(hObject,'BackgroundColor'),...
+        get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 %% Checkboxes
 % --- Executes on button press in CheckDUIM2BW.
-function CheckDUIM2BW_Callback(hObject, eventdata, handles)
-% hObject    handle to CheckDUIM2BW (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of CheckDUIM2BW
+function CheckDUIM2BW_Callback(hObject, ~, handles) %#ok<DEFNU>
+% if this checkbox is checked, the IM2BW transformation wont be used before
+% calling the EDGE function. performing this transformation can bring out
+% more points to be considered as plate edges, but with some images, this
+% causes finding of false edges
 
 handles.metricdata.DUIM2BW = get(hObject,'Value');
 
@@ -339,9 +311,9 @@ guidata(hObject, handles);
 
 
 
-%% Auxiliary functions
+%% Auxiliary function
 function metricdata = ...
-    initializeGUI(hObject,eventdata,handles)
+    initializeGUI(~,~,handles)
 %
 % function for gui inicialization, to be executed just before progGui is
 % made visible
