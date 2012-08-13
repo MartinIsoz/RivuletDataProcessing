@@ -38,6 +38,7 @@ function OUT = rivuletProcessing(handles)
 %                   coeficients for rotameter calibration, surface tension,
 %                   density and dynamic viscosity of the liquid phase
 %                   (formerly stored in Konstanten_Fluid.txt)
+% fluidType ...     string containing type of the selected liquid
 % storDir   ...     directory for storing outputs
 % rootDir   ...     root directory for program execution
 % RivProcPars..     cell with additional parameters for rivulet
@@ -128,12 +129,13 @@ function OUT = rivuletProcessing(handles)
 
 %% Processing function input
 
-plateSize   = handles.metricdata.RivProcPars{1};                            %now these parameters are set by default
+% experimental setup parameters
+plateSize   = handles.metricdata.RivProcPars{1};
 InclAngle   = handles.metricdata.RivProcPars{2};
 filmTh      = handles.metricdata.RivProcPars{3};
 RegressionPlate = handles.metricdata.RivProcPars{4};
 nCuts       = handles.metricdata.RivProcPars{5};
-GasFlow     = handles.metricdata.RivProcPars{6};
+FFactor     = handles.metricdata.RivProcPars{6};
 
 % extracting programcontrol
 DNTLoadIM = handles.prgmcontrol.DNTLoadIM;
@@ -157,6 +159,7 @@ Treshold  = handles.metricdata.Treshold;
 FilterSensitivity = handles.metricdata.FSensitivity;
 EdgCoord  = handles.metricdata.EdgCoord;
 fluidData = handles.metricdata.fluidData;
+fluidType = handles.metricdata.fluidType;
 
 % auxiliary variable
 nImages = numel(files);                                                     %number of processed images
@@ -168,6 +171,16 @@ sigma = fluidData(2);                                                       %sav
 rho   = fluidData(3);
 eta   = fluidData(4);
 clear fluidData
+
+%% Creating parameters for plots descriptions
+% to each plot, there is added description specifying the dimensionless
+% flow rate, f-factor, type of the liquid and measurement number (within
+% the measurements with the same dimensionless flow rates)
+tmpVar = zeros(1,nImages);
+parfor i = 1:nImages
+    tmpVar(i) = str2double(files{i}(5:end-4));
+end
+txtPars = {M FFactor tmpVar fluidType};                                     %parameters for legends
 
 %% Importing images into workspace
 % is taken care of in "Load Images"
@@ -185,7 +198,7 @@ if DNTLoadIM == 0                                                           %are
         ['Converting grayscale values into distances for all images ',...   %updating th statusbar
         'loaded in memory']);
     YProfilPlatte = ImConv(daten,EdgCoord,filmTh,RegressionPlate,...        %if the are, I can process them all at once
-        GR.regr,GR.regime,GR.format,storDir,rootDir);
+        GR.regr,GR.regime,GR.format,txtPars,storDir,rootDir);
     tmpCell = cell(size(YProfilPlatte));                                    %create empty cell
     tmpCell(:) = {fspecial('disk',FilterSensitivity)};
     YProfilPlatte = cellfun(@imfilter,YProfilPlatte,...                     %apply selected filter to YProfilPlatte
@@ -209,7 +222,7 @@ else                                                                        %oth
         handles.statusbar.ProgressBar.setValue(i);
         tmpIM = {imread([subsImDir '/' files{i}])};                         %load image from substracted directory and save it as cell
         tmpIM = ImConv(tmpIM,EdgCoord,filmTh,RegressionPlate,...            %convert it to distances
-            GR.regr,GR.regime,GR.format,storDir,rootDir,i);
+            GR.regr,GR.regime,GR.format,txtPars,storDir,rootDir,i);
         tmpIM = imfilter(tmpIM{:},...                                       %use selected filter
             fspecial('disk',FilterSensitivity));
         imwrite(tmpIM,[smImDir '/' files{i}]);                              %save it into 'Smoothed' folder (but under original name)
@@ -219,8 +232,9 @@ end
 
 %% Saving smoothed images and obtaining visualizations of the riv.
 % store and plot smoothed images
-if GR.contour == 1 || GR.regime == 1                                        %if any of the graphics are wanted, enter the cycle
+if GR.contour == 1 || GR.profcompl == 1                                     %if any of the graphics are wanted, enter the cycle
     for i=1:nImages                                                         %for each image
+        % update statusbar
         handles.statusbar = statusbar(handles.MainWindow,...
             ['Creating profiles and/or contour plots ',...
             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
@@ -229,6 +243,12 @@ if GR.contour == 1 || GR.regime == 1                                        %if 
         handles.statusbar.ProgressBar.setMinimum(0);
         handles.statusbar.ProgressBar.setMaximum(nImages);
         handles.statusbar.ProgressBar.setValue(i);
+        % create description of the plot - id of the measurement
+        txtStr = ['Liq. tp.: ' txtPars{4} 10 ...                            %liquid type
+            'M = ' mat2str(txtPars{1}(i),4) 10 ...                          %dimensionless flow
+            'F = ' mat2str(txtPars{2},4) ' Pa^{0.5}' 10 ...                 %f-factor, [Pa^0.5]
+            'image n^o: ' mat2str(txtPars{3}(i))];                          %number of image
+        % load images if needed
         if DNTLoadIM == 1
             load([tmpfDir '/' files{i}(1:end-4) '.mat']);                   %if images are not present in handles, load them from tmpfDir
         else
@@ -251,14 +271,15 @@ if GR.contour == 1 || GR.regime == 1                                        %if 
                 size(tmpIM,1));                                             %length coord, number of rows in YProfilPlatte
             [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
             contour(hAxs,XX,ZZ,tmpIM);                                      %here I keep rivulet height in mm because it looks better
-            title(hAxs,['\bf Look on the rivulet ' mat2str(i) ' from top'],...
-                'FontSize',13)
+            title(hAxs,'\bf Look on rivulet from the top','FontSize',13);   %what is on the plot
             xlabel(hAxs,'width coordinate, [m]');
             ylabel(hAxs,'length coordinate, [m]');
             colbarh = colorbar('peer',hAxs);                                %open colorbar in desired axes
             set(colbarh,'Location','East');                                 %add the colorbar - scale
             ylabel(colbarh,'rivulet height, [mm]')                          %set units to colorbar
-            axis(hAxs,'ij');                                                         %switch axis to match photos
+            text(0.05,0.9,txtStr,'Units','Normal');                         %write the description on the plot
+            axis(hAxs,'ij');                                                %switch axis to match photos
+            % save plot if needed
             if GR.regime ~= 0                                               %if I want to save the images
                 saveas(hFig,[plotDir '/riv' mat2str(i) 'fromtop'],...
                     GR.format);
@@ -286,7 +307,9 @@ if GR.contour == 1 || GR.regime == 1                                        %if 
             xlabel(hAxs,'width of the plate, [m]')
             ylabel(hAxs,'length of the plate, [m]')
             zlabel(hAxs,'height of the rivulet, [mm]')
-            title(hAxs,['\bf Profile of the rivulet ' mat2str(i)],'FontSize',13);
+            title(hAxs,'\bf Profile of the rivulet','FontSize',13);         %create title
+            text(0.05,0.9,txtStr,'Units','Normal');                         %write the description on the plot
+            % save the plot if needed
             if GR.regime ~= 0                                               %if I want to save the images
                 saveas(hFig,[plotDir '/riv' mat2str(i) 'complprof'],...
                     GR.format);
@@ -341,13 +364,13 @@ if DNTLoadIM == 1
         handles.statusbar.ProgressBar.setValue(i);
         load([tmpfDir '/' files{i}(1:end-4) '.mat']);                       %if images are not present in handles, load them from tmpfDir
         [YProfilPlatte(i),XProfilPlatte]=cutRiv({tmpIM'},nCuts,plateSize,...%call with calculation variables
-            GR.profcut,GR.regime,GR.format,storDir,rootDir,i);              %auxiliary variables for graphics and data manipulation
+            GR.profcut,GR.regime,GR.format,txtPars,storDir,rootDir,i);      %auxiliary variables for graphics and data manipulation
     end
     rmdir(tmpfDir,'s');                                                     %remove unnecessary temporary folder with all contents
 else
     set(handles.statusbar,'Text','Calculating mean profiles along the rivulets');%update statusbar
     [YProfilPlatte,XProfilPlatte]=cutRiv(YProfilPlatte,nCuts,plateSize,...  %call with calculation variables
-        GR.profcut,GR.regime,GR.format,storDir,rootDir);                    %auxiliary variables for graphics and data manipulation
+        GR.profcut,GR.regime,GR.format,txtPars,storDir,rootDir);            %auxiliary variables for graphics and data manipulation
 end
 
 %% Calculate variables to be saved, mean values in each cut
@@ -395,7 +418,7 @@ cd([storDir '/Profile'])
 OUT.Profiles = saveProf(XProfilPlatte,YProfilPlatte,minLVec,minRVec,files);
 cd(rootDir)
 
-sPars = {M GasFlow plateSize nCuts};                                        %common variables for all saved files
+sPars = {M FFactor plateSize nCuts};                                        %common variables for all saved files
 
 % 2. Local mean speed in cuts
 cd([storDir '/Speed'])
@@ -414,139 +437,12 @@ cd(rootDir)
 
 % 5. Interfacial area of the rivulets
 cd([storDir '/Correlation'])
-varIN = {sigma rho eta M InclAngle GasFlow};                                %input variables for correlation
+varIN = {sigma rho eta M InclAngle FFactor};                                %input variables for correlation
 varOUT= IFArea;                                                             %output variable for correlation
 OUT.IFACorr = saveCorrData(varOUT,varIN,'IFAreaCorr');
 cd(rootDir)
 
 set(handles.statusbar,'Text','Rivulet processing ended succesfully');
-end
-
-
-
-%% Function to convert gray values ​​in distances
-% Is required for the image and the regression coefficients of quadratic regression
-% 21/11/2011, rewritten July 2012, by Martin Isoz
-
-function ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
-    GR,GRregime,GRformat,storDir,rootDir,imNumber)
-%
-%   ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
-%    GR,GRregime,GRformat,storDir,rootDir,[imNumber])
-%
-% function for conversion images from grayscale to distances using
-% polynomial regression with polynomial of degree specified in RegDegree
-%
-% INPUT variables
-% ImData    ... images of the plate (in form of matrix)to be converted,cell
-% EdgCoord  ... coordinates of section edges of the plate(plate, cuvettes),
-%               pixels/indexes, matrix (numImages x 10)
-% filmTh    ... film thickness, in mm + width of cuvettes in pixels
-%               [maxCuvette1 minCuvette1 maxCuvette2 minCuvette2 CuvWidth]
-% RegDegree ... degree of polynomial used for the regression
-% GR                ... variable for graphics (yes/no)
-% GRregime          ... variable for graphics (show/save/show+save)
-% GRformat          ... format of save graphics (compatible with SAVEAS)
-% storDir           ... directory for storing outputs
-% rootDir           ... main execution directory
-% imNumber  ... optional input parameter, if the images are processed 1 by
-%               1, this i the number of the currently processed image
-%
-% OUTPUT variebles
-% ImgConv   ... converted image, gray values -> local heights of the riv,
-%               in mm
-
-ImgConv     = cell(1,numel(ImData));                                        %preallocation of output variable
-for i = 1:numel(ImData)                                                     %for each file
-    if nargin < 9
-        imNumber = i;
-    end
-    % read coordinates of the cuvettes and plate on each image
-    % small cuvette
-    xoS = EdgCoord(i,1);                                                    %mean  x-Value
-    yoS = EdgCoord(i,2);                                                    %upper y-Value
-    yuS = EdgCoord(i,3);                                                    %lower y-Value
-    % big cuvette
-    xoB = EdgCoord(i,4);
-    yoB = EdgCoord(i,5);
-    yuB = EdgCoord(i,6);
-    % plate
-    xol = EdgCoord(i,7);                                                    %upper left x-Value
-    yol = EdgCoord(i,8);                                                    %upper left y-Value
-    xur = EdgCoord(i,9);                                                    %lower right x-Value
-    yur = EdgCoord(i,10);
-    % prepare cuvette calibration
-    XS  = linspace(filmTh(1),filmTh(2),yuS-yoS+1)';                             %thickness of the film in mm small Kuevette
-    XB  = linspace(filmTh(3),filmTh(4),yuB-yoB+1)';                             %thickness of the film in mm big Kuevette
-    CW  = filmTh(5)/2;                                                          %cuvette width/2
-    % load i-th image
-    Image = ImData{i};                                                      %temporary variablefor each image
-    % find mean grayscale value for each row of the cuvette
-    YS   = mean(Image(yoS:yuS,xoS-CW:xoS+CW),2);
-    YB   = mean(Image(yoB:yuB,xoB-CW:xoB+CW),2);
-    % combine grayscale value and film thickness into 1 matrix
-    CuvetteS  =[YS XS];                                                     %Y ... brightness, X ... height of liquid
-	CuvetteB  =[YB XB];                                                     %calibration data for image conversion
-    
-    Image   = double(Image(yol:yur,xol:xur));                               %reduce Image only to plate and convert to double
-    tmpMatS = CuvetteS(50:end-50,:);                                        %cut off potentially strange values on sides
-    tmpMatB = CuvetteB(50:end-20,:);                                        %... brute and unelegant
-    
-    impS    = numel(tmpMatS(:,1));                                          %i must cheat matlab to polyfit through point (0,0) artificialy add
-%     impB    = numel(tmpMatB(:,1));                                        % point (0,0) with the same importance as all other points together
-    [RegS ErrorEstS]    = polyfit([tmpMatS(:,1);zeros(impS,1)],...
-        [tmpMatS(:,2);zeros(impS,1)],RegDegree);                            %Regression small cuvette (with the point (0,0))
-    [RegB ErrorEstB]= polyfit(tmpMatB(:,1),tmpMatB(:,2),RegDegree);         %Regression big cuvette (without the point (0,0))
-%     RegB = polyfit([tmpMatB(:,1);zeros(impB,1)],...
-%         [tmpMatB(:,2);zeros(impB,1)],RegDegree);                          %Regression big cuvette (with the point (0,0)
-    % split image into 2 based on grayscale values and convert it to the
-    % distances separately
-    [rowSize colSize] = size(Image);                                        %save dimensions of the original image
-    ImgConv{i}(Image<=max(YS)) = polyval(RegS,Image(Image<=max(YS)));       %convert small values
-    ImgConv{i}(Image >max(YS)) = polyval(RegB,Image(Image >max(YS)));       %convert big values
-    ImgConv{i}        = reshape(ImgConv{i},rowSize,colSize);                %reshape the matrix into original dimensions
-%     ImgConv{i} = polyval(RegS,Image);                                       %original conversion command
-    if GR == 1
-    % Calculate fitted values
-    [fitS deltaS] = polyval(RegS,CuvetteS(:,1),ErrorEstS);                  %fitted values and estimated errors
-    [fitB deltaB] = polyval(RegB,CuvetteB(:,1),ErrorEstB);
-    % Graphs to control regression state..
-    if GRregime == 1
-        Visible = 'off';                                                    %if I want the graphs only to be saved, I dont have to make them
-    else                                                                    %visible
-        Visible = 'on';
-    end
-    hFig = figure('Visible',Visible);figSet_size(hFig,[1100 600]);
-    hAxsL = axes('OuterPosition',[0 0 0.5 1]);                              %create axes for left side of the image
-    hAxsR = axes('OuterPosition',[0.5 0 0.5 1]);                            %axes for the right side of the image
-    subplot(hAxsL)
-    plot(hAxsL,CuvetteS(:,1),CuvetteS(:,2),'+',...                          %experimental points
-        CuvetteS(:,1),fitS,'g-',...                                         %fit
-        CuvetteS(:,1),fitS+2*deltaS,'r:',...                                %95% confidence interval for large samples
-        CuvetteS(:,1),fitS-2*deltaS,'r:');
-    title(hAxsL,['\bf Calibration, figure ' mat2str(imNumber) ', small cuvette']...
-        ,'FontSize',13)
-    xlabel(hAxsL,'grayscale value')
-    ylabel(hAxsL,'height of the liquid, mm')
-    subplot(hAxsR)
-    plot(hAxsR,CuvetteB(:,1),CuvetteB(:,2),'+',...                          %experimental points
-        CuvetteB(:,1),fitB,'g-',...                                         %fit
-        CuvetteB(:,1),fitB+2*deltaB,'r:',...                                %95% confidence interval for large samples
-        CuvetteB(:,1),fitB-2*deltaB,'r:');
-    title(hAxsR,['\bf Calibration, figure ' mat2str(imNumber) ', big cuvette']...
-        ,'FontSize',13)
-    xlabel(hAxsR,'grayscale value')
-    ylabel(hAxsR,'height of the liquid, mm')
-    if GRregime ~= 0                                                        %if I want to save the images
-        cd([storDir '/Plots']);
-        saveas(hFig,['riv' mat2str(imNumber) 'regrstate'],GRformat);
-        if GRregime == 1                                                    %I want images only to be saved
-            close(hFig);
-        end
-        cd(rootDir);
-    end
-    end
-end
 end
 
 %% Function for the rotameter calibration
@@ -584,10 +480,148 @@ M       = (m_Pumpe/1000)./(eta*Cap);                                        %dim
 V_Pumpe = m_Pumpe./1000./rho;                                               %volumetric flow, m^3/s
 end
 
+%% Function to convert gray values ​​in distances
+% Is required for the image and the regression coefficients of quadratic regression
+% 21/11/2011, rewritten July 2012, by Martin Isoz
+
+function ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
+    GR,GRregime,GRformat,txtPars,storDir,rootDir,imNumber)
+%
+%   ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
+%    GR,GRregime,GRformat,txtPars,storDir,rootDir,[imNumber])
+%
+% function for conversion images from grayscale to distances using
+% polynomial regression with polynomial of degree specified in RegDegree
+%
+% INPUT variables
+% ImData    ... images of the plate (in form of matrix)to be converted,cell
+% EdgCoord  ... coordinates of section edges of the plate(plate, cuvettes),
+%               pixels/indexes, matrix (numImages x 10)
+% filmTh    ... film thickness, in mm + width of cuvettes in pixels
+%               [maxCuvette1 minCuvette1 maxCuvette2 minCuvette2 CuvWidth]
+% RegDegree ... degree of polynomial used for the regression
+% GR                ... variable for graphics (yes/no)
+% GRregime          ... variable for graphics (show/save/show+save)
+% GRformat          ... format of save graphics (compatible with SAVEAS)
+% txtPars   ... description of the plots (to be shown on them)
+% storDir   ... directory for storing outputs
+% rootDir   ... main execution directory
+% imNumber  ... optional input parameter, if the images are processed 1 by
+%               1, this i the number of the currently processed image
+%
+% OUTPUT variebles
+% ImgConv   ... converted image, gray values -> local heights of the riv,
+%               in mm
+%
+% !! at the time, the BIG cuvette is NOT used !!
+
+ImgConv     = cell(1,numel(ImData));                                        %preallocation of output variable
+for i = 1:numel(ImData)                                                     %for each file
+    if nargin < 10
+        imNumber = i;
+    end
+    % read coordinates of the cuvettes and plate on each image
+    % small cuvette
+    xoS = EdgCoord(i,1);                                                    %mean  x-Value
+    yoS = EdgCoord(i,2);                                                    %upper y-Value
+    yuS = EdgCoord(i,3);                                                    %lower y-Value
+%     % big cuvette        BIG CUVETTE NOT USED
+%     xoB = EdgCoord(i,4);
+%     yoB = EdgCoord(i,5);
+%     yuB = EdgCoord(i,6);
+    % plate
+    xol = EdgCoord(i,7);                                                    %upper left x-Value
+    yol = EdgCoord(i,8);                                                    %upper left y-Value
+    xur = EdgCoord(i,9);                                                    %lower right x-Value
+    yur = EdgCoord(i,10);
+    % prepare cuvette calibration
+    XS  = linspace(filmTh(1),filmTh(2),yuS-yoS+1)';                             %thickness of the film in mm small Kuevette
+%     XB  = linspace(filmTh(3),filmTh(4),yuB-yoB+1)';                             %thickness of the film in mm big Kuevette
+    CW  = filmTh(5)/2;                                                          %cuvette width/2
+    % load i-th image
+    Image = ImData{i};                                                      %temporary variablefor each image
+    % find mean grayscale value for each row of the cuvette
+    YS   = mean(Image(yoS:yuS,xoS-CW:xoS+CW),2);
+%     YB   = mean(Image(yoB:yuB,xoB-CW:xoB+CW),2);
+    % combine grayscale value and film thickness into 1 matrix
+    CuvetteS  =[YS XS];                                                     %Y ... brightness, X ... height of liquid
+% 	CuvetteB  =[YB XB];                                                     %calibration data for image conversion
+    
+    Image   = double(Image(yol:yur,xol:xur));                               %reduce Image only to plate and convert to double
+    tmpMatS = CuvetteS(50:end-50,:);                                        %cut off potentially strange values on sides
+%     tmpMatB = CuvetteB(50:end-20,:);                                        %... brute and unelegant
+    
+    impS    = numel(tmpMatS(:,1));                                          %i must cheat matlab to polyfit through point (0,0) artificialy add
+%     impB    = numel(tmpMatB(:,1));                                        % point (0,0) with the same importance as all other points together
+    [RegS ErrorEstS]    = polyfit([tmpMatS(:,1);zeros(impS,1)],...
+        [tmpMatS(:,2);zeros(impS,1)],RegDegree);                            %Regression small cuvette (with the point (0,0))
+%     [RegB ErrorEstB]= polyfit(tmpMatB(:,1),tmpMatB(:,2),RegDegree);         %Regression big cuvette (without the point (0,0))
+%     RegB = polyfit([tmpMatB(:,1);zeros(impB,1)],... BIG CUVETTE NOT USED
+%         [tmpMatB(:,2);zeros(impB,1)],RegDegree);                          %Regression big cuvette (with the point (0,0)
+%     % split image into 2 based on grayscale values and convert it to the
+%     % distances separately BIG CUVETTE NOT USED
+%     [rowSize colSize] = size(Image);                                        %save dimensions of the original image
+%     ImgConv{i}(Image<=max(YS)) = polyval(RegS,Image(Image<=max(YS)));       %convert small values
+%     ImgConv{i}(Image >max(YS)) = polyval(RegB,Image(Image >max(YS)));       %convert big values
+%     ImgConv{i}        = reshape(ImgConv{i},rowSize,colSize);                %reshape the matrix into original dimensions
+    ImgConv{i}  = polyval(RegS,Image);
+%     ImgConv{i} = polyval(RegS,Image);                                       %original conversion command
+    if GR == 1
+        % create description of the plot - id of the measurement
+        txtStr = ['Liq. tp.: ' txtPars{4} 10 ...                            %liquid type
+            'M = ' mat2str(txtPars{1}(imNumber),4) 10 ...                   %dimensionless flow rate
+            'F = ' mat2str(txtPars{2},4) ' Pa^{0.5}' 10 ...                 %f-factor, [Pa^0.5]
+            'image n^o: ' mat2str(txtPars{3}(imNumber))];                   %number of image
+        % Calculate fitted values
+        [fitS deltaS] = polyval(RegS,CuvetteS(:,1),ErrorEstS);              %fitted values and estimated errors
+        %     [fitB deltaB] = polyval(RegB,CuvetteB(:,1),ErrorEstB); NOT USED
+        % Graphs to control regression state..
+        if GRregime == 1
+            Visible = 'off';                                                %if I want the graphs only to be saved, I dont have to make them
+        else                                                                %visible
+            Visible = 'on';
+        end
+        hFig = figure('Visible',Visible);figSet_size(hFig,[1100 600]);
+        hAxsL = axes('OuterPosition',[0 0 0.5 1]);                          %create axes for left side of the image
+        hAxsR = axes('OuterPosition',[0.5 0 0.5 1]);                        %axes for the right side of the image
+        subplot(hAxsL)
+        plot(hAxsL,CuvetteS(:,1),CuvetteS(:,2),'+',...                      %experimental points
+            CuvetteS(:,1),fitS,'g-',...                                     %fit
+            CuvetteS(:,1),fitS+2*deltaS,'r:',...                            %95% confidence interval for large samples
+            CuvetteS(:,1),fitS-2*deltaS,'r:');
+        text(0.05,0.85,txtStr,'Units','Normal');                            %add the description to the current plot
+        title(hAxsL,'\bf Calibration, small cuvette','FontSize',13)
+        xlabel(hAxsL,'grayscale value')
+        ylabel(hAxsL,'height of the liquid, mm')
+        subplot(hAxsR) % BIG CUVETTE NOT USED
+%             plot(hAxsR,CuvetteB(:,1),CuvetteB(:,2),'+',...                  %experimental points
+%                 CuvetteB(:,1),fitB,'g-',...                                 %fit
+%                 CuvetteB(:,1),fitB+2*deltaB,'r:',...                        %95% confidence interval for large samples
+%                 CuvetteB(:,1),fitB-2*deltaB,'r:');
+%             text(0.05,0.85,txtStr,'Units','Normal');                        %add the description to the current plot
+%             title(hAxsR,'\bf Calibration big cuvette','FontSize',13)
+%             xlabel(hAxsR,'grayscale value')
+%             ylabel(hAxsR,'height of the liquid, mm')
+        set(hAxsR,'Visible','off') %BIG CUVETTE NOT USED - nothing to show
+        title('\bf Big cuvette not used','FontSize',13,'Units','Normal',...     %notify user about the white space on the right side of the plot
+            'Visible','on')
+        if GRregime ~= 0                                                        %if I want to save the images
+            cd([storDir '/Plots']);
+            saveas(hFig,['riv' mat2str(imNumber) 'regrstate'],GRformat);
+            if GRregime == 1                                                    %I want images only to be saved
+                close(hFig);
+            end
+            cd(rootDir);
+        end
+    end
+end
+end
+
 %% Function for cutting rivulet into nCuts parts along the vertical
 %% coordinate (Z)
 function [YProfilPlatte XProfilPlatte] =...
-    cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,GRformat,storDir,rootDir,imNumber)
+    cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,GRformat,txtPars,...
+    storDir,rootDir,imNumber)
 %
 %   [YProfilPlatte XProfilPlatte] =...
 %       cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,GRformat,storDir,rootDir,imNumber)
@@ -599,6 +633,7 @@ function [YProfilPlatte XProfilPlatte] =...
 % GR                ... variable for graphics (yes/no)
 % GRregime          ... variable for graphics (show/save/show+save)
 % GRformat          ... format of saved graphics (compatible with SAVEAS)
+% txtPars           ... description of the plots (to be shown on them)
 % storDir           ... directory for storing outputs
 % rootDir           ... main execution directory
 % imNumber          ... optional arguments, if the images are processed 1
@@ -611,9 +646,10 @@ function [YProfilPlatte XProfilPlatte] =...
 %
 
 for i=1:numel(YProfilPlatte)
-    if nargin < 8
+    if nargin < 9
         imNumber = i;
     end
+    % prepare variables and cut the rivulet
     Distance     = round(size(YProfilPlatte{i},2)/(nCuts+1));               %number of points in each mean profile
     if nCuts == 0 || Distance < 50                                          %if too much cuts is specified
         warndlg(['The number of cuts specified is bigger than'...           %notify user by dialog
@@ -631,6 +667,12 @@ for i=1:numel(YProfilPlatte)
     YProfilPlatte{i} = YProfilPlatte{i}(:,1:nCuts)*1e-3;                    %need to change size of output matrix, mm -> m
 % ploting results
     if GR == 1
+        % create description of the plot - id of the measurement
+        txtStr = ['Liq. tp.: ' txtPars{4} 10 ...                            %liquid type
+            'M = ' mat2str(txtPars{1}(imNumber),4) 10 ...                   %dimensionless flow
+            'F = ' mat2str(txtPars{2},4) ' Pa^{0.5}' 10 ...                 %f-factor, [Pa^0.5]
+            'image n^o: ' mat2str(txtPars{3}(imNumber))];                   %number of image
+        % decide if show plot
         if GRregime == 1
             Visible = 'off';                                                %if I want the graphs only to be saved, I dont have to make them
         else                                                                %visible
@@ -641,6 +683,7 @@ for i=1:numel(YProfilPlatte)
         set(hFig,'CurrentAxes',hAxs);
         plot(hAxs,XProfilPlatte,YProfilPlatte{i})
         axis(hAxs,'tight');
+        text(0.05,0.9,txtStr,'Units','Normal');                             %add the description to the plot
         xlabel(hAxs,'width of the plate, [m]')
         ylabel(hAxs,'height of the rivulet, [m]')
         ttl=title(hAxs,['\bf Mean profiles of riv. ' mat2str(imNumber)...

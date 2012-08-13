@@ -34,7 +34,7 @@ if type == 0
     ColNames = {'Surface tension,|[N/m]',...                                %set up ColNames for correlation data
         'Density,|[kg/m3]','Viscosity,|[Pa s]',...
         'Dimensionless,|flow rate, [-]','Plate incl.|angle,[deg]',...
-        'Vol. gas flow|rate, [m3/s]','Riv. surface|area, [m2]'};
+        'F-Factor,|[Pa^0.5]','Riv. surface|area, [m2]'};
 else
     if plots == 0
         set(hFig,'Units','Pixels','Position',[10 30 950 200],...             %for description, there are more columns than rows
@@ -46,7 +46,7 @@ else
     ColNames = 1:numel(data(1,1:end-6));                                    %last six columns are auxiliary variables to be named
     ColNames = reshape(strtrim(cellstr(num2str(ColNames(:)))), size(ColNames));
     ColNames = [ColNames {'' 'Mean|value' 'Standard|deviation'...
-        'Dimensionless|flow rate, [-]' 'Vol. gas flow|rate, [m3/s]',...
+        'Dimensionless|flow rate, [-]' 'F-Factor,|[Pa^0.5]',...
         'Distance from|plate top, [m]'}];
 end
 % set up table position vector

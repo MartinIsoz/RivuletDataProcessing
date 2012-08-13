@@ -46,7 +46,7 @@ else
 end
 % End initialization code - DO NOT EDIT
 
-%% Initialization functions
+%% Initialization and setting default GUI properties
 
 % --- Executes just before showProcData is made visible.
 function showProcData_OpeningFcn(hObject, ~, handles, varargin)
@@ -104,10 +104,13 @@ function varargout = showProcData_OutputFcn(~, ~, handles)
 % Get default command line output from handles structure
 varargout{1} = handles.output;
 
+% --- Disabling useless warnings
+%#ok<*DEFNU> - GUI cannot see what functions will be used by user
+
 %% Listbox
 
 % --- Executes on selection change in ListData.
-function ListData_Callback(hObject, ~, handles) %#ok<DEFNU>
+function ListData_Callback(hObject, ~, handles)
 % listbox to show currently avalible data for postprocessing
 
 handles.metricdata.selDT = get(hObject,'Value');                            %get selected data (indexes)
@@ -116,7 +119,7 @@ guidata(hObject,handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function ListData_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function ListData_CreateFcn(hObject, ~, ~)
 % function for setting properties of ListData listbox
 
 % Hint: listbox controls usually have a white background on Windows.
@@ -127,7 +130,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'),...
 end
 
 % --- Executes on button press in PushLoad.
-function PushLoad_Callback(hObject, ~, handles) %#ok<DEFNU>
+function PushLoad_Callback(hObject, ~, handles)
 % function for loading data from presaved processed_data .mat files. the
 % loaded data are merged with the currents. Current data with the same ID
 % strings as loaded are rewritten
@@ -163,7 +166,7 @@ guidata(hObject, handles);
 %% Pushbuttons
 
 % --- Executes on button press in PushSaveAll.
-function PushSaveAll_Callback(~, ~, handles) %#ok<DEFNU>
+function PushSaveAll_Callback(~, ~, handles)
 % function for saving all the postprocessing (output) data currently
 % present in the listbox (and more importantly in the handles.metricdata)
 
@@ -172,7 +175,7 @@ uisave('Availible','Processed_data');
 
 
 % --- Executes on button press in PushClearSel.
-function PushClearSel_Callback(hObject, ~, handles) %#ok<DEFNU>
+function PushClearSel_Callback(hObject, ~, handles)
 % function for clearing selected data from the list. if there are no data
 % left, the pushbuttons using the data are disabled
 
@@ -192,7 +195,7 @@ if isfield(handles.metricdata,'selDT') == 1
         end
     end
     set(handles.ListData,'String',strCellAV,'Max',max([2 numel(strCellAV)]),...%keep the listbox multiselect for nothing-selected option
-        'Value',[]);                                                        %update listbox
+        'Value',1);                                                         %update listbox
     handles.metricdata = rmfield(handles.metricdata,'selDT');               %nothing is selected
 else
     msgbox('Please select data first','modal');uiwait(gcf);
@@ -205,7 +208,7 @@ guidata(hObject, handles);
 
 
 % --- Executes on button press in PushSaveSel.
-function PushSaveSel_Callback(~, ~, handles) %#ok<DEFNU>
+function PushSaveSel_Callback(~, ~, handles)
 %function for saving selected data into the .mat file
 
 if isfield(handles.metricdata,'selDT') == 1
@@ -218,7 +221,7 @@ end
 
 
 % --- Executes on button press in PushStartPostProc.
-function PushStartPostProc_Callback(~, ~, handles) %#ok<DEFNU>
+function PushStartPostProc_Callback(~, ~, handles)
 % button that stars the postprocessing tool with the selected data from
 % ListData listbox. if no data are selected, user is notified
 

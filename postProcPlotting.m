@@ -19,6 +19,9 @@ function postProcPlotting(Availible)
 %
 % See also RIVULETEXPDATAPROCESSING SHOWPROCDATA
 
+% --- Disabling useless warnings
+%#ok<*DEFNU> - GUI cannot see what functions will be used by user
+
 
 %% GUI preparation
 PosVec = [10 30 1100 700];                                                  %position and the size of the window
@@ -300,7 +303,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
             tmpVar = regexp(Availible{selGR(k)}.ID,'_','split');            %cut the string between '_'
             tmpVar = tmpVar(1:3);                                           %take only usefull data (liquid type, gas vol.flow and plt. incl. an.)
             tmpVar{1} = ['Liq. tp.: ' tmpVar{1}];                           %liquid type
-            tmpVar{2} = ['V_g = ' tmpVar{2} ' m3/s'];                       %volumetric gas flow
+            tmpVar{2} = ['F = ' tmpVar{2} ' Pa^{0.5}'];                     %f-factor
             tmpVar{3} = ['\alpha = ' tmpVar{3} '\circ{}'];                  %plate inclination angle
             rdblCellStr{j} = [tmpVar{1} 10 ...
                 tmpVar{2} 10 ...
@@ -395,7 +398,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 % create popupmenu for chosing the x-axis
                 uicontrol(hPlFig,'Style','popupmenu',...
                     'String',['Dimensionless liquid flow rate|'...
-                    'Volumetric gas flow rate'],...
+                    'gas F-Factor'],...
                     'Units','Normal',...
                     'Callback',@PopUpXAxsCorr_Callback,...
                     'Position',[0.3 0.01 0.4 0.08],'Value',1);              %create popup menu for choosing x axes
@@ -532,11 +535,11 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 ttlStr = ['Interfacial area as fun. of '...
                     'dimensionless liq. flow rate'];
                 xlblStr= 'dimensionless liq. flow rate, [-]';
-            case 'Volumetric gas flow rate'
+            case 'gas F-Factor'
                 indX = 6;                                                   %column index of x-data in table
                 ttlStr = ['Interfacial area as fun. of '...
-                    'volumetric gas flow rate'];
-                xlblStr= 'volumetric gas flow rate, [m^3/s]';
+                    'gas F-Factor'];
+                xlblStr= 'F-Factor, [Pa^{0.5}]';
         end
         cla(hPlAxes);                                                       %clear axes for the new plot
         hold(hPlAxes,'on');
@@ -824,7 +827,7 @@ function fillIFACorrUITable(hTable,dataSH)
 ColNames = {'Surface tension,|[N/m]',...                                    %set up ColNames for correlation data
         'Density,|[kg/m3]','Viscosity,|[Pa s]',...
         'Dimensionless,|flow rate, [-]','Plate incl.|angle,[deg]',...
-        'Vol. gas flow|rate, [m3/s]','Riv. surface|area, [m2]'};
+        'F-Factor,|[Pa^0.5]','Riv. surface|area, [m2]'};
 % creating data matrix to show
 Data    = [];
 DataClr = [];
@@ -873,7 +876,7 @@ end                                                                         %las
 ColNames = 1:max(numMS);                                                    %need space for all the data
 ColNames = reshape(strtrim(cellstr(num2str(ColNames(:)))), size(ColNames)); %vector -> cell of strings
 ColNames = [ColNames {'' 'Mean|value' 'Standard|deviation'...               %add names for last 6 columns
-    'Dimensionless|flow rate, [-]' 'Vol. gas flow|rate, [m3/s]',...
+    'Dimensionless|flow rate, [-]' 'F-Factor,|[m3/s]',...
     'Distance from|plate top, [m]'}];
 % prepare data to be shown
 Data    = [];

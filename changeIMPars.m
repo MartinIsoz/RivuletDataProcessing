@@ -40,7 +40,7 @@ else
 end
 % End initialization code - DO NOT EDIT
 
-%% Initialization functions
+%% Initialization and setting default GUI properties
 
 % --- Executes just before changeIMPars is made visible.
 function changeIMPars_OpeningFcn(hObject, eventdata, handles, varargin)
@@ -105,10 +105,13 @@ varargout{1} = handles.output;
 % The figure can be deleted now
 delete(handles.figure1);
 
+% --- Disabling useless warnings
+%#ok<*DEFNU> - GUI cannot see what functions will be used by user
+
 
 %% Pushbuttons
 % --- Executes on button press in PushOK.
-function PushOK_Callback(hObject, ~, handles) %#ok<DEFNU>
+function PushOK_Callback(hObject, ~, handles)
 % this functions reads all the variables values present into the GUI and
 % sends them into the changeIMPars_OutputFcn
 
@@ -134,7 +137,7 @@ uiresume(handles.figure1);
 
 
 % --- Executes on button press in PushDef.
-function PushDef_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+function PushDef_Callback(hObject, eventdata, handles)
 % by pushing this button, default values are loaded into all GUI fields
 
 % reinitialize gui
@@ -145,7 +148,7 @@ guidata(hObject, handles);
 
 
 % --- Executes on button press in PushCancelClose.
-function PushCancelClose_Callback(hObject, ~, handles) %#ok<DEFNU>
+function PushCancelClose_Callback(hObject, ~, handles)
 % this functions handles the output if user cancels modification of
 % parameters. output is then set as empty matrix
 
@@ -162,7 +165,7 @@ uiresume(handles.figure1);
 
 %% Edit fields
 
-function EdithpTr_Callback(hObject, ~, handles) %#ok<DEFNU>
+function EdithpTr_Callback(hObject, ~, handles)
 % editable field that allows user to change treshold for the HOUGH
 % transform (input of the HOUGH function)
 
@@ -173,7 +176,7 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EdithpTr_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function EdithpTr_CreateFcn(hObject, ~, ~)
 % function for setting properties of EdithpTr edit field
 
 % Hint: edit controls usually have a white background on Windows.
@@ -185,7 +188,7 @@ end
 
 
 
-function EditnumPeaks_Callback(hObject, ~, handles) %#ok<DEFNU>
+function EditnumPeaks_Callback(hObject, ~, handles)
 % function that allows user to change number of peaks to look for at image
 % transformed by HOUGH transform, input of the HOUGHPEAKS function
 
@@ -196,7 +199,7 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditnumPeaks_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function EditnumPeaks_CreateFcn(hObject, ~, ~)
 % function for setting properties of the EditnumPeaks edit field
 
 % Hint: edit controls usually have a white background on Windows.
@@ -208,7 +211,7 @@ end
 
 
 
-function EditfG_Callback(hObject, ~, handles) %#ok<DEFNU>
+function EditfG_Callback(hObject, ~, handles)
 % function that allows user to change how big gaps between the lines with
 % the same 'rho' parameters should be filled. input of HOUGHLINES
 
@@ -219,7 +222,7 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditfG_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function EditfG_CreateFcn(hObject, ~, ~)
 % function for setting properties of EditfG edit field
 
 % Hint: edit controls usually have a white background on Windows.
@@ -231,7 +234,7 @@ end
 
 
 
-function EditmL_Callback(hObject, ~, handles) %#ok<DEFNU>
+function EditmL_Callback(hObject, ~, handles)
 % function that allows user to change minimal length of the line taken into
 % account. input of HOUGHLINES
 
@@ -242,7 +245,7 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditmL_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function EditmL_CreateFcn(hObject, ~, ~)
 % function for setting properties of the EditmL edit field
 
 % Hint: edit controls usually have a white background on Windows.
@@ -252,7 +255,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'),...
     set(hObject,'BackgroundColor','white');
 end
 
-function EditIm2BW_Callback(hObject, ~, handles) %#ok<DEFNU>
+function EditIm2BW_Callback(hObject, ~, handles)
 % function allowing user to change the treshold for IM2BW function
 
 handles.metricdata.im2bwTr = str2double(get(hObject,'String'));
@@ -262,7 +265,7 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditIm2BW_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function EditIm2BW_CreateFcn(hObject, ~, ~)
 % function for changing properties of the EditIm2BW edit field
 
 % Hint: edit controls usually have a white background on Windows.
@@ -274,7 +277,7 @@ end
 
 %% Pop up menu
 % --- Executes on selection change in PopupEdgeMethod.
-function PopupEdgeMethod_Callback(hObject, ~, handles) %#ok<DEFNU>
+function PopupEdgeMethod_Callback(hObject, ~, handles)
 % popup menu that allows user to change method used for elements edges
 % finding on the processed picture. input of the EDGE function
 
@@ -286,7 +289,7 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function PopupEdgeMethod_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function PopupEdgeMethod_CreateFcn(hObject, ~, ~)
 % function for setting properties of the PopupEdgeMethod popup menu
 
 % Hint: popupmenu controls usually have a white background on Windows.
@@ -298,7 +301,7 @@ end
 
 %% Checkboxes
 % --- Executes on button press in CheckDUIM2BW.
-function CheckDUIM2BW_Callback(hObject, ~, handles) %#ok<DEFNU>
+function CheckDUIM2BW_Callback(hObject, ~, handles)
 % if this checkbox is checked, the IM2BW transformation wont be used before
 % calling the EDGE function. performing this transformation can bring out
 % more points to be considered as plate edges, but with some images, this
@@ -311,7 +314,7 @@ guidata(hObject, handles);
 
 
 
-%% Auxiliary function
+%% GUI values initialization
 function metricdata = ...
     initializeGUI(~,~,handles)
 %

@@ -125,6 +125,8 @@ else
 end
 % End initialization code - DO NOT EDIT
 
+%% Initialization and default GUI properties
+
 % --- Executes just before progGUI is made visible.
 function progGUI_OpeningFcn(hObject, eventdata, handles, varargin)
 % This function has no output args, see OutputFcn.
@@ -138,9 +140,6 @@ function progGUI_OpeningFcn(hObject, eventdata, handles, varargin)
     initializeGUI(hObject, eventdata, handles,'all');                       %call initialize function for all availible data
 
 set(handles.MainWindow,'DockControl','off');                                %I want to make the window undockable
-
-% handles.statusbar = statusbar(handles.MainWindow,'Program is ready');
-
 
 % Choose default command line output for progGUI
 handles.output = hObject;
@@ -182,6 +181,9 @@ varargout{1} = handles.output;
 % Update handles structure
 guidata(hObject, handles);                                                  %i need to do this because of the handles.statusbar
 
+% --- Disabling useless warnings
+%#ok<*DEFNU> - GUI cannot see what functions will be used by user
+
 %% PushButtons - Preprocessing
 
 % --- Executes on button press in PushChooseDir.
@@ -195,6 +197,12 @@ function storDir = PushChooseDir_Callback(~, ~, handles)
 % function also check the existing subdirectories of the chosen directory
 % and if they dont exist, it creates all the subdirectories needed for the
 % program execution
+
+% extract variables from handles
+DNTLoadIM = handles.prgmcontrol.DNTLoadIM;
+
+% suspend any existing log file
+diary off
 
 % choosing directory to store outputs
 start_path = '~/Documents/Freiberg/EvalExp';                                %start path for choosing directory (only for my machine)
@@ -233,6 +241,20 @@ parfor i = 1:numel(nameList)
     end
 end
 
+% if the images are not loaded into structure, but already prepared into
+% different folder
+if isfield(handles.metricdata,'imNames') == 1 && DNTLoadIM == 1
+    handles.metricdata = rmfield(handles.metricdata,'imNames');             %otherwise, the program would be looking into the wrong folders
+    warndlg({'Subtracted images are in unreacheable folder'...
+        'Please reload images'},'Images cleared','modal');uiwait(gcf);
+end
+
+% create log file (or open it if it exists
+fid = fopen([storDir '/log.txt'],'a+');
+fprintf(fid,'\nDate: %s\n==========\n\n',datestr(now,'dd_mm_yy-HH_MM_SS')); %create header
+fclose(fid);                                                                %close current file
+diary([storDir '/log.txt']);                                                %start writing into specified file a diary
+
 %modify string to display in statusbar
 statusStr = ['Data storage directory ' storDir...
     ' loaded. Subdirectories are ready.'];
@@ -258,7 +280,7 @@ end
 guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in PushLoadBg.
-function PushLoadBg_Callback(~, ~, handles) %#ok<DEFNU>
+function PushLoadBg_Callback(~, ~, handles)
 % function for loading the background image into the handles.metricdata
 % structure. 
 %
@@ -304,7 +326,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushLoadIM.
-function daten = PushLoadIM_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+function daten = PushLoadIM_Callback(hObject, eventdata, handles)
 % function for loading images to be processed and for subtracting the
 % background from them. this functions needs for run specified storDir and
 % background image, so if they are not yet loaded/chosen, the function asks
@@ -425,7 +447,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushClearIM.
-function PushClearIM_Callback(~, ~, handles) %#ok<DEFNU>
+function PushClearIM_Callback(~, ~, handles)
 % function for clearing currently loaded images. it clears the images or
 % image infor from the current handles as well as the background image and
 % it updates concerned editable fields
@@ -453,7 +475,7 @@ guidata(handles.MainWindow, handles);
 %% Editable fields - Preprocessing
 
 
-function EditStorDir_Callback(hObject, ~, handles) %#ok<DEFNU>
+function EditStorDir_Callback(hObject, ~, handles)
 % editable field that shows current chosen storDir and also allows user to
 % set it manually from the keyboard by writing full or relative path to it.
 %
@@ -504,7 +526,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditStorDir_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function EditStorDir_CreateFcn(hObject, ~, ~)
 % function for setting up properties of the EditStorDir editable field
 
 % Hint: edit controls usually have a white background on Windows.
@@ -516,13 +538,13 @@ end
 
 
 
-function EditBcgLoc_Callback(~, ~, ~) %#ok<DEFNU>
+function EditBcgLoc_Callback(~, ~, ~)
 % uneditable text field used for showing the location of chosen background
 % image
 
 
 % --- Executes during object creation, after setting all properties.
-function EditBcgLoc_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function EditBcgLoc_CreateFcn(hObject, ~, ~)
 % function for setting up properties of the EditBcgLoc editable field
 
 % Hint: edit controls usually have a white background on Windows.
@@ -534,12 +556,12 @@ end
 
 
 
-function EditIMLoc_Callback(~, ~, ~) %#ok<DEFNU>
+function EditIMLoc_Callback(~, ~, ~)
 % uneditable text field used for showing the location of processed images
 
 
 % --- Executes during object creation, after setting all properties.
-function EditIMLoc_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function EditIMLoc_CreateFcn(hObject, ~, ~)
 % function for setting up properties of the EditIMLoc editable field
 
 % Hint: edit controls usually have a white background on Windows.
@@ -552,7 +574,7 @@ end
 %% Checkboxes - Preprocessing
 
 % --- Executes on button press in CheckDNL.
-function CheckDNL_Callback(hObject, ~, handles) %#ok<DEFNU>
+function CheckDNL_Callback(hObject, ~, handles)
 % checkbox for controlling if the user wants to load all the processed
 % images into the handles structure. If users computer has a lot of
 % availible RAM memory and slow HDD, it is good to load all into the
@@ -572,7 +594,7 @@ guidata(handles.MainWindow, handles);
 %% Pushbuttons - Image Processing
 
 % --- Executes on button press in PushFindEdg.
-function PushFindEdg_Callback(~, ~, handles) %#ok<DEFNU>
+function PushFindEdg_Callback(~, ~, handles)
 % pushbutton that summons all the preset parameters and calls the findEdges
 % function for EdgCoord specification. After the EdgCoord matrix is created
 % and saved into the handles.metricdata structure, it is controlled by the
@@ -605,7 +627,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushClearEdg.
-function PushClearEdg_Callback(~, ~, handles) %#ok<DEFNU>
+function PushClearEdg_Callback(~, ~, handles)
 % by pressing this button, the EdgCoord matrix is cleared from the
 % handles.metricdata structure
 
@@ -618,7 +640,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushDefEdg.
-function PushDefEdg_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+function PushDefEdg_Callback(hObject, eventdata, handles)
 % if this button is pressed, default image processing parameters are
 % loaded. This means that initializeGUI function is called with option to
 % return only image processing parameters and then the old and the new
@@ -649,7 +671,7 @@ guidata(handles.MainWindow, handles);
 %% Checkboxes - Image Processing
 
 % --- Executes on button press in CheckCuvRegrGR.
-function CheckCuvettes_Callback(hObject, ~, handles) %#ok<DEFNU>
+function CheckCuvettes_Callback(hObject, ~, handles)
 % checkbox for controlling if the user wants to display graphs from
 % cuvettes finding
 
@@ -663,7 +685,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in CheckPlate.
-function CheckPlate_Callback(hObject, ~, handles) %#ok<DEFNU>
+function CheckPlate_Callback(hObject, ~, handles)
 % checkbox for controlling if the user wants to display graphs from plate
 % edges finding
 
@@ -677,7 +699,7 @@ guidata(handles.MainWindow, handles);
 %% Popupmenu - Image Processing
 
 % --- Executes on selection change in PopupIMProc.
-function PopupIMProc_Callback(hObject, ~, handles) %#ok<DEFNU>
+function PopupIMProc_Callback(hObject, ~, handles)
 % popup menu for choosing the level of automaticity of the findEdges
 % function execution. Availible options are 'Manual', 'Semi-automatic',
 % 'Automatic' and 'Force-automatic'. The default option is
@@ -694,7 +716,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function PopupIMProc_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function PopupIMProc_CreateFcn(hObject, ~, ~)
 % function for setting up properties of the PopupIMProc popup list
 
 % Hint: popupmenu controls usually have a white background on Windows.
@@ -706,7 +728,7 @@ end
 
 %% Editable fields - Rivulet processing
 
-function EditTreshold_Callback(hObject, ~, handles) %#ok<DEFNU>
+function EditTreshold_Callback(hObject, ~, handles)
 % field for specifying the treshold (liquid layer height) for differencing
 % between the rivulet and the noise on the plate, the value is inserted
 % into mm and the default value is 0.1 (but anything between 0.05 and 0.1
@@ -719,7 +741,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditTreshold_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function EditTreshold_CreateFcn(hObject, ~, ~)
 % function for setting up properties of EditTreshold editable field
 
 % Hint: edit controls usually have a white background on Windows.
@@ -731,7 +753,7 @@ end
 
 
 
-function EditFSensitivity_Callback(hObject, ~, handles) %#ok<DEFNU>
+function EditFSensitivity_Callback(hObject, ~, handles)
 % field for specifying the filter sensitivity to be used when getting rid
 % of the noise on the experimental pictures, it is used when the predefined
 % 2D filter is created by the MATLAB function fspecial. The default (and
@@ -745,7 +767,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function EditFSensitivity_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function EditFSensitivity_CreateFcn(hObject, ~, ~)
 % function for set up properties of EditFSensitivity editable field
 
 % Hint: edit controls usually have a white background on Windows.
@@ -758,7 +780,7 @@ end
 %% Popup menu - Rivulet processing
 
 % --- Executes on selection change in PopupLiqType.
-function PopupLiqType_Callback(hObject, ~, handles) %#ok<DEFNU>
+function PopupLiqType_Callback(hObject, ~, handles)
 % popup menu that allows user to select between different liquid types used
 % during the experiments. This menu calls function fluidDataFcn with
 % specified liquid and plate inclination angles parameters and saves
@@ -776,13 +798,14 @@ angle = handles.metricdata.RivProcPars{2};                                  %get
 
 % save selected value to handles
 handles.metricdata.fluidData = fluidDataFcn(selected,angle);                %call database function
+handles.metricdata.fluidType = selected;                                    %save selected fluid type
 
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function PopupLiqType_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function PopupLiqType_CreateFcn(hObject, ~, ~)
 % function for setting up propertios of the PopupLiqType popup menu
 
 % Hint: popupmenu controls usually have a white background on Windows.
@@ -793,7 +816,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'),...
 end
 
 % --- Executes on selection change in PopupGrFormat.
-function PopupGrFormat_Callback(hObject, ~, handles) %#ok<DEFNU>
+function PopupGrFormat_Callback(hObject, ~, handles)
 % through this menu, user can specify in which format he wants to save
 % plots generated during the rivuletProcessing function execution.
 %
@@ -810,7 +833,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function PopupGrFormat_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function PopupGrFormat_CreateFcn(hObject, ~, ~)
 % function for setting up properties of PopupGRFormat popup list
 
 % Hint: popupmenu controls usually have a white background on Windows.
@@ -824,7 +847,7 @@ end
 %% Checkboxes - Rivulet processing
 
 % --- Executes on button press in CheckCompProfGR.
-function CheckCuvRegrGR_Callback(hObject, ~, handles) %#ok<DEFNU>
+function CheckCuvRegrGR_Callback(hObject, ~, handles)
 % checkbox for controlling if the user wants to generate graphics from the
 % cuvette regression. By default, no plots are generated.
 
@@ -836,7 +859,7 @@ handles.prgmcontrol.GR.regr = get(hObject,'Value');
 guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in CheckRivTopGR.
-function CheckRivTopGR_Callback(hObject, ~, handles) %#ok<DEFNU>
+function CheckRivTopGR_Callback(hObject, ~, handles)
 % checkbox for controlling if the user wants to generates contour plots of
 % the rivulet from top view. By default, no plots are generated.
 
@@ -848,7 +871,7 @@ handles.prgmcontrol.GR.contour = get(hObject,'Value');
 guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in CheckCompProfGR.
-function CheckCompProfGR_Callback(hObject, ~, handles) %#ok<DEFNU>
+function CheckCompProfGR_Callback(hObject, ~, handles)
 % checkbox for controlling if the user wants to generate plots of the
 % complete rivulet profiles. By default, no plots are generated. Generation
 % of the complete rivulet profiles plots is also the most time consuming
@@ -862,7 +885,7 @@ handles.prgmcontrol.GR.profcompl = get(hObject,'Value');
 guidata(handles.MainWindow, handles);
 
 % --- Executes on button press in CheckMeanCutsGR.
-function CheckMeanCutsGR_Callback(hObject, ~, handles) %#ok<DEFNU>
+function CheckMeanCutsGR_Callback(hObject, ~, handles)
 % checkbox for controlling if the user wants to generate plots from mean
 % profiles of the rivulets into the made cuts. By default no plots are
 % generated.
@@ -876,7 +899,7 @@ guidata(handles.MainWindow, handles);
 
 %% Radiobuttons - Rivulets processing (uibuttongroup)
 % --- Executes when selected object is changed in PlotSetts.
-function PlotSetts_SelectionChangeFcn(~, eventdata, handles) %#ok<DEFNU>
+function PlotSetts_SelectionChangeFcn(~, eventdata, handles)
 % uibuttongroup for specifying the handling of generated plots, by default
 % the plots are only saved, but user can chose between only showing the
 % plots, only saving the plots and both showing and saving the plots.
@@ -911,7 +934,7 @@ guidata(handles.MainWindow, handles);
 %% Pushbuttons - Rivulet processing
 
 % --- Executes on button press in PushCalculate.
-function PushCalculate_Callback(~, ~, handles) %#ok<DEFNU>
+function PushCalculate_Callback(~, ~, handles)
 % pushbutton that summons up all the parameters and calls the function
 % rivuletProcessing.m
 %
@@ -1007,7 +1030,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushSetDefRiv.
-function PushSetDefRiv_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+function PushSetDefRiv_Callback(hObject, eventdata, handles)
 % by pressing this pushbutton, the default parameters for the
 % rivuletProcessing are loaded and any user set values are rewritten
 % (initializeGUI function is called with option to return only the rivulet
@@ -1050,7 +1073,7 @@ handles.statusbar = statusbar(handles.MainWindow,...
 
 
 % --- Executes on button press in PushClearALL.
-function PushClearALL_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+function PushClearALL_Callback(hObject, eventdata, handles)
 % when this button is pressed, all the user defined variables are cleared
 % both from the metricdata and prgmcontrol structures
 
@@ -1069,7 +1092,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes on button press in PushClosePlots.
-function PushClosePlots_Callback(~, ~, handles) %#ok<DEFNU>
+function PushClosePlots_Callback(~, ~, handles)
 % function for closing all the figure windows except of the main program
 % (its handle is currently made invisible)
 
@@ -1080,7 +1103,7 @@ set(handles.MainWindow,'HandleVisibility','on');
 %% Pushbuttons - Outputs overview
 
 % --- Executes on button press in PushShowProfiles.
-function PushShowProfiles_Callback(~, ~, handles) %#ok<DEFNU>
+function PushShowProfiles_Callback(~, ~, handles)
 % pressing this button opens uitable with rivulet profiles data for each
 % selected item in the ListProfiles listbox. Please note that opening more
 % profiles at the time can cause apparition of inconveniently high number
@@ -1108,7 +1131,7 @@ else
 end
 
 % --- Executes on button press in PushShowOtherData.
-function PushShowOtherData_Callback(~, ~, handles) %#ok<DEFNU>
+function PushShowOtherData_Callback(~, ~, handles)
 % pushbutton for showing the mSpeed, RivHeight, RivWidth and IFACorr
 % variables. if the checkbox CheckShowDataPlots is checked, in the created
 % window are present also axes linked to the shown uitable. otherwise, only
@@ -1154,7 +1177,7 @@ end
 %% Listboxes - Outputs overview
 
 % --- Executes on selection change in ListProfiles.
-function ListProfiles_Callback(hObject, ~, handles) %#ok<DEFNU>
+function ListProfiles_Callback(hObject, ~, handles)
 % listbox for showing availible data for Quick outputs overview. In this
 % list are present the data only for profiles from the last data
 % evaluation. for more detailed of data or for comparing different
@@ -1168,7 +1191,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function ListProfiles_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function ListProfiles_CreateFcn(hObject, ~, ~)
 % function for setting properties of ListProfiles listbox
 
 % Hint: listbox controls usually have a white background on Windows.
@@ -1179,7 +1202,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'),...
 end
 
 % --- Executes on selection change in ListOtherData.
-function ListOtherData_Callback(hObject, ~, handles) %#ok<DEFNU>
+function ListOtherData_Callback(hObject, ~, handles)
 % listbox for showing availible data for Quick outputs overview. In this
 % list are present the data only for mSpeed, RivHeight, RivWidth and
 % IFACorr from the last data evaluation. for more detailed of data or for
@@ -1193,7 +1216,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function ListOtherData_CreateFcn(hObject, ~, ~) %#ok<DEFNU>
+function ListOtherData_CreateFcn(hObject, ~, ~)
 % function for setting properties of ListOtherData listbox
 
 % Hint: listbox controls usually have a white background on Windows.
@@ -1206,13 +1229,13 @@ end
 %% Checkboxes - Outputs overview
 
 % --- Executes on button press in CheckShowDataPlots.
-function CheckShowDataPlots_Callback(~, ~, ~) %#ok<DEFNU>
+function CheckShowDataPlots_Callback(~, ~, ~)
 % checkbox for controlling the output of PushShowOtherData. if it is
 % checked, there is plot show, else there is showed only uitable. this
 % callback does nothing at the time
 
 
-%% Initialization function
+%% GUI values initialization
 function [metricdata prgmcontrol] = ...
     initializeGUI(~,~,handles,dataPart)
 %
@@ -1318,6 +1341,7 @@ set(handles.EditFSensitivity, 'String', handles.metricdata.FSensitivity);
 contents = cellstr(get(handles.PopupLiqType,'String'));                     %get the stringcell of options in popup menu
 indSel   = find(strcmp(contents,string)~=0);                                %get position of selected value
 set(handles.PopupLiqType,'Value',indSel);                                   %select appropriate choice
+handles.metricdata.fluidType = contents{indSel};                            %save selected liquid type into handles
 end
 
 metricdata = handles.metricdata;
@@ -1330,13 +1354,13 @@ guidata(handles.MainWindow, handles);
 
 %% File menu
 % --------------------------------------------------------------------
-function FileMenu_Callback(~, ~, ~) %#ok<DEFNU>
+function FileMenu_Callback(~, ~, ~)
 % file menu header, actually doesn't have any fucntion
 %
 % Shortcut: --
 
 % --------------------------------------------------------------------
-function SaveBase_Callback(~, ~, handles) %#ok<DEFNU>
+function SaveBase_Callback(~, ~, handles)
 % function for saving all the variables into main workspace, wont work into
 % compiled version
 %
@@ -1350,7 +1374,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --------------------------------------------------------------------
-function SaveFile_Callback(~, ~, handles) %#ok<DEFNU>
+function SaveFile_Callback(~, ~, handles)
 % function that save all the program execution variables into .mat file
 %
 % Shortcut: Ctrl+S
@@ -1367,7 +1391,7 @@ set(handles.statusbar,'Text',...
 
 
 % --------------------------------------------------------------------
-function LoadFile_Callback(~, ~, handles) %#ok<DEFNU>
+function LoadFile_Callback(~, ~, handles)
 % menu entry that loads variables saved by SaveFile_Callback function and
 % merges them with the existing data. If there are the fields with the same
 % names in both old and new data, old value is rewritten
@@ -1410,7 +1434,7 @@ end
 guidata(handles.MainWindow, handles);
 
 % --------------------------------------------------------------------
-function QuitPrgm_Callback(~, ~, handles) %#ok<DEFNU>
+function QuitPrgm_Callback(~, ~, handles)
 % simple quitting command, call close request function
 %
 % Shortcut: Ctrl+Q
@@ -1419,14 +1443,14 @@ close(handles.MainWindow);                                                  %cal
 
 %% Elements edges finding menu
 % --------------------------------------------------------------------
-function findEdgesMenu_Callback(~, ~, ~) %#ok<DEFNU>
+function findEdgesMenu_Callback(~, ~, ~)
 % Element edges finding menu header, doesn't have any function
 %
 % Shortcut: --
 
 
 % --------------------------------------------------------------------
-function SaveEdgCoord_Callback(~, ~, handles) %#ok<DEFNU>
+function SaveEdgCoord_Callback(~, ~, handles)
 % function for saving actual EdgCoord variable into the .mat file for later
 % use.
 %
@@ -1444,7 +1468,7 @@ set(handles.statusbar,'Text',...
 
 
 % --------------------------------------------------------------------
-function LoadEdgCoord_Callback(~, ~, handles) %#ok<DEFNU>
+function LoadEdgCoord_Callback(~, ~, handles)
 % function for loading EdgCoord matrix from the .mat file. The file has to
 % be saved by SaveEdgCoord_Callback
 %
@@ -1469,7 +1493,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --------------------------------------------------------------------
-function ModIMPars_Callback(~, ~, handles) %#ok<DEFNU>
+function ModIMPars_Callback(~, ~, handles)
 % function that call changeIMPars.m with no inputs => user is allowed to
 % modify parameters and at the begining, the default parameters are shown
 %
@@ -1486,7 +1510,7 @@ end
 guidata(handles.MainWindow, handles);
 
 % --------------------------------------------------------------------
-function ShowIMPars_Callback(~, ~, handles) %#ok<DEFNU>
+function ShowIMPars_Callback(~, ~, handles)
 % function that call changeIMPars.m with 'onlyshow' option => user is no
 % allowed to modify the parameters and current parameters are shown
 
@@ -1494,7 +1518,7 @@ changeIMPars('onlyshow',handles.metricdata.IMProcPars);                     %cal
 
 
 % --------------------------------------------------------------------
-function SaveIMPars_Callback(~, ~, handles) %#ok<DEFNU>
+function SaveIMPars_Callback(~, ~, handles)
 % function for saving IMProcPars into .mat file for later use
 %
 % Shortcut: --
@@ -1511,7 +1535,7 @@ set(handles.statusbar,'Text',...
 
 
 % --------------------------------------------------------------------
-function LoadIMPars_Callback(~, ~, handles) %#ok<DEFNU>
+function LoadIMPars_Callback(~, ~, handles)
 % function for loading IMProcPars saved by SaveIMPars_Callback. This
 % rewrites current IMProcPars variable with loaded values
 %
@@ -1535,7 +1559,7 @@ end
 guidata(handles.MainWindow, handles);
 
 % --------------------------------------------------------------------
-function BestMethod_Callback(~, ~, handles) %#ok<DEFNU>
+function BestMethod_Callback(~, ~, handles)
 % from this menu entry is called function bestMethod.m for specifying the
 % best image processing parameters (IMProcPars).
 % the original IMProcPars are rewritten new values => user is asked if he
@@ -1568,7 +1592,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --------------------------------------------------------------------
-function SpecAppPlatePos_Callback(~, ~, handles) %#ok<DEFNU>
+function SpecAppPlatePos_Callback(~, ~, handles)
 % function that allows user to specify approximate plate position on photos
 % outside of the findEdges function. This is usefull when the user wants to
 % run findEdges more times at the row because specyfying the approximate
@@ -1622,14 +1646,14 @@ guidata(handles.MainWindow, handles);
 
 %% Data processing menu
 % --------------------------------------------------------------------
-function rivProcMenu_Callback(~, ~, ~) %#ok<DEFNU>
+function rivProcMenu_Callback(~, ~, ~)
 % Data processing menu header, this doesn't do anything
 %
 % Shortcut: --
 
 
 % --------------------------------------------------------------------
-function ModExpPars_Callback(~, ~, handles) %#ok<DEFNU>
+function ModExpPars_Callback(~, ~, handles)
 % function for calling changeRPPars.m without any specification => at the
 % begining, the default values are loaded and user is allowed to change
 % them
@@ -1647,7 +1671,7 @@ end
 guidata(handles.MainWindow, handles);
 
 % --------------------------------------------------------------------
-function ShowExpPars_Callback(~, ~, handles) %#ok<DEFNU>
+function ShowExpPars_Callback(~, ~, handles)
 % function that calls changeRPPars.m with specification 'onlyshow' =>
 % current values of RivProcPars are loaded at the GUI initialization and
 % user is not allowed to modify them
@@ -1657,7 +1681,7 @@ function ShowExpPars_Callback(~, ~, handles) %#ok<DEFNU>
 changeRPPars('onlyshow',handles.metricdata.RivProcPars);                    %call gui for changing parameters with loaded current
 
 % --------------------------------------------------------------------
-function SaveRPPars_Callback( ~, ~, handles) %#ok<DEFNU>
+function SaveRPPars_Callback( ~, ~, handles)
 % function for saving current RivProcPars into .mat file for later use
 %
 % Shortcut: ..
@@ -1674,7 +1698,7 @@ set(handles.statusbar,'Text',...
 
 
 % --------------------------------------------------------------------
-function LoadRPPars_Callback(~, ~, handles) %#ok<DEFNU>
+function LoadRPPars_Callback(~, ~, handles)
 % function for loading RivProcPars from .mat file, saved by
 % SaveRPPars_Callback. Current RivProcPars are rewritten with new values
 %
@@ -1697,17 +1721,17 @@ end
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
-%% postprocmenu menu
+%% Postprocessing menu
 
 % --------------------------------------------------------------------
-function PostProcMenu_Callback(~, ~, ~) %#ok<DEFNU>
+function PostProcMenu_Callback(~, ~, ~)
 % Postprocessing menu header, doesn't do anything
 %
 % Shortcut: --
 
 
 % --------------------------------------------------------------------
-function ShowGenPlots_Callback(~, ~, handles) %#ok<DEFNU>
+function ShowGenPlots_Callback(~, ~, handles)
 % function that allows user to open images created during the program
 % executin (after pressing the "Calculate" button).
 %
@@ -1718,7 +1742,7 @@ function ShowGenPlots_Callback(~, ~, handles) %#ok<DEFNU>
 
 FilterSpec  = {'*.fig';'*.png;*.eps;*.tif'};
 DlgTitle   = 'Select figures to load';
-if isfield(handles.metricdata,'storDir')                                    %if storDir is selected and subdirectories created
+if isfield(handles.metricdata,'storDir') == 1                               %if storDir is selected and subdirectories created
     start_path = [handles.metricdata.storDir '/Plots'];
 else
     start_path = pwd;
@@ -1727,19 +1751,24 @@ selectmode  = 'on';
 % choose background image
 [fileNames fileDir] = uigetfile(FilterSpec,DlgTitle,'Multiselect',...
     selectmode,start_path);
+if fileNames == 0                                                           %if cancelled by user
+    set(handles.statusbar,'Text','Loading plots cancelled by user');
+    return
+end
 if isa(fileNames,'char') == 1
     fileNames = {fileNames};                                                %if only 1 is selected, convert to cell
 end
 for i = 1:numel(fileNames)                                                  %for all loaded images
     if strcmp(fileNames{1}(end-3:end),'.fig') == 1
-        openfig([fileDir '/' fileNames{i}]);
+        openfig([fileDir fileNames{i}],'new','visible');                    %open in new figure and made it visible
     else
-        figure;imshow([fileDir '/' fileNames{i}]);
+        figure;imshow([fileDir fileNames{i}]);
     end
 end
+set(handles.statusbar,'Text','Selected plots were shown.');
 
 % --------------------------------------------------------------------
-function ShowAvProcData_Callback(~, ~, handles) %#ok<DEFNU>
+function ShowAvProcData_Callback(~, ~, handles)
 % this function calls showProcData.m with current data availible for
 % postprocessing. from the raised GUI is possible to start postprocessing
 % tool or load other data from .mat files
@@ -1750,7 +1779,7 @@ showProcData('handles',handles);
 
 
 % --------------------------------------------------------------------
-function SaveProcessedData_Callback(~, ~, handles) %#ok<DEFNU>
+function SaveProcessedData_Callback(~, ~, handles)
 % this function allows user to save outputs from the rivuletProcessing.m
 % into .mat file for later use in postprocessing tool
 %
@@ -1769,7 +1798,7 @@ end
 
 
 % --------------------------------------------------------------------
-function LoadProcessedData_Callback(~, ~, handles) %#ok<DEFNU>
+function LoadProcessedData_Callback(~, ~, handles)
 % function for loading output data saved by SaveProcessedData_Callback
 % the loaded data are merged into existing handles.metricdata.Availible
 % cell. If there are two sets of data with the same ID, current values are
@@ -1822,7 +1851,7 @@ guidata(handles.MainWindow, handles);
 
 
 % --------------------------------------------------------------------
-function OpenPostProcTool_Callback(~, ~, handles) %#ok<DEFNU>
+function OpenPostProcTool_Callback(~, ~, handles)
 % function that calls postProcPlotting.m (postprocessing tool) with output
 % data currently present into the handles.metricdata.Availible cell
 %
