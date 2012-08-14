@@ -73,9 +73,10 @@ function OUT = rivuletProcessing(handles)
 %                   - GR.profcut    = 0/1 - mean profiles in cuts
 %                   - GR.regime     = 0/1/2 - show/save/show+save
 %                   - GR.format     = string - format for SAVEAS
+% DNTLoadIM ...     0 - images are loaded into structure
 %
 % OUTPUT variable
-% OUT   ... structure with same data as are saved into files
+% OUT       ... structure with same data as are saved into files
 % OUT.profiles  ... cell with mean profiles in cuts for every processed
 %                   image
 % OUT.mSpeed    ... cells with sliced var data, last cell is string with
@@ -964,7 +965,7 @@ for i = 1:numel(varIN)
 end
 CorMat(:,numel(varIN)+1:end) = varOUT;
 
-dlmwrite(fileNM,CorMat,'delimiter','\t','precision','%5.6e')                %write write data matrix into file, SI unist
+dlmwrite([fileNM '.txt'],CorMat,'delimiter','\t','precision','%5.6e')       %write write data matrix into file, SI unist
 
 end
 
