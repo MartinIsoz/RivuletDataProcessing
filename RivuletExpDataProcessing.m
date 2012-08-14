@@ -255,16 +255,20 @@ fprintf(fid,'\nDate: %s\n==========\n\n',datestr(now,'dd_mm_yy-HH_MM_SS')); %cre
 fclose(fid);                                                                %close current file
 diary([storDir '/log.txt']);                                                %start writing into specified file a diary
 
-%modify string to display in statusbar
-statusStr = ['Data storage directory ' storDir...
-    ' loaded. Subdirectories are ready.'];
 % set gui visible output
 if numel(storDir) <= 45
     str   = storDir;
 else
     str   = ['...' storDir(end-45:end)];
 end
+statusStr = storDir;
+if ispc == 1                                                                %needed for compatibility of file path and sprintf
+    statusStr   = strrep(statusStr,'\','\\');
+end
 set(handles.EditStorDir,'String',str);                                      %display only 45 last characters or the whole string;
+%modify string to display in statusbar
+statusStr = ['Data storage directory ' statusStr...
+    ' loaded. Subdirectories are ready.'];
 
 % saving outputs
 handles.metricdata.storDir = storDir;
@@ -405,7 +409,7 @@ for i = 1:numel(imNames)
     tmpIM = imsubtract(tmpIM,bgImage);                                      %subtract background from image
     imwrite(tmpIM,[subsImDir '/' imNames{i}]);                              %save new images into subfolder
     if handles.prgmcontrol.DNTLoadIM == 0                                   %if i dont want to have stored images in handles.metricdata
-        daten{i} = tmpIM;                                                   %if i want the images to be saved into handles
+        daten{i} = tmpIM;                                       %#ok<AGROW> %if i want the images to be saved into handles
     end
     handles.statusbar = statusbar(handles.MainWindow,...
         'Loading and subtracting background from image %d of %d (%.1f%%)',...%updating statusbar
