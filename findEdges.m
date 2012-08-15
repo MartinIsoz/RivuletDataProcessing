@@ -243,7 +243,7 @@ handles.statusbar.ProgressBar.setValue(i);
     trLeft = round(size(tmpIM,2)/2);                                        %i dont care about the left side of the image (with the plate)
     tmpIM  = tmpIM(:,trLeft:end);                                           %cut of unwanted part of the image and save temp. image var.
     tmpIM  = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                 %temporary image variable, enhance contrasts
-    tmpIM  = im2bw(tmpIM, 0.055);                                           %temporary black and white image, convert image to BW
+    tmpIM  = im2bw(tmpIM, 0.12);                                            %temporary black and white image, convert image to BW
     sizeIM = size(tmpIM);                                                   %save size of the image
     [B,L]  = bwboundaries(tmpIM,'noholes');clear tmpIM;                     %find boundaries of each element, clear tmpIM
     % preallocation of variables
@@ -252,7 +252,7 @@ handles.statusbar.ProgressBar.setValue(i);
     rectG  = Vec;
     for j = 1:numel(B)
         nB= size(B{j},1);                                                   %nB is the number of elements on the region boundary
-        stmt1 = nB >= 1000 && nB < 2000;                                    %get rid of too big and too small regions (hardcoded, 2B polished)
+        stmt1 = nB >= 800 && nB < 3000;                                    %get rid of too big and too small regions (hardcoded, 2B polished)
         % i dont want elements close to the borders (would be better to
         % code distances in relative way)
         stmt2 = min(B{j}(:,1)) > 200 && max(B{j}(:,1)) < sizeIM(1)-200;     %get rid of the elements to much on the top and bottom
@@ -529,7 +529,7 @@ end
     % saving data into OUTPUT variable
     EdgCoord(i,7:end) = coordVec + trnVec;                                  %need to add the cutted values
 end
-set(handles.statusbar.ProgressBar,'Visible','off');                         %made progresbar invisible again
+handles.statusbar.ProgressBar.setVisible(false);                            %make progressbar invisible again
 set(handles.statusbar,'Text','Edges were found.')                           %update statusbar
 end
 

@@ -61,19 +61,9 @@ handles.metricdata.GREdges = [0 0];
 
 % extracting needed values from handles
 if isfield(handles.metricdata,'AppPlatePos') == 0                           %if approximate plate position is not yet specified
-    if isfield(handles.metricdata,'daten') == 1                             %see if there are images saved into handles
-        DNTLoadIM = 0;
-    else
-        DNTLoadIM = 1;
-        imNames   = handles.metricdata.imNames;                             %if not, obtain info for loading
-        subsImDir = handles.metricdata.subsImDir;
-    end
-    
-    % setting up the statusbar
-    handles.statusbar = statusbar(handles.MainWindow,...
-        'Waiting for user response');
-    
     % obtaining approximate coordinates of the plate
+    handles.statusbar = statusbar(handles.MainWindow,...                    %update the statusbar
+        'Waiting for user response');
     options.Interpreter = 'tex';
     options.WindowStyle = 'modal';
     msgbox({['Please specify approximate position of the'...
@@ -81,6 +71,13 @@ if isfield(handles.metricdata,'AppPlatePos') == 0                           %if 
         ['Click little bit outside of {\bf upper left} '...
         'and {\bf lower right corner}']},options);uiwait(gcf);
     se      = strel('disk',12);                                             %morphological structuring element
+    if isfield(handles.metricdata,'daten') == 1                             %see if there are images saved into handles
+        DNTLoadIM = 0;
+    else
+        DNTLoadIM = 1;
+        imNames   = handles.metricdata.imNames;                             %if not, obtain info for loading
+        subsImDir = handles.metricdata.subsImDir;
+    end
     if DNTLoadIM == 1                                                       %if the images are not loaded, i need to get the image from directory
         tmpIM = imread([subsImDir '/' imNames{1}]);                         %load image from directory with substracted images
     else
@@ -111,12 +108,6 @@ for i = 1:nExp
         k = k+1;
         j = 1;
     end
-    handles.statusbar = statusbar(handles.MainWindow,...
-        ['Trying combination  ',...
-        ' %d of %d (%.1f%%)'],...                                           %updating statusbar
-        i,nExp,100*i/nExp);
-    set(handles.statusbar.ProgressBar,...
-        'Visible','on', 'Minimum',0, 'Maximum',nExp, 'Value',i);
     % load specific combination of changed parameters
     handles.metricdata.IMProcPars{6} = DUIM2BW(k);
     if handles.metricdata.IMProcPars{6} == 1

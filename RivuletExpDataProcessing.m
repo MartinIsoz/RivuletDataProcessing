@@ -145,6 +145,8 @@ set(handles.MainWindow,'DockControl','off');                                %I w
 handles.output = hObject;
 set(hObject,'CloseRequestFcn',@my_closereq)
 
+warning('off', 'Images:initSize:adjustingMag');                             %turn off image is to big to fit the screen wrng
+
 % Update handles structure
 guidata(hObject, handles);
 
@@ -1581,11 +1583,9 @@ choice = questdlg({'Actual IMProcPars will be rewritten.'...                %ask
     'Save original', ...
     'Yes','No','No');
 % Handle response
-switch choice
-    case 'Yes'
+if strcmp('Yes',choice) == 1                                                %if user wants to save IMProcPars
         IMProcPars = handles.metricdata.IMProcPars; %#ok<NASGU>             %this variable is used "indirectly"
         uisave('IMProcPars','IMProcPars')
-    case 'No'                                                               %do nothing
 end
 
 handles.metricdata.IMProcPars = ...                                         %call method for finding best image processing method
