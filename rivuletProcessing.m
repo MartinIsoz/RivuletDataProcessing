@@ -125,6 +125,9 @@ function OUT = rivuletProcessing(handles)
 % To Do:
 % - plot, dependence of IFArea on break criterium
 
+%% Disabling useless warnings
+%#ok<*LAXES>                                                                %axes have to be in loops, otherwise they would be created MW
+
 %% Creating subdirectories
 % is taken care of in "Choose storDir"
 
@@ -384,6 +387,7 @@ set(handles.statusbar,'Text','Calculating output data of the program');
 [~,RivWidth2,RivHeight2,minLVec,minRVec] =...                               %calculates the mean widths of the rivulet and return indexes of
     RivSurf(YProfilPlatte,Treshold,plateSize);                              %the "edges" of the rivulet + calculates max height of each part of
                                                                             %the rivulet
+                                                                            
 %% Mean speed determination from average profiles
 % - calculate area of the horizontal cut through the rivulet
 % - from known volumetric rate calculate local (mean) speed in the cut
@@ -765,20 +769,20 @@ for i = 1:numel(YProfilPlatte)
     for j = 1:numel(MaxVec)
         tmpVecL      = YProfilPlatte{i}(1:IndX(j),j);                       %left side of the rivulet
         tmpVecR      = YProfilPlatte{i}(IndX(j)+1:end,j);                   %right side of the rivulet
-        tmpIndL      = find(tmpVecL >= Treshold,1,'first');                 %find the first element bigger then Treshold (search from L->R)
+        tmpIndL      = find(tmpVecL <= Treshold,1,'last');                  %find the last element lower then Treshold (search from L->R)
         tmpIndR      = find(tmpVecR <= Treshold,1,'first');                 %find the first element lower then Treshold
-        if isempty(tmpIndL) == 1                                            %there werent found any value higher then treshold on left side of r.
-            tmpIndL = numel(tmpVecL);
+        if isempty(tmpIndL) == 1                                            %there werent found any values lower then treshold on left side of r.
+            tmpIndL = 1;
             warning('Pers:LoPiL',['Treshold is higher than liquid heigh'...
                 ' for all the left side of the rivulet'])
-        elseif isempty(tmpIndR) == 1                                        %there werent found any value lower than treshold on right side of r.
+        elseif isempty(tmpIndR) == 1                                        %there werent found any values lwr than treshold on right side of r.
             tmpIndR = numel(tmpVecR);
-            warning('Pers:HoPiR',['Treshold is lower than liquid heigh'...
+            warning('Pers:HoPiR',['Treshold is higher than liquid heigh'... %there werent found any values lower than treshold
                 ' for all the right side of the rivulet'])
-        elseif tmpIndL == 1                                                 %first value bigger than treshold is first value on the plate
-            warning('Pers:HoPiL',['Treshold is lower than liquid heigh'...
+        elseif tmpIndL == 1                                                 %last value bigger than treshold is first value on the plate
+            warning('Pers:HoPiL',['Treshold is higher than liquid heigh'...
                 ' for all the left side of the rivulet'])
-        elseif tmpIndR == 1                                                 %first value of the right side of the rivulet is smaller than Tr.
+        elseif tmpIndR == numel(tmpVecR)                                    %first value smaller than TR is the end of the plate
             warning('Pers:LoPiR',['Treshold is higher than liquid heigh'...
                 ' for all the right side of the rivulet'])
         end
@@ -863,6 +867,7 @@ for i = 1:numel(YProfilPlatte)                                              %1 f
     nameStr = [files{i}(1:end-4) '.txt'];                                   %constructuin of the name string - name of the file \ .tif
     dlmwrite(nameStr,tmp,'delimiter','\t','precision','%5.6e')              %save data, in m
     ProfOUT{i} = tmp;                                                       %save created matrix also in output
+    assignin('base','ProfOUT',ProfOUT)
 end
 end
 
