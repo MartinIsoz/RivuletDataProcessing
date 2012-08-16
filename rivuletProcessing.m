@@ -153,7 +153,9 @@ subsImDir = handles.metricdata.subsImDir;
 smImDir   = [subsImDir '/Smoothed'];                                        %directory with smoothed images
 storDir   = handles.metricdata.storDir;
 rootDir   = handles.metricdata.rootDir;
-plotDir   = [storDir '/Plots'];                                             %directory for saving plots
+if GR.regime ~= 0                                                           %if user wants to save the plots
+    plotDir   = [storDir '/Plots'];                                         %directory for saving plots
+end
 tmpfDir   = [storDir '/tmp'];                                               %directory for saving temporary files
 % program execution parameters
 Treshold  = handles.metricdata.Treshold;
@@ -364,13 +366,13 @@ if DNTLoadIM == 1
         handles.statusbar.ProgressBar.setMaximum(nImages);
         handles.statusbar.ProgressBar.setValue(i);
         load([tmpfDir '/' files{i}(1:end-4) '.mat']);                       %if images are not present in handles, load them from tmpfDir
-        [YProfilPlatte(i),XProfilPlatte]=cutRiv({tmpIM'},nCuts,plateSize,...%call with calculation variables
+        [YProfilPlatte(i),XProfilPlatte]=CutRiv({tmpIM'},nCuts,plateSize,...%call with calculation variables
             GR.profcut,GR.regime,GR.format,txtPars,storDir,rootDir,i);      %auxiliary variables for graphics and data manipulation
     end
     rmdir(tmpfDir,'s');                                                     %remove unnecessary temporary folder with all contents
 else
     set(handles.statusbar,'Text','Calculating mean profiles along the rivulets');%update statusbar
-    [YProfilPlatte,XProfilPlatte]=cutRiv(YProfilPlatte,nCuts,plateSize,...  %call with calculation variables
+    [YProfilPlatte,XProfilPlatte]=CutRiv(YProfilPlatte,nCuts,plateSize,...  %call with calculation variables
         GR.profcut,GR.regime,GR.format,txtPars,storDir,rootDir);            %auxiliary variables for graphics and data manipulation
 end
 
@@ -447,25 +449,63 @@ set(handles.statusbar,'Text','Rivulet processing ended succesfully');
 end
 
 %% Function for the rotameter calibration
-% i think it isnt very usefull to keep this in the code, because of
-% symplifying the work with variable names
-function [M,V_Pumpe] = rotameterCalib(filenames,DatenFluid)
-% files - the first 3 numbers in filenames are volumetric flow rates in
-%         L/h, so I need to read these, cell
-% DatenFluid - regression coeficients for rotameter calibration, vector
+function [M,V_Pumpe] = rotameterCalib(filenames,fluidData)
 %
-% M     - dimensionless mass flow
-% V_Pumpe-volumetric flow
+%   [M,V_Pumpe] = rotameterCalib(filenames,fluidData)
 %
-% Function returns vector, but it is useless, all the values for same
-% regimes are equal
+% function for calibration of the rotameter. The rotameter on the
+% experimental device is calibrated for the water at 15 deg C. In this
+% case, it shows volumetric flow rate of the water in L/h. However, the
+% liquid type is changed during the experiments and also the working
+% temperature is 25 deg C instead of 15.
+% because of this, it is necessary to calibrate the rotameter for different
+% conditions
+%
+% princip of the calibration
+% for different values show at rotameter is measured the mass of the liquid
+% going through the device during 1 minute. this way, for each tested value
+% of volumetric flow rate show on the rotameter scale are availible mass
+% flow rates in kg/min. These values are transformed into g/s and then, the
+% polynomial regression is made for obtaining the dependecy of actual mass
+% flow rates on the volumetric flow rates shown on the rotameter scale.
+%
+% INPUT variables
+% filenames     ... cell with filenames of the processed images. each
+%                   filename has structure ***_***.tif (for example
+%                   001_004.tif), where the first number corresponds to the
+%                   volumetric flow rate shown on the rotameter scale.
+%                   second number is the rank of the experiment with the
+%                   same volumetric flow rate
+% fluidData     ... informations about currently processed fluid. this
+%                   variable is a vector containing g, gravitational
+%                   acceleration for the current plate inclination angle,
+%                   sigma, surface tension of the liquid, rho, liquid
+%                   density, eta, liquid viscosity and Reg - coefficients
+%                   of the polynomial regression obtained during the
+%                   rotameter calibration (view princip of the calibration)
+%                   Reg has no pre-specified length, so the degree of the
+%                   polynomial used for volumetric to mass flow rates
+%                   recalculation depends only on the number of specified
+%                   coefficients on the input.
+%
+% Rq: Reg should have at most 3 coefficients. usually, the linear
+% regression is ok for the water and tensids (water with surfactants), but
+% for the silicon oils, quadratic regression could be needed.
+%
+% OUTPUT variables
+% M             ... vector with dimensionless flow rate specified for each
+%                   image, obviously, there are multiple same values
+% V_Pumpe       ... volumetric flow rate of the pumpe, in m3/s, it is used
+%                   in calculation of the mean speed of the liquid in cuts.
+%                   Same as for M, there are multiple times the same
+%                   values.
 
 % extracting parameters
-g       = DatenFluid(1);                                                    %m/s^2
-sigma   = DatenFluid(2);                                                    %N/m
-rho     = DatenFluid(3);                                                    %kg/m^3
-eta     = DatenFluid(4);                                                    %Pa s
-Reg     = DatenFluid(5:end);                                                %pumpe constants
+g       = fluidData(1);                                                     %m/s^2
+sigma   = fluidData(2);                                                     %N/m
+rho     = fluidData(3);                                                     %kg/m^3
+eta     = fluidData(4);                                                     %Pa s
+Reg     = fluidData(5:end);                                                 %pumpe constants
 
 % computational part
 parfor i = 1:numel(filenames)
@@ -536,9 +576,9 @@ for i = 1:numel(ImData)                                                     %for
     xur = EdgCoord(i,9);                                                    %lower right x-Value
     yur = EdgCoord(i,10);
     % prepare cuvette calibration
-    XS  = linspace(filmTh(1),filmTh(2),yuS-yoS+1)';                             %thickness of the film in mm small Kuevette
-%     XB  = linspace(filmTh(3),filmTh(4),yuB-yoB+1)';                             %thickness of the film in mm big Kuevette
-    CW  = filmTh(5)/2;                                                          %cuvette width/2
+    XS  = linspace(filmTh(1),filmTh(2),yuS-yoS+1)';                         %thickness of the film in mm small Kuevette
+%     XB  = linspace(filmTh(3),filmTh(4),yuB-yoB+1)';                         %thickness of the film in mm big Kuevette
+    CW  = filmTh(5)/2;                                                      %cuvette width/2
     % load i-th image
     Image = ImData{i};                                                      %temporary variablefor each image
     % find mean grayscale value for each row of the cuvette
@@ -621,11 +661,11 @@ end
 %% Function for cutting rivulet into nCuts parts along the vertical
 %% coordinate (Z)
 function [YProfilPlatte XProfilPlatte] =...
-    cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,GRformat,txtPars,...
+    CutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,GRformat,txtPars,...
     storDir,rootDir,imNumber)
 %
 %   [YProfilPlatte XProfilPlatte] =...
-%       cutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,GRformat,storDir,rootDir,imNumber)
+%       CutRiv(YProfilPlatte,nCuts,plateSize,GR,GRregime,GRformat,storDir,rootDir,imNumber)
 %
 % INPUT variables
 % YProfilPlatte     ... variable with heights of the rivulet
@@ -662,7 +702,7 @@ for i=1:numel(YProfilPlatte)
     end
     XProfilPlatte= linspace(0,plateSize(1),size(YProfilPlatte{i},1));       %this changes from image to image - auto coordinates, m
     for n = 1:nCuts
-        YProfilPlatte{i}(:,n)=mean(YProfilPlatte{i}...                      %plot mean profiles in the place of the cut, over 50 pixels
+        YProfilPlatte{i}(:,n)=mean(YProfilPlatte{i}...                      %create mean profiles in the place of the cut, over 50 pixels
             (:,n*Distance-25:n*Distance+25),2);
     end
     YProfilPlatte{i} = YProfilPlatte{i}(:,1:nCuts)*1e-3;                    %need to change size of output matrix, mm -> m
@@ -715,6 +755,13 @@ end
 %% Function for calculating the rivulet area and local width
 function [IFArea RivWidth RivHeight minLVec minRVec] = ...
     RivSurf(YProfilPlatte,Treshold,plateSize)
+%
+%   function [IFArea RivWidth RivHeight minLVec minRVec] = ...
+%       RivSurf(YProfilPlatte,Treshold,plateSize)
+%
+% function for the rivulet interfacial area, width, height and borders
+% calculation
+%
 % INPUT variables
 % YProfilPlatte     ... variable with heights of the rivulet (in mm?)
 % Treshold          ... Treshold for distinguishing between bcgrnd and riv.
@@ -765,21 +812,21 @@ for i = 1:numel(YProfilPlatte)
     for j = 1:numel(MaxVec)
         tmpVecL      = YProfilPlatte{i}(1:IndX(j),j);                       %left side of the rivulet
         tmpVecR      = YProfilPlatte{i}(IndX(j)+1:end,j);                   %right side of the rivulet
-        tmpIndL      = find(tmpVecL >= Treshold,1,'first');                 %find the first element bigger then Treshold (search from L->R)
-        tmpIndR      = find(tmpVecR <= Treshold,1,'first');                 %find the first element lower then Treshold
-        if isempty(tmpIndL) == 1                                            %there werent found any value higher then treshold on left side of r.
+        tmpIndL      = find(tmpVecL <= Treshold,1,'last');                  %find the last element lower then Treshold in L side of the rivulet
+        tmpIndR      = find(tmpVecR <= Treshold,1,'first');                 %find the first element lower then Treshold in R side of the rivulet
+        if isempty(tmpIndL) == 1 || tmpIndL == 1                            %all the left side of the rivulet is higher than treshold
             tmpIndL = numel(tmpVecL);
-            warning('Pers:LoPiL',['Treshold is higher than liquid heigh'...
+            warning('Pers:HoPiL',['Treshold is higher than liquid heigh'...
                 ' for all the left side of the rivulet'])
-        elseif isempty(tmpIndR) == 1                                        %there werent found any value lower than treshold on right side of r.
+        elseif isempty(tmpIndR) == 1 || tmpIndR == numel(tmpVecR)           %all the right side of the rivulet is higher than treshold
             tmpIndR = numel(tmpVecR);
-            warning('Pers:HoPiR',['Treshold is lower than liquid heigh'...
+            warning('Pers:HoPiR',['Treshold is higher than liquid heigh'...
                 ' for all the right side of the rivulet'])
-        elseif tmpIndL == 1                                                 %first value bigger than treshold is first value on the plate
-            warning('Pers:HoPiL',['Treshold is lower than liquid heigh'...
+        elseif tmpIndL == numel(tmpVecL)                                    %last lower than treshold is max height of the cut
+            warning('Pers:LoPiL',['Treshold is lower than liquid heigh'...
                 ' for all the left side of the rivulet'])
-        elseif tmpIndR == 1                                                 %first value of the right side of the rivulet is smaller than Tr.
-            warning('Pers:LoPiR',['Treshold is higher than liquid heigh'...
+        elseif tmpIndR == 1                                                 %first lower than treshold is max height of the cut
+            warning('Pers:LoPiR',['Treshold is lower than liquid heigh'...
                 ' for all the right side of the rivulet'])
         end
         minLVec(i,j) = tmpIndL;
@@ -810,8 +857,6 @@ for i = 1:numel(YProfilPlatte)
         end
         IFArea(i) = IFArea(i) + lArc*deltaZ;                                %length of j-th arc x length of an element of the plate length
     end
-
-    clear dummyL dummyR                                                     %clear dummy variable at the end of each loop
 end
 end
 
