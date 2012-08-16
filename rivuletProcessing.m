@@ -816,7 +816,6 @@ for i = 1:numel(YProfilPlatte)
     for j = 1:numel(MaxVec)
         tmpVecL      = YProfilPlatte{i}(1:IndX(j),j);                       %left side of the rivulet
         tmpVecR      = YProfilPlatte{i}(IndX(j)+1:end,j);                   %right side of the rivulet
-<<<<<<< HEAD
         tmpIndL      = find(tmpVecL <= Treshold,1,'last');                  %find the last element lower then Treshold in L side of the rivulet
         tmpIndR      = find(tmpVecR <= Treshold,1,'first');                 %find the first element lower then Treshold in R side of the rivulet
         if isempty(tmpIndL) == 1 || tmpIndL == 1                            %all the left side of the rivulet is higher than treshold
