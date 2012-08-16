@@ -125,6 +125,9 @@ function OUT = rivuletProcessing(handles)
 % To Do:
 % - plot, dependence of IFArea on break criterium
 
+%% Disabling useless warnings
+%#ok<*LAXES>                                                                %axes have to be in loops, otherwise they would be created MW
+
 %% Creating subdirectories
 % is taken care of in "Choose storDir"
 
@@ -386,6 +389,7 @@ set(handles.statusbar,'Text','Calculating output data of the program');
 [~,RivWidth2,RivHeight2,minLVec,minRVec] =...                               %calculates the mean widths of the rivulet and return indexes of
     RivSurf(YProfilPlatte,Treshold,plateSize);                              %the "edges" of the rivulet + calculates max height of each part of
                                                                             %the rivulet
+                                                                            
 %% Mean speed determination from average profiles
 % - calculate area of the horizontal cut through the rivulet
 % - from known volumetric rate calculate local (mean) speed in the cut
@@ -812,6 +816,7 @@ for i = 1:numel(YProfilPlatte)
     for j = 1:numel(MaxVec)
         tmpVecL      = YProfilPlatte{i}(1:IndX(j),j);                       %left side of the rivulet
         tmpVecR      = YProfilPlatte{i}(IndX(j)+1:end,j);                   %right side of the rivulet
+<<<<<<< HEAD
         tmpIndL      = find(tmpVecL <= Treshold,1,'last');                  %find the last element lower then Treshold in L side of the rivulet
         tmpIndR      = find(tmpVecR <= Treshold,1,'first');                 %find the first element lower then Treshold in R side of the rivulet
         if isempty(tmpIndL) == 1 || tmpIndL == 1                            %all the left side of the rivulet is higher than treshold
@@ -908,6 +913,7 @@ for i = 1:numel(YProfilPlatte)                                              %1 f
     nameStr = [files{i}(1:end-4) '.txt'];                                   %constructuin of the name string - name of the file \ .tif
     dlmwrite(nameStr,tmp,'delimiter','\t','precision','%5.6e')              %save data, in m
     ProfOUT{i} = tmp;                                                       %save created matrix also in output
+    assignin('base','ProfOUT',ProfOUT)
 end
 end
 

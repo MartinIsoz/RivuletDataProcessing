@@ -1755,7 +1755,7 @@ selectmode  = 'on';
 % choose background image
 [fileNames fileDir] = uigetfile(FilterSpec,DlgTitle,'Multiselect',...
     selectmode,start_path);
-if fileNames == 0                                                           %if cancelled by user
+if isa(fileNames,'double') == 1                                             %if cancelled by user
     set(handles.statusbar,'Text','Loading plots cancelled by user');
     return
 end
