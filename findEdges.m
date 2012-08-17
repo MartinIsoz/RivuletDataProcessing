@@ -152,6 +152,7 @@ mL        = handles.metricdata.IMProcPars{4};
 im2bwTr   = handles.metricdata.IMProcPars{5};
 DntUIm2Bw = handles.metricdata.IMProcPars{6};
 EdgFMethod= handles.metricdata.IMProcPars{7};
+im2bwCuvTr= handles.metricdata.IMProcPars{8};
 
 % extract handles
 if isfield(handles.metricdata,'daten') == 1                                 %there are saved images into handles
@@ -204,7 +205,7 @@ if isfield(handles.metricdata,'AppPlatePos') == 0                           %app
     end
     tmpIM   = imtophat(tmpIM,se);
     tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                %enhance contrasts
-    tmpIM   = im2bw(tmpIM,0.16);                                            %conversion to black and white
+    tmpIM   = im2bw(tmpIM,im2bwTr);                                         %conversion to black and white
     figure;imshow(tmpIM);                                                   %show image to work with
     cutMat  = round(ginput(2));close(gcf);                                  %let the user specify approximate position of the plate
     cutLeft = cutMat(1,1);cutRight = cutMat(2,1);
@@ -243,7 +244,7 @@ handles.statusbar.ProgressBar.setValue(i);
     trLeft = round(size(tmpIM,2)/2);                                        %i dont care about the left side of the image (with the plate)
     tmpIM  = tmpIM(:,trLeft:end);                                           %cut of unwanted part of the image and save temp. image var.
     tmpIM  = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                 %temporary image variable, enhance contrasts
-    tmpIM  = im2bw(tmpIM, 0.12);                                            %temporary black and white image, convert image to BW
+    tmpIM  = im2bw(tmpIM, im2bwCuvTr);                                      %temporary black and white image, convert image to BW
     sizeIM = size(tmpIM);                                                   %save size of the image
     [B,L]  = bwboundaries(tmpIM,'noholes');clear tmpIM;                     %find boundaries of each element, clear tmpIM
     % preallocation of variables
@@ -283,7 +284,7 @@ handles.statusbar.ProgressBar.setValue(i);
                 - [tmp2(end),tmp1(end)];
             dotPr(1) = dot(vec1/norm(vec1),vec2/norm(vec2));                %specify dot products on edges
             dotPr(2) = dot(vec3/norm(vec2),vec4/norm(vec3));
-            rectG(j) = rectG(j) + max(dotPr)/sum(dotPr);                    %rectangularity - sum of dotproducts + ratio of areas
+            rectG(j) = rectG(j) + sum(dotPr);                               %rectangularity - sum of dotproducts + ratio of areas
         else
             Vec(j) = 0;
         end

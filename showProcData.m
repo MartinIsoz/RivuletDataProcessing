@@ -141,8 +141,11 @@ if exist('Availible','var') == 0
         '"Save all processed data into .mat file" option from program menu.'],...
         'modal');uiwait(gcf);
 else
-    Availible = [handles.metricdata.Availible Availible];                   %#ok<NODEF> %append new data to the structure
-    strCellAV = cell(1,numel(Availible));
+    if iscell(Availible) == 0 %#ok<NODEF>
+        Availible = {Availible};                                            %convert to cell if needed
+    end
+    Availible = [handles.metricdata.Availible Availible];                   %append new data to the structure
+    strCellAV = cellstr(num2str((1:numel(Availible))',1))';
     k         = 1;                                                          %auxiliary indexing variable
     for i = 1:numel(Availible)
         if sum(strcmp(strCellAV,Availible{i}.ID))==0                        %if the same ID isn't present
@@ -213,7 +216,7 @@ function PushSaveSel_Callback(~, ~, handles)
 
 if isfield(handles.metricdata,'selDT') == 1
     selDT     = handles.metricdata.selDT;
-    Availible = handles.metricdata.Availible{selDT}; %#ok<NASGU>            %resave only selected data, var Availible is used indirectly
+    Availible = handles.metricdata.Availible(selDT); %#ok<NASGU>            %resave only selected data, var Availible is used indirectly
     uisave('Availible','Processed_data');
 else
     msgbox('Please select data first','modal');uiwait(gcf);

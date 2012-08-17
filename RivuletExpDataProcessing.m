@@ -411,7 +411,7 @@ for i = 1:numel(imNames)
     tmpIM = imsubtract(tmpIM,bgImage);                                      %subtract background from image
     imwrite(tmpIM,[subsImDir '/' imNames{i}]);                              %save new images into subfolder
     if handles.prgmcontrol.DNTLoadIM == 0                                   %if i dont want to have stored images in handles.metricdata
-        daten{i} = tmpIM;                                       %#ok<AGROW> %if i want the images to be saved into handles
+        daten{i} = tmpIM;                                                   %if i want the images to be saved into handles
     end
     handles.statusbar = statusbar(handles.MainWindow,...
         'Loading and subtracting background from image %d of %d (%.1f%%)',...%updating statusbar
@@ -936,7 +936,6 @@ end
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
-
 %% Pushbuttons - Rivulet processing
 
 % --- Executes on button press in PushCalculate.
@@ -1295,7 +1294,7 @@ set(handles.PopupIMProc,'Value',indSel);                                    %set
 set(handles.CheckCuvettes,'Value',handles.prgmcontrol.GREdges(1));
 set(handles.CheckPlate,'Value',handles.prgmcontrol.GREdges(2));
 % default values for image processing additional parameters
-handles.metricdata.IMProcPars = {0.3300 200 35 25 0.4000 0 'Prewitt'};
+handles.metricdata.IMProcPars = {0.3300 200 35 25 0.4000 0 'Prewitt' 0.15};
 end
 
 if rvp == 1
@@ -1505,7 +1504,17 @@ function ModIMPars_Callback(~, ~, handles)
 %
 % Shortcut: Ctrl+I
 
-IMProcPars = changeIMPars;                                                  %call gui for changing parameters
+% extract inputs from handles
+if isfield(handles.metricdata,'imNames') == 1                               %this implies also the subsImDir specified
+    imData{1} = handles.metricdata.subsImDir;                               %directory, where are saved the images
+    imData{2} = handles.metricdata.imNames{1};                              %name of the first image
+    if isfield(handles.metricdata,'AppPlatePos') == 1                       %are the plate edges specified?
+        imData{3} = handles.metricdata.AppPlatePos;
+    end
+    IMProcPars = changeIMPars('imdata',imData);                             %call gui for changing parameters, with loaded images
+else
+    IMProcPars = changeIMPars('nodata');                                    %call gui for changing parameters without loaded images
+end
 
 % check ouptuts
 if isempty(IMProcPars) == 0

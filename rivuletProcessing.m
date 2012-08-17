@@ -389,7 +389,6 @@ set(handles.statusbar,'Text','Calculating output data of the program');
 [~,RivWidth2,RivHeight2,minLVec,minRVec] =...                               %calculates the mean widths of the rivulet and return indexes of
     RivSurf(YProfilPlatte,Treshold,plateSize);                              %the "edges" of the rivulet + calculates max height of each part of
                                                                             %the rivulet
-                                                                            
 %% Mean speed determination from average profiles
 % - calculate area of the horizontal cut through the rivulet
 % - from known volumetric rate calculate local (mean) speed in the cut
@@ -904,9 +903,9 @@ for i = 1:numel(YProfilPlatte)                                              %1 f
             [zeros(1,zerLeft) XProfilPlatte(minLVec(i,k):minRVec(i,k))...
             zeros(1,zerRight)]';
         tmp(:,j+1) = tmp(:,j+1) +...                                        %write local heights of the rivulet, in m !!
-            [zeros(1,zerLeft)...
-            YProfilPlatte{i}(minLVec(i,k):minRVec(i,k))*1e-3...
-            zeros(1,zerRight)]';
+            [zeros(zerLeft,1);...
+            YProfilPlatte{i}(minLVec(i,k):minRVec(i,k),k)*1e-3;...
+            zeros(zerRight,1)];
     end
     clear k                                                                 %get rid of temp index
     nameStr = [files{i}(1:end-4) '.txt'];                                   %constructuin of the name string - name of the file \ .tif

@@ -30,6 +30,7 @@ appdata= struct('metricdata',[],'prgmcontrol',[]);                          %cre
 hFig    = figure('Units','Pixels','Position',PosVec,...
     'NumberTitle','off','Name','Post processing data plotting',...
     'DockControl','off',...
+    'HandleVisibility','off',...
     'ResizeFcn',@MyResizeFcn,'Tag','MainWindow');                           %create figure window with specified size
 
 % initialize appdata
@@ -176,7 +177,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         selGR = appdata.prgmcontrol.selGR;
                         appdata.prgmcontrol.selMS    = selGR;               %initialization of the next selected indexes (needed for PushPlot)
                         appdata.prgmcontrol.GR       =...
-                            cellstr(num2str(numel(selGR),1));               %needed for making legend strings
+                            cellstr(num2str(selGR',1))';                    %needed for making legend strings
                     case 'Other'                                            %mSpeed, rivWidth and/or rivHeight are to be shown
                         Msrt = dataSH{j}{end};                              %get list of regimes saved into 'other' variables
                         strCellMS = [strCellMS strCellGR(k) separators(1)...
@@ -601,7 +602,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         table = get(hTable,'UserData');                                     %Get copy of uitable data
         if isempty(selcols(selcols~=size(table,2)))==0
             errordlg({'As Y-axis data, you can choose only from within'...
-                'the IFArea column.'});
+                'the IFArea column.'},...
+                'Wrong column selected','modal');
             return
         else
             %Get vectors of x,y values for each column in the selection;
@@ -642,7 +644,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         
         if max(selcols) > numel(table(1,:)) - 6                             %if user wants to plot anything else than measurements
             errordlg({'You can add to plot only different measuremets'...
-                'Please select different columns'})
+                'Please select different columns'},...
+                'Wrong column selected','modal');
         else
             %Get vectors of x,y values for each column in the selection;
             for jdx = 1:1:numel(selcols)
@@ -788,7 +791,7 @@ end
 Data    = [];
 DataClr = [];
 dTopsB  = sort([dTopsU dTopsU]);
-rgb     = distinguishable_colors(cellfun(@numel,dataSH));                   %create matrix of distinguishable colors for each group
+rgb     = distinguishable_colors(sum(cellfun(@numel,dataSH)));              %create matrix of distinguishable colors for each group
 parfor i = 1:size(rgb,1)                                                    %convert these colors into html
     tmpHex    = dec2hex(round(255*rgb(i,:)));
     html(i,:) = [tmpHex(1,:) tmpHex(2,:) tmpHex(3,:)];
@@ -868,10 +871,12 @@ function fillOtherUITable(hTable,dataSH)
 
 % find maximal number of measurements for each dataset
 numMS   = zeros(1,numel(dataSH));
-nCuts   = numMS;
-parfor i = 1:numel(dataSH)                                                  %for all data
+nCuts   = zeros(numel(dataSH),max(cellfun(@numel,dataSH)));                 %number of groups -> nrows, max number of selected -> ncols
+for i = 1:numel(dataSH)                                                  %for all data
     nCuts(i) = size(dataSH{i}{1},1);                                        %number of cuts in i-th measurement
-    numMS(i) = size(dataSH{i}{1},2)-6;                                      %for all data in 1 measurement, the number of images is the same
+    for j = 1:numel(dataSH{i})
+        numMS(i,j) = size(dataSH{i}{j},2)-6;                                %number of images can differ 1 pumpe regime to another
+    end
 end                                                                         %last 6 columns are added data, not measurements
 ColNames = 1:max(numMS);                                                    %need space for all the data
 ColNames = reshape(strtrim(cellstr(num2str(ColNames(:)))), size(ColNames)); %vector -> cell of strings
@@ -881,22 +886,22 @@ ColNames = [ColNames {'' 'Mean|value' 'Standard|deviation'...               %add
 % prepare data to be shown
 Data    = [];
 DataClr = [];
-rgb     = distinguishable_colors(cellfun(@numel,dataSH));                   %create matrix of distinguishable colors for each group
+rgb     = distinguishable_colors(sum(cellfun(@numel,dataSH)));              %create matrix of distinguishable colors for each group
 parfor i = 1:size(rgb,1)                                                    %convert these colors into html
     tmpHex    = dec2hex(round(255*rgb(i,:)));
     html(i,:) = [tmpHex(1,:) tmpHex(2,:) tmpHex(3,:)];
 end
 l     = 1;                                                                  %auxiliary indexing variable for indexing colors
 for i = 1:numel(dataSH) 
-    nZeros = max(numMS) - numMS(i);                                         %number of zeros is difference between maximal and actual n of measur.
     for j = 1:numel(dataSH{i})
-        tmpMat = [dataSH{i}{j}(:,1:numMS(i)) ...                            %current data + added zero columns
-            zeros(nCuts(i),nZeros) dataSH{i}{j}(:,numMS(i)+1:end)];
+        nZeros = max(max(numMS)) - numMS(i,j);                              %number of zeros is difference between maximal and actual n of measur.
+        tmpMat = [dataSH{i}{j}(:,1:numMS(i,j)) ...                          %current data + added zero columns
+            zeros(nCuts(i),nZeros) dataSH{i}{j}(:,numMS(i,j)+1:end)];
         Data = [Data;tmpMat];                                               %add current data to Data
         tmpMat = reshape(strtrim(cellstr(num2str(tmpMat(:)))),...
             size(tmpMat));                                                  %convert data to cell of strings
         for k = 1:numel(tmpMat)
-            tmpMat(k) = strcat(...                                          %modify format of the problematic value
+            tmpMat(k) = strcat(...                                          %color data
                 ['<html><span style="color: #' ...
                 html(l,:) '; font-weight: normal;">'], ...
                 tmpMat(k), ...

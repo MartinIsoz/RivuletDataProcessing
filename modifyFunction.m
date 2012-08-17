@@ -121,7 +121,7 @@ switch choice
             for k = 1:numel(prbCoord(:,2));                                 %for all problems
                 i = prbCoord(k,1);j = prbCoord(k,2);                        %save indexes into temporary variables
                 if DNTLoadIM == 1                                           %if the images are not loaded, i need to get the image from directory
-                    tmpIM = imread([subsImDir imNames{1}]);                 %load image from directory with substracted images
+                    tmpIM = imread([subsImDir '/' imNames{1}]);             %load image from directory with substracted images
                 else
                     tmpIM = IMDataCell{i};                                  %else i can get it from handles
                 end
