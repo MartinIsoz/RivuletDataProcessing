@@ -67,10 +67,13 @@ handles.output = hObject;
 if(nargin > 3)
     for index = 1:2:(nargin-3),
         if nargin-3==index, break, end
+        assignin('base','input',varargin{index+1})
         switch lower(varargin{index})
             case 'onlyshow'
                 tmpVar =  varargin{index+1};                                %input - parameters to show
                 set(handles.PushOK,'enable','off');                         %if parameters are only shown, they cannot be set
+                set(handles.SliderIm2BW,'enable','off');                    %no image data input ->disable slider that opens images
+                set(handles.SliderIm2BWCuv,'enable','off');
                 % extract input
                 handles.metricdata.hpTr     = tmpVar{1};
                 handles.metricdata.numPeaks = tmpVar{2};
@@ -89,17 +92,20 @@ if(nargin > 3)
                 if numel(tmpVar)==3
                     AppPlatePos = tmpVar{3};                                %extract input approximate plate position
                 else
-                    AppPlatePos = [0 0 2*size(image,2)/3 size(image,1)];    %otherwise take left 2/3 of the image
+                    AppPlatePos = [size(image,1)/6 1 ...                    %nothing interesting on left 1/6 of the image
+                        2*round(size(image,2)/3) size(image,1)];    %otherwise take left 2/3 of the image
                     warndlg(['Full functionality of the program is reached'...
                         ' only when the approximate plate position is '...
-                        'specified'],'Limited mode','modal');               %let user know that the program runs in limited mode
+                        'specified'],'Limited mode','modal');uiwait(gcf);   %let user know that the program runs in limited mode
                 end
-            otherwise
+            case 'nodata'
                 warndlg(['When the program is runned before loading the images,'...
                     'only limited functionality is availible'],...
-                    'Limited mode','modal');                                %let user know that the program runs in limited mode
+                    'Limited mode','modal');uiwait(gcf);                    %let user know that the program runs in limited mode
                 set(handles.SliderIm2BW,'enable','off');                    %no image data input ->disable slider that opens images
                 set(handles.SliderIm2BWCuv,'enable','off');
+            otherwise
+                error('Pers:WCall','Wrong calling parameters');             %error for wrong calling parameterx
         end
     end
 end

@@ -335,7 +335,12 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 heightPl= 0.5;                                              %height of 1 plot, 2 rows
                 l       = -1;                                               %auxiliary indexe for horizontal ax. placing
                 spV     = 0.5;                                              %space from the bottom of the figure
-                for j = 1:nSubPl
+                % find maximal and minimal y values
+                yMax    = max(max(Data(:,2:2:end)));                        %y-values are in the pair columns, find maximal
+%                 yMin    = Data(:,2:2:end);                                  %need to find minimum only from nonzero elements
+%                 yMin    = min(min(yMin(yMin~=0)));                          %find minimum from nonzeros, consult this !! (leave 0?)
+                yMin    = 0;                                                %to see how big part of the rivulet was left of with Treshold
+                for j = 1:nSubPl                                            %for all the subplots
                     if j == ceil(nSubPl/2)+1;                               %end of the first row
                         l  =  0;
                         spV=  0;
@@ -360,7 +365,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         plot(hPlAxes(j),tmpVar(brks(k):brks(k+1)-1,1),...
                             tmpVar(brks(k):brks(k+1)-1,2),'Color',color(k,:),...
                             'LineWidth',2)
-                        xlim(hPlAxes(j),[0 plateSize(1)]);                  %width of the plate is the x-coordinate
+%                         xlim(hPlAxes(j),[0 plateSize(1)]);                  %width of the plate is the x-coordinate
+                        axis(hPlAxes(j),[0 plateSize(1) yMin yMax]);        %set axis of the current subplot
                     end
                 end
                 % create legend, I need to help myself with little hack

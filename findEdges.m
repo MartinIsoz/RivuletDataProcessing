@@ -245,7 +245,7 @@ handles.statusbar.ProgressBar.setValue(i);
     tmpIM  = tmpIM(:,trLeft:end);                                           %cut of unwanted part of the image and save temp. image var.
     tmpIM  = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                 %temporary image variable, enhance contrasts
     tmpIM  = im2bw(tmpIM, im2bwCuvTr);                                      %temporary black and white image, convert image to BW
-    sizeIM = size(tmpIM);                                                   %save size of the image
+%     sizeIM = size(tmpIM);                                                   %save size of the image
     [B,L]  = bwboundaries(tmpIM,'noholes');clear tmpIM;                     %find boundaries of each element, clear tmpIM
     % preallocation of variables
     Vec    = zeros(1,numel(B));                                             %temporary indexing vector
@@ -253,12 +253,12 @@ handles.statusbar.ProgressBar.setValue(i);
     rectG  = Vec;
     for j = 1:numel(B)
         nB= size(B{j},1);                                                   %nB is the number of elements on the region boundary
-        stmt1 = nB >= 800 && nB < 3000;                                    %get rid of too big and too small regions (hardcoded, 2B polished)
+        stmt1 = nB >= 800 && nB < 3000;                                     %get rid of too big and too small regions (hardcoded, 2B polished)
         % i dont want elements close to the borders (would be better to
         % code distances in relative way)
-        stmt2 = min(B{j}(:,1)) > 200 && max(B{j}(:,1)) < sizeIM(1)-200;     %get rid of the elements to much on the top and bottom
-        stmt3 = min(B{j}(:,2)) > 200 && max(B{j}(:,2)) < sizeIM(2)-200;     %get rid of the elements to much on the left and right
-        if stmt1 == 1 && stmt2 == 1 && stmt3 == 1
+%         stmt2 = min(B{j}(:,1)) > 200 && max(B{j}(:,1)) < sizeIM(1)-200;     %get rid of the elements to much on the top and bottom
+%         stmt3 = min(B{j}(:,2)) > 200 && max(B{j}(:,2)) < sizeIM(2)-200;     %get rid of the elements to much on the left and right
+        if stmt1 == 1 %&& stmt2 == 1 && stmt3 == 1
             Vec(j) = j;
             rectA  = (max(B{j}(:,1)) - min(B{j}(:,1)))*...
                 (max(B{j}(:,2)) - min(B{j}(:,2)));                          %Area if the element if it would be rectangle
@@ -374,7 +374,7 @@ handles.statusbar.ProgressBar.setValue(i);
     lines = houghlines(tmpIM,theta,rho,P,'FillGap',fG,'MinLength',mL);      %Find lines in the image using the houghlines function
 % here a do a bit wrong indenation, but otherwise, the code would be to
 % wide
-if AUTO ~= 0                                                                %if some automatic processing is wanted
+if AUTO ~= 0 && isfield(lines,'point1') == 1                                %if some automatic processing is wanted and lines were found
     % from this, i get pretty good position of 2 edges, fair position of 1
     % and close to zero information about the last one (on the first set of
     % testing images) -> i must use the information about side length ratio
@@ -522,10 +522,18 @@ if AUTO ~= 0                                                                %if 
         tmpPars   = [edgXL edgXR edgYT edgYB epsX epsY i];                  %contruct vector of parameters for plotLines 
         coordVec  = plotLines(tmpIM,lines,tmpPars);coordVec = coordVec';    %call the function for manual edge selection
     end
-else                                                                        %case of completely manual edges choosing
+elseif AUTO == 0                                                            %case of completely manual edges choosing
     tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];                        %contruct vector of parameters for plotLines 
-    coordVec= plotLines(tmpIM,lines,tmpPars);                               %call the function for manual edge selection
+    coordVec= plotLines(tmpIM,lines,tmpPars)';                              %call the function for manual edge selection
     clear tmpPars
+else                                                                        %no lines were found
+    coordVec= [NaN NaN NaN NaN];                                            %save vector of NaNs
+    % plotting
+    if GR(2) == 1
+        imshow(tmpIM)
+        title(['\bf Hough transform for finding edges of the plate, '...    %title of graphics
+            'image ' mat2str(i)])
+    end
 end
     % saving data into OUTPUT variable
     EdgCoord(i,7:end) = coordVec + trnVec;                                  %need to add the cutted values

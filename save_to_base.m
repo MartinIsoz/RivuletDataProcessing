@@ -21,7 +21,7 @@ function save_to_base(overwrite)
 
 ws_caller= evalin('caller','who()');
 
-if length(nargin) && overwrite
+if ~isempty(nargin) && overwrite
    % Overwrite preexisting variables:
    variables= ws_caller;
 else

@@ -8,6 +8,11 @@ function varargout = changeRPPars(varargin)
 % option 'onlyshow' and then, the current rivulet processing parameters are
 % displayed without possibility to modify them.
 %
+% WARNING: Program is written for the rotameter used into laboratory of TU
+% Bergakademie Freiberg. This rotameter is calibrated for the AIR at 20 deg
+% C and 1 atmosphere. If you are using different rotameters, you need to
+% modify the code of this function - modify internal data of FFactFcn
+%
 % Author:       Martin Isoz
 % Organisation: ICT Prague / TU Bergakademie Freiberg
 % Date:         30. 07. 2012
@@ -696,6 +701,25 @@ function FFact = FFactFcn(metricdata)
 %
 % OUTPUT variables
 % FFact         ... f-factor of the gas, in Pa^0.5
+%
+% WARNING: Program is written for the rotameter used into laboratory of TU
+% Bergakademie Freiberg. This rotameter is calibrated for the AIR at 20 deg
+% C and 1 atmosphere. If you are using different rotameters, you need to
+% modify the code - internal data of this function
+
+% constants
+R       = 8.314;                                                            %universal gas constant
+
+% internal data of the program TO BE MODIFIED WITH CHANGE OF GAS ROTAMETER
+TcR     = 132.64;                                                           %critical temperature of the AIR, K
+PcR     = 3.766e6;                                                          %critical pressure of the AIR, Pa
+TR      = 293.15;                                                           %temperature for which is the rotameter calibrated, K
+PR      = 100e3;                                                            %pressure for which is the rotameter calibrated, Pa
+
+% find molar volume of the air at conditions of rot. calibration
+aR      = 27/64*(R*TcR/PcR)^2; bR = 1/8*(R*TcR/PcR);                        %coefficients of the equation
+VmR     = fzero(@(Vm) PR*Vm^3-(bR*PR+R*TR)*Vm^2+aR*Vm-bR*aR,30e-3);         %molar volume of the air at conditions of rot. calibration
+
 
 % extracting parameters + conversion to SI units
 Width   = metricdata.Width;
@@ -705,19 +729,20 @@ Tc      = metricdata.Tc;
 Pc      = metricdata.Pc*1e3;                                                %kPa->Pa
 T       = metricdata.T;
 P       = metricdata.P*1e3;                                                 %kPa->Pa
-M       = metricdata.M;
+M       = metricdata.M*1e-3;                                                %g/mol->kg/mol
 
-% constants
-R       = 8.314;                                                            %universal gas constant
-
-% calculating the velocity of the gas (vol. flow/cross-section)
-uG      = GasFl/(Width*Height);                                             %convert gas flow to m3/s and divide by cross-section of the device
-
-% calculating the gas density
+% calculating molar volume of the processed gas at the lab temperature
 a       = 27/64*(R*Tc/Pc)^2; b = 1/8*(R*Tc/Pc);                             %coefficients of the equation
 
 Vm      = fzero(@(Vm) P*Vm^3-(b*P+R*T)*Vm^2+a*Vm-b*a,30e-3);                %finding the molar volume of the gas
 % Rq: this equation has 3 roots, molar volume of the gas is the highest one
+
+% convert measured gas flow rate into actual for lab temperature and
+% pressure and for the right gas
+conCoef = Vm/VmR;                                                           %ratio of the molar volume of the processed gas and air
+
+% calculating the velocity of the gas (vol. flow/cross-section)
+uG      = conCoef*GasFl/(Width*Height);                                     %mult. gas flow by conCoeg and div. it by cross-section of the device
 
 rho     = M/Vm;
 
