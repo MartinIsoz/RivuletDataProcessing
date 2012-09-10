@@ -49,16 +49,14 @@ switch LiquidName
         sigma   = 55.18e-3;
         rho     = 998;
         eta     = 1.178e-3;
-        reg     = [0.00268867271984935...
-                   0.0165546451606565...
-                   0.0738965243420832];
+        reg     = [0.274879879879880...                                     %this calibration looks quite good even with linear regression
+                   0.271921921921918];
     case 'Tenzids'
         sigma   = 29.36e-3;
         rho     = 998;
         eta     = 1.114e-3;
-        reg     = [0.00268867271984935...
-                   0.0165546451606565...
-                   0.0738965243420832];
+        reg     = [0.274879879879880...                                     %this calibration looks quite good even with linear regression
+                   0.271921921921918];
 end
 
 fluidData = [g sigma rho eta reg];

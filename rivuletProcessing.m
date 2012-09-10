@@ -32,7 +32,8 @@ function OUT = rivuletProcessing(handles)
 %                   noise on the plate
 % FSensitivity.     filter sensitivity for image smoothing
 % EdgCoord  ...     coordinates of plate and cuvette edges on each image,
-%                   matrix nImages x 10
+%                   matrix 1 x 10 -> !! cammera cannot be moved during
+%                   experiments !!
 %                   [xCMS yCLS yCHS xCMB yCLB yCHB xL yL xH yH]
 % fluidData ...     data concerning the liquid phase, regression
 %                   coeficients for rotameter calibration, surface tension,
@@ -126,7 +127,7 @@ function OUT = rivuletProcessing(handles)
 % - plot, dependence of IFArea on break criterium
 
 %% Disabling useless warnings
-%#ok<*LAXES>                                                                %axes have to be in loops, otherwise they would be created MW
+%#ok<*LAXES>                                                                %axes have to be in loops, otherwise they would be created in the MW
 
 %% Creating subdirectories
 % is taken care of in "Choose storDir"
@@ -164,14 +165,16 @@ tmpfDir   = [storDir '/tmp'];                                               %dir
 Treshold  = handles.metricdata.Treshold;
 FilterSensitivity = handles.metricdata.FSensitivity;
 EdgCoord  = handles.metricdata.EdgCoord;
-fluidData = handles.metricdata.fluidData;
 fluidType = handles.metricdata.fluidType;
 
 % auxiliary variable
 nImages = numel(files);                                                     %number of processed images
 
 %% Rotameter calibration
-% Pumpenkonstante und Stoffwerte
+% create fluidData by calling the fluid database function for current
+% chosen liquid and experimental parameters
+fluidData = fluidDataFcn(fluidType,InclAngle);                              %call database function
+% call calibration function for current fluidData
 [M,V_Pumpe]= rotameterCalib(files,fluidData);                               %rotameter calibration
 sigma = fluidData(2);                                                       %save input parameters for correlations
 rho   = fluidData(3);
@@ -186,7 +189,7 @@ tmpVar = zeros(1,nImages);
 parfor i = 1:nImages
     tmpVar(i) = str2double(files{i}(5:end-4));
 end
-txtPars = {M FFactor tmpVar fluidType};                                     %parameters for legends
+txtPars = {M FFactor tmpVar fluidType InclAngle};                           %parameters for graphs descriptions
 
 %% Importing images into workspace
 % is taken care of in "Load Images"
@@ -197,7 +200,8 @@ txtPars = {M FFactor tmpVar fluidType};                                     %par
 %% Finding edges of cuvettes and plate
 % is taken care of in "Image Processing"
 
-%% Image conversion from grayscale values to distances
+%% Image conversion from grayscale values to distances and saving of
+%% smoothed images
 % heights of the film in mm
 if DNTLoadIM == 0                                                           %are all the data loaded?
     handles.statusbar = statusbar(handles.MainWindow,...
@@ -205,7 +209,7 @@ if DNTLoadIM == 0                                                           %are
         'loaded in memory']);
     YProfilPlatte = ImConv(daten,EdgCoord,filmTh,RegressionPlate,...        %if the are, I can process them all at once
         GR.regr,GR.regime,GR.format,txtPars,storDir,rootDir);
-    tmpCell = cell(size(YProfilPlatte));                                    %create empty cell
+    tmpCell = cell(1,nImages);                                              %create empty cell with number of elements corresponding to nImages
     tmpCell(:) = {fspecial('disk',FilterSensitivity)};
     YProfilPlatte = cellfun(@imfilter,YProfilPlatte,...                     %apply selected filter to YProfilPlatte
         tmpCell,'UniformOutput',0);
@@ -232,13 +236,19 @@ else                                                                        %oth
         tmpIM = imfilter(tmpIM{:},...                                       %use selected filter
             fspecial('disk',FilterSensitivity));
         imwrite(tmpIM,[smImDir '/' files{i}]);                              %save it into 'Smoothed' folder (but under original name)
-        save([tmpfDir '/' files{i}(1:end-4)],'tmpIM');                      %save obtained data matrix into temporary directory
+        save([tmpfDir '/' files{i}(1:end-4) '.mat'],'tmpIM');               %save obtained data matrix into temporary directory
     end
 end
 
-%% Saving smoothed images and obtaining visualizations of the riv.
-% store and plot smoothed images
+% Note: now I have stored smoothed images (only the plate) into Smoothed
+% folder and (or) present YProfilPlatte into handles. YProfilPlatte is a
+% cell of size (1,nImages) and each of its elements is a matrix with same
+% size (xR - xL, yB - yT)
+
+%% Creating visualizations of the rivulet
+% plot smoothed images
 if GR.contour == 1 || GR.profcompl == 1                                     %if any of the graphics are wanted, enter the cycle
+    
     for i=1:nImages                                                         %for each image
         % update statusbar
         handles.statusbar = statusbar(handles.MainWindow,...
@@ -253,6 +263,7 @@ if GR.contour == 1 || GR.profcompl == 1                                     %if 
         txtStr = ['Liq. tp.: ' txtPars{4} 10 ...                            %liquid type
             'M = ' mat2str(txtPars{1}(i),4) 10 ...                          %dimensionless flow
             'F = ' mat2str(txtPars{2},4) ' Pa^{0.5}' 10 ...                 %f-factor, [Pa^0.5]
+            '\alpha = ' mat2str(txtPars{5}) '^\circ{}' 10 ...               %plate inclination angle, [degrees]
             'image n^o: ' mat2str(txtPars{3}(i))];                          %number of image
         % load images if needed
         if DNTLoadIM == 1
@@ -271,10 +282,12 @@ if GR.contour == 1 || GR.profcompl == 1                                     %if 
             hFig = figure('Visible',Visible);figSet_size(hFig,[400 700]);
             hAxs = axes('OuterPosition',[0 0 1 1]);                         %this is usefull when user does something else on the computer
             set(hFig,'CurrentAxes',hAxs);
+            tic
             XProfilPlatte = linspace(0,plateSize(1),...
                 size(tmpIM,2));                                             %width coord, number of columns in YProfilPlatte
             ZProfilPlatte = linspace(0,plateSize(2),...
                 size(tmpIM,1));                                             %length coord, number of rows in YProfilPlatte
+            toc
             [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
             contour(hAxs,XX,ZZ,tmpIM);                                      %here I keep rivulet height in mm because it looks better
             title(hAxs,'\bf Look on rivulet from the top','FontSize',13);   %what is on the plot
@@ -540,7 +553,7 @@ function ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
 % INPUT variables
 % ImData    ... images of the plate (in form of matrix)to be converted,cell
 % EdgCoord  ... coordinates of section edges of the plate(plate, cuvettes),
-%               pixels/indexes, matrix (numImages x 10)
+%               pixels/indexes, matrix (1 x 10)
 % filmTh    ... film thickness, in mm + width of cuvettes in pixels
 %               [maxCuvette1 minCuvette1 maxCuvette2 minCuvette2 CuvWidth]
 % RegDegree ... degree of polynomial used for the regression
@@ -559,29 +572,33 @@ function ImgConv = ImConv(ImData,EdgCoord,filmTh,RegDegree,...
 %
 % !! at the time, the BIG cuvette is NOT used !!
 
+% for all the images
 ImgConv     = cell(1,numel(ImData));                                        %preallocation of output variable
+% read coordinates of the cuvettes and plate on each image
+% small cuvette
+xoS = EdgCoord(1);                                                          %mean  x-Value
+yoS = EdgCoord(2);                                                          %top y-Value
+yuS = EdgCoord(3);                                                          %bottom y-Value
+%     % big cuvette        BIG CUVETTE NOT USED
+%     xoB = EdgCoord(4);
+%     yoB = EdgCoord(5);
+%     yuB = EdgCoord(6);
+% plate
+xol = EdgCoord(7);                                                          %left x-Value
+yol = EdgCoord(8);                                                          %top  y-Value
+xur = EdgCoord(9);                                                          %right x-Value
+yur = EdgCoord(10);                                                         %bottom y-Value
+
+% prepare cuvette calibration
+XS  = linspace(filmTh(1),filmTh(2),yuS-yoS+1)';                             %thickness of the film in mm small cuvette
+% XB  = linspace(filmTh(3),filmTh(4),yuB-yoB+1)';                           %thickness of the film in mm big cuvette
+CW  = filmTh(5)/2;                                                          %cuvette width/2
+    
+% for each image
 for i = 1:numel(ImData)                                                     %for each file
     if nargin < 10
         imNumber = i;
     end
-    % read coordinates of the cuvettes and plate on each image
-    % small cuvette
-    xoS = EdgCoord(i,1);                                                    %mean  x-Value
-    yoS = EdgCoord(i,2);                                                    %upper y-Value
-    yuS = EdgCoord(i,3);                                                    %lower y-Value
-%     % big cuvette        BIG CUVETTE NOT USED
-%     xoB = EdgCoord(i,4);
-%     yoB = EdgCoord(i,5);
-%     yuB = EdgCoord(i,6);
-    % plate
-    xol = EdgCoord(i,7);                                                    %upper left x-Value
-    yol = EdgCoord(i,8);                                                    %upper left y-Value
-    xur = EdgCoord(i,9);                                                    %lower right x-Value
-    yur = EdgCoord(i,10);
-    % prepare cuvette calibration
-    XS  = linspace(filmTh(1),filmTh(2),yuS-yoS+1)';                         %thickness of the film in mm small Kuevette
-%     XB  = linspace(filmTh(3),filmTh(4),yuB-yoB+1)';                         %thickness of the film in mm big Kuevette
-    CW  = filmTh(5)/2;                                                      %cuvette width/2
     % load i-th image
     Image = ImData{i};                                                      %temporary variablefor each image
     % find mean grayscale value for each row of the cuvette
@@ -615,6 +632,7 @@ for i = 1:numel(ImData)                                                     %for
         txtStr = ['Liq. tp.: ' txtPars{4} 10 ...                            %liquid type
             'M = ' mat2str(txtPars{1}(imNumber),4) 10 ...                   %dimensionless flow rate
             'F = ' mat2str(txtPars{2},4) ' Pa^{0.5}' 10 ...                 %f-factor, [Pa^0.5]
+            '\alpha = ' mat2str(txtPars{5}) '^\circ{}' 10 ...               %plate inclination angle, [degrees]
             'image n^o: ' mat2str(txtPars{3}(imNumber))];                   %number of image
         % Calculate fitted values
         [fitS deltaS] = polyval(RegS,CuvetteS(:,1),ErrorEstS);              %fitted values and estimated errors
@@ -689,21 +707,24 @@ function [YProfilPlatte XProfilPlatte] =...
 % XProfilPlatte     ... linspace coresponding to plate width, m
 %
 
+% for all the images, all the YProfilPlatte have the same size
+Distance     = round(size(YProfilPlatte{1},2)/(nCuts+1));                   %number of points in each mean profile
+% prepare variables and cut the rivulet
+if nCuts == 0 || Distance < 50                                              %if too much cuts is specified
+    warndlg(['The number of cuts specified is bigger than'...               %notify user by dialog
+        ' number of rows necessary to obtain mean values for each cut'],...
+        'modal');uiwait(gcf);
+    fprintf(1,'Change the number of cuts\n');
+    nCuts = input('nCuts = ');                                              %inputs from keyboard, to command window (!!)
+    Distance     = round(size(YProfilPlatte{1},2)/(nCuts+1));               %need to recalculate distance
+end
+XProfilPlatte= linspace(0,plateSize(1),size(YProfilPlatte{1},1));           %this is the same for all the images, m
+
+% for each image
 for i=1:numel(YProfilPlatte)
     if nargin < 9
         imNumber = i;
     end
-    % prepare variables and cut the rivulet
-    Distance     = round(size(YProfilPlatte{i},2)/(nCuts+1));               %number of points in each mean profile
-    if nCuts == 0 || Distance < 50                                          %if too much cuts is specified
-        warndlg(['The number of cuts specified is bigger than'...           %notify user by dialog
-            ' number of rows necessary to obtain mean values for each cut'],...
-            'modal');uiwait(gcf);
-        fprintf(1,'Change the number of cuts\n');
-        nCuts = input('nCuts = ');                                          %inputs from keyboard, to command window (!!)
-        Distance     = round(size(YProfilPlatte{i},2)/(nCuts+1));           %need to recalculate distance
-    end
-    XProfilPlatte= linspace(0,plateSize(1),size(YProfilPlatte{i},1));       %this changes from image to image - auto coordinates, m
     for n = 1:nCuts
         YProfilPlatte{i}(:,n)=mean(YProfilPlatte{i}...                      %create mean profiles in the place of the cut, over 50 pixels
             (:,n*Distance-25:n*Distance+25),2);
@@ -715,6 +736,7 @@ for i=1:numel(YProfilPlatte)
         txtStr = ['Liq. tp.: ' txtPars{4} 10 ...                            %liquid type
             'M = ' mat2str(txtPars{1}(imNumber),4) 10 ...                   %dimensionless flow
             'F = ' mat2str(txtPars{2},4) ' Pa^{0.5}' 10 ...                 %f-factor, [Pa^0.5]
+            '\alpha = ' mat2str(txtPars{5}) '^\circ{}' 10 ...               %plate inclination angle, [degrees]
             'image n^o: ' mat2str(txtPars{3}(imNumber))];                   %number of image
         % decide if show plot
         if GRregime == 1
@@ -792,24 +814,21 @@ function [IFArea RivWidth RivHeight minLVec minRVec] = ...
 Treshold= Treshold*1e-3;                                                    %convert treshold to m
 
 % allocating space for variables
-m = 0;n = 0;
-mVec = zeros(1,numel(YProfilPlatte));nVec = mVec;
-for i = 1:numel(YProfilPlatte)
-    [mVec(i),nVec(i)]   = size(YProfilPlatte{i});                           %save dimension of YProfilPlatte arrays - should be same for all
-    m = max([m mVec(i)]);n = max([n nVec(i)]);                              %find maximal size of plate
-end
+[m,n] = size(YProfilPlatte{1});                                             %all the YProfilPlatte elements have the same size
 IFArea  = zeros(numel(YProfilPlatte),1);
 RivWidth= zeros(numel(YProfilPlatte),n);
 RivHeight=zeros(numel(YProfilPlatte),n);
 minLVec = zeros(numel(YProfilPlatte),n);
 minRVec = zeros(numel(YProfilPlatte),n);
 
-for i = 1:numel(YProfilPlatte)
-    % calculating the deltaX (distance between 2 pixels)
-    deltaX  = plateSize(1)/mVec(i);                                         %distance between 2 points on X-axis (in m)
-    deltaZ  = plateSize(2)/nVec(i);                                         %distance between 2 points on Z-axis (in m)
+% for all the images
+% calculating the deltaX (distance between 2 pixels)
+deltaX  = plateSize(1)/m;                                                   %distance between 2 points on X-axis (in m)
+deltaZ  = plateSize(2)/n;                                                   %distance between 2 points on Z-axis (in m)
+
+% for each image
+for i = 1:numel(YProfilPlatte)  
     YProfilPlatte{i} = YProfilPlatte{i}*1e-3;                               %mm -> m
-    
     % find width of the rivulet
     [MaxVec,IndX] = max(YProfilPlatte{i});                                  %find maximum in every horizontal row and save its position
     for j = 1:numel(MaxVec)
@@ -838,13 +857,13 @@ for i = 1:numel(YProfilPlatte)
 
     % calculate local widths and heights of i-th rivulet
     RivWidth(i,:) = (minRVec(i,:) - minLVec(i,:))*deltaX;                   %number of elements in rivulet x width of element
-    RivHeight(i,1:nVec(i))  = MaxVec;                                       %saves maximum height of each part of the rivulet, in m
+    RivHeight(i,:)= MaxVec;                                                 %saves maximum height of each part of the rivulet, in m
     
     % calculate the interfacial area of the rivulet
     % IFArea = lengthOfArc x lengthOfPlate(between 2 arcs)
     
     % for all horizontal cuts
-    for j = 1:nVec(i)-1                                                     %need to omit the last piece (but the error wouldn't be big)
+    for j = 1:n-1                                                           %need to omit the last piece (but the error wouldn't be big)
         % walking through the arc and adding the approximate length of the
         % element
         lArc  = 0;                                                          %restart the length counter
@@ -911,7 +930,6 @@ for i = 1:numel(YProfilPlatte)                                              %1 f
     nameStr = [files{i}(1:end-4) '.txt'];                                   %constructuin of the name string - name of the file \ .tif
     dlmwrite(nameStr,tmp,'delimiter','\t','precision','%5.6e')              %save data, in m
     ProfOUT{i} = tmp;                                                       %save created matrix also in output
-    assignin('base','ProfOUT',ProfOUT)
 end
 end
 
@@ -957,8 +975,7 @@ n         = numel(DistVec);                                                 %num
 % for each regime (001/005) create 1 file and save Var into this file
 tmpVec = zeros(1,numel(files));                                             %temporary vector for slicing mVar
 for i = 1:numel(files)
-    vol        = regexp(files{i}, '[\_ \.]', 'split');                      %split file name
-    tmpVec(i)  = str2double(vol{2});clear vol;                              %create number from digits in the file names
+    tmpVec(i)  = str2double(regexp(files{i},'[0-9]+(?=.tif)', 'match'));    %create number from n digits before .tif in the file names
     slInd      = [find(tmpVec == 1) numel(tmpVec)+1];                       %find slicing indexes, last index must be length of Vec + 1
 end
 
@@ -973,7 +990,8 @@ for i = 1:length(slInd)-1                                                   %for
         [M(slInd(i));zeros(n-1,1)]...                                       %dimensionless flow rate during regime
         [V_gas;zeros(n-1,1)]...                                             %volumetric gas flow rate during experiments
         DistVec'];
-    nameStr = [fileNm '_' files{slInd(i)}(1:3) '.txt'];                     %create filename
+    volFl   = regexp(files{slInd(i)}, '.+(?=\_[0-9]+.tif)', 'match');       %find all the characters in filename before first _
+    nameStr = [fileNm '_' volFl{:} '.txt'];                                 %create filename
     dlmwrite(nameStr,tmpMat,'delimiter','\t','precision','%5.6e')           %write write data matrix into file, SI unist
     VarOUT{i} = tmpMat;                                                     %save i-th regime into cell output
     VarOUT{end}(i) = {files{slInd(i)}(1:3)};

@@ -70,7 +70,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 %    saved
 %11. Calculate results (this calls function rivuletProcessing with
 %   specified parameters)
-%-postprocmenu-----------------------------------------------------------
+%-postprocmenu-------------------------------------------------------------
 %12. Set defaults - sets default variable values for rivulet data
 %   processing
 %13. Save vars to base (calls function save_to_base)
@@ -95,6 +95,8 @@ function varargout = RivuletExpDataProcessing(varargin)
 % 4. save_to_base.m (function for saving data into base workspace)
 % 5. fluidDataFcn.m (database with fluid data)
 %
+%==========================================================================
+% LICENSE
 % Author:       Martin Isoz
 % Organisation: ICT Prague / TU Bergakademie Freiberg
 % Date:         17. 07. 2012
@@ -104,7 +106,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 %
 % See also FINDEDGES RIVULETPROCESSING
 
-% Last Modified by GUIDE v2.5 08-Aug-2012 14:40:10
+% Last Modified by GUIDE v2.5 10-Sep-2012 12:56:51
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -258,7 +260,7 @@ fclose(fid);                                                                %clo
 diary([storDir '/log.txt']);                                                %start writing into specified file a diary
 
 % set gui visible output
-if numel(storDir) <= 45
+if numel(storDir) <= 45                                                     %modify length of string to fit specified place
     str   = storDir;
 else
     str   = ['...' storDir(end-45:end)];
@@ -800,10 +802,7 @@ function PopupLiqType_Callback(hObject, ~, handles)
 contents = cellstr(get(hObject,'String'));
 selected = contents{get(hObject,'Value')};                                  %get selected value from popmenu
 
-angle = handles.metricdata.RivProcPars{2};                                  %get angle from rivulet processing parameters
-
-% save selected value to handles
-handles.metricdata.fluidData = fluidDataFcn(selected,angle);                %call database function
+% save selected values into handles
 handles.metricdata.fluidType = selected;                                    %save selected fluid type
 
 % Update handles structure
@@ -1496,6 +1495,132 @@ end
 % Update handles structure
 guidata(handles.MainWindow, handles);
 
+% --------------------------------------------------------------------
+function EditEdgCoord_Callback(~, ~, handles)
+% function for opening an editable uitable with current and new EdgCoord
+% vectors
+%
+% Shortcut: --
+
+% check presence of EdgCoord into handles and prepare data
+if isfield(handles.metricdata,'EdgCoord') == 1                              %if EdgCoord vector is present
+    currentData = handles.metricdata.EdgCoord;                              %resave current EdgCoord vector
+else
+    currentData = zeros(1,10);                                              %otherwise fill it with zeros
+end
+newData     = currentData;                                                  %initial state of new values
+
+% creation of simple GUI for editing values
+defaultBackground = get(0,'defaultUicontrolBackgroundColor');               %get default bacground for gui on system
+hFig = figure('Units','Pixels','Position',[0 0 1000 150],'Resize','off',...
+    'NumberTitle','off','Name','Edit EdgCoord','Color',defaultBackground,...
+    'MenuBar','none');
+
+% fill appdata for hFig
+setappdata(hFig,'EdgCoord',currentData);
+
+% create data table
+TableData = uitable(hFig,'Tag','TableData');                                %create table for showing selected data
+% create text
+TextHint  = uicontrol(hFig,'Style','text','String',...
+    'Edit fields in the second row of the table');
+% create pushbuttons
+PushEditEdgCoordOK = uicontrol(hFig,'Style','pushbutton','Tag','PushPlot',...
+    'String','OK','Callback',{@PushEditEdgCoordOK_Callback [TableData hFig]});
+PushEditEdgCoordCanc = uicontrol(hFig,'Style','pushbutton','Tag','PushPlot',...
+    'String','Cancel','Callback',{@PushEditEdgCoordCanc_Callback [TableData hFig]});
+    
+% Determine the position of the new figure- centered on the callback figure
+% if available, else, centered on the screen
+FigPos=get(0,'DefaultFigurePosition');
+OldUnits = get(hFig, 'Units');
+set(hFig, 'Units', 'pixels');
+OldPos = get(hFig,'Position');
+FigWidth = OldPos(3);
+FigHeight = OldPos(4);
+if isempty(gcbf)
+    ScreenUnits=get(0,'Units');
+    set(0,'Units','pixels');
+    ScreenSize=get(0,'ScreenSize');
+    set(0,'Units',ScreenUnits);
+
+    FigPos(1)=1/2*(ScreenSize(3)-FigWidth);
+    FigPos(2)=2/3*(ScreenSize(4)-FigHeight);
+else
+    GCBFOldUnits = get(gcbf,'Units');
+    set(gcbf,'Units','pixels');
+    GCBFPos = get(gcbf,'Position');
+    set(gcbf,'Units',GCBFOldUnits);
+    FigPos(1:2) = [(GCBFPos(1) + GCBFPos(3) / 2) - FigWidth / 2, ...
+                   (GCBFPos(2) + GCBFPos(4) / 2) - FigHeight / 2];
+end
+FigPos(3:4)=[FigWidth FigHeight];
+set(hFig, 'Position', FigPos);
+set(hFig, 'Units', OldUnits);
+
+% resize and reposition elements
+set(TableData,'Units','Normal','Position',[0.01 0.30 0.98 0.55])
+set(PushEditEdgCoordOK,'Units','Normal','Position',[0.35 0.05 0.10 0.20])
+set(PushEditEdgCoordCanc,'Units','Normal','Position',[0.55 0.05 0.10 0.20])
+set(TextHint,'Units','Normal','Position',[0.35 0.90 0.30 0.08])
+
+% fill in data
+set(TableData,'Data',[currentData;newData],...                              %fill uitable with data
+    'RowName',{'Current EdgCoord','New EdgCoord'},...                       %set row names
+    'ColumnName',{' x|M,SC',...                                             %set column names
+    'y|T,SC', 'y|B,SC',...
+    'x|M,BC',...
+    'y|T,BC', 'y|B,BC',...
+    'x|L,PL','y|T,PL',...
+    'x|R,PL','y|B,PL'},...
+    'ColumnWidth',{80},...                                                  %set column width
+    'ColumnEditable',true(1,10),...                                         %set columns to be editable
+    'CellEditCallback',@EditEdgCoordCellEdit_Callback...                    %set cell edit callback
+    );
+
+uiwait(hFig);
+
+% update EdgCoord vector
+if ishandle(hFig) == 1                                                      %control if the figure is closed by window manager
+    handles.metricdata.EdgCoord = getappdata(hFig,'EdgCoord');
+    close(hFig);
+else                                                                        %if it is -> same as cancel
+    handles.metricdata.EdgCoord = currentData;
+end
+guidata(handles.MainWindow,handles);                                        %update guidata
+
+% callbacks for EditEdgCoord menu option
+function PushEditEdgCoordOK_Callback(~,~,eventdata)
+% callback for returning values set through EditEdgCoord menu option into
+% its workspace
+% into variable evendata is hidden variable TableData containing handles to
+% TableData
+EdgCoord = get(eventdata(1),'Data');
+EdgCoord = EdgCoord(2,:);                                                   %save new EdgCoord
+setappdata(eventdata(2),'EdgCoord',EdgCoord);                               %update appdata of the hFig window created by EditEdgCoord
+
+uiresume(eventdata(2));
+
+function PushEditEdgCoordCanc_Callback(~,~,eventdata)
+% function for cancelling modification of the EdgCoord vector
+EdgCoord = get(eventdata(1),'Data');
+EdgCoord = EdgCoord(1,:);                                                   %save current (old) EdgCoord
+setappdata(eventdata(2),'EdgCoord',EdgCoord);                               %update appdata of the hFig window created by EditEdgCoord
+
+uiresume(eventdata(2));
+
+function EditEdgCoordCellEdit_Callback(o,e)
+% callback for editing of uitable into gui created by Edit EdgCoord
+tableData = get(o, 'Data');
+if e.Indices(1)~=2                                                          %check if the user is not trying to something else than prop. values
+    tableData(e.Indices(1),e.Indices(2)) = e.PreviousData;
+    set(o, 'data', tableData);
+    errordlg('You can modify only second row of the table','modal')
+else
+    tableData(2,e.Indices(2)) = e.NewData;                                  %save new value
+    set(o,'data',tableData);                                                %push data back to uitable
+end
+
 
 % --------------------------------------------------------------------
 function ModIMPars_Callback(~, ~, handles)
@@ -1513,12 +1638,17 @@ if isfield(handles.metricdata,'imNames') == 1                               %thi
     end
     IMProcPars = changeIMPars('imdata',imData);                             %call gui for changing parameters, with loaded images
 else
-    IMProcPars = changeIMPars('nodata');                                    %call gui for changing parameters without loaded images
+    IMProcPars = changeIMPars('nodata',[]);                                 %call gui for changing parameters without loaded images
 end
 
 % check ouptuts
 if isempty(IMProcPars) == 0
     handles.metricdata.IMProcPars = IMProcPars;                             %if parameters are changed, save them into structure
+    set(handles.statusbar,'Text',['Image processing parameters were '...
+        'updated.']);
+else
+    set(handles.statusbar,'Text',['Modification of image processing '...
+        'parameters cancelled by user.']);
 end
 
 % Update handles structure
@@ -1541,12 +1671,13 @@ function SaveIMPars_Callback(~, ~, handles)
 if isempty(handles.metricdata.IMProcPars) == 0
     IMProcPars = handles.metricdata.IMProcPars; %#ok<NASGU>                 %this variable is used "indirectly"
     uisave('IMProcPars','IMProcPars')
+    set(handles.statusbar,'Text',...
+        'Image processing parameters were saved into .mat file');
 else
     msgbox('You must specify IMProcPars at first','modal');uiwait(gcf);
+    set(handles.statusbar,'Text',...
+        'Saving image processing parameters failed');
 end
-
-set(handles.statusbar,'Text',...
-    'Image processing parameters were saved into .mat file');
 
 
 % --------------------------------------------------------------------
@@ -1583,8 +1714,10 @@ function BestMethod_Callback(~, ~, handles)
 % Shortcut: Ctrl+B
 
 % check if there all required data are present
-if isfield(handles.metricdata,'imNames') == 0                               %are there loaded images?                                                               %if not, force user to load them
+if isfield(handles.metricdata,'imNames') == 0                               %are there loaded images? if not, force user to load them
     msgbox('First, you must load images','modal');uiwait(gcf);
+    set(handles.statusbar,'Text',...
+        'Best image processig method finding failed');
     return
 end
 choice = questdlg({'Actual IMProcPars will be rewritten.'...                %ask user if he wants to save actual parameters
@@ -1678,6 +1811,11 @@ RivProcPars = changeRPPars;                                                 %cal
 %check output
 if isempty(RivProcPars) == 0                                                %if parameters were modified, save them into structures
     handles.metricdata.RivProcPars = RivProcPars;
+    set(handles.statusbar,'Text',['Rivulet processing parameters were '...
+        'updated.']);
+else
+    set(handles.statusbar,'Text',['Modification of rivulet processing '...
+        'parameters cancelled by user.']);
 end
 
 % Update handles structure
@@ -1699,15 +1837,16 @@ function SaveRPPars_Callback( ~, ~, handles)
 %
 % Shortcut: ..
 
-if isempty(handles.metricdata.RivProcPars) == 0
+if isfield(handles.metricdata,'RivProcPars') == 0
     RivProcPars = handles.metricdata.RivProcPars; %#ok<NASGU>               %this variable is used "indirectly"
     uisave('RivProcPars','RivProcPars')
-else
+    set(handles.statusbar,'Text',...
+        'Rivulet processing parameters were saved into .mat file');
+else                                                                        %shouldnt occur
     msgbox('You must specify RivProcPars at first','modal');uiwait(gcf);
+    set(handles.statusbar,'Text',...
+        'Saving rivulet processing parameters failed');
 end
-
-set(handles.statusbar,'Text',...
-    'Rivulet processing parameters were saved into .mat file');
 
 
 % --------------------------------------------------------------------
@@ -1875,3 +2014,4 @@ if isfield(handles.metricdata,'Availible') == 1
 else
     msgbox('There are no availible processed data yet','modal');uiwait(gcf);
 end
+

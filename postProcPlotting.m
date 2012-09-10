@@ -27,10 +27,12 @@ function postProcPlotting(Availible)
 PosVec = [10 30 1100 700];                                                  %position and the size of the window
 appdata= struct('metricdata',[],'prgmcontrol',[]);                          %create data for gui
 % create GUI elements
+defaultBackground = get(0,'defaultUicontrolBackgroundColor');               %get default bacground for gui on system
 hFig    = figure('Units','Pixels','Position',PosVec,...
     'NumberTitle','off','Name','Post processing data plotting',...
     'DockControl','off',...
     'HandleVisibility','off',...
+    'Color',defaultBackground,...
     'ResizeFcn',@MyResizeFcn,'Tag','MainWindow');                           %create figure window with specified size
 
 % initialize appdata
@@ -43,6 +45,17 @@ parfor i = 1:numel(Availible)
     strCellGR{i} = Availible{i}.ID;
 end
 separators = {'-------' ' '};                                               %separators used in ListData
+% create list of availible liquid dimensionless flow rates
+MList = cell(1,numel(Availible));MUList = cell(1,numel(Availible));         %preallocate variables
+for i = 1:numel(Availible)                                                  %for all the groups
+    MList{i} = [];
+    for q = 1:numel(Availible{i}.mSpeed)-1                                  %for all the measured data in each group
+        MList{i} = [MList{i};
+            Availible{i}.mSpeed{q}(1,end-2)*...
+            ones(numel(Availible{i}.mSpeed{q}(1,1:end-6)),1)];              %extract dimensionless liquid flow rate and add it to the list
+    end
+    MUList{i} = unique(MList{i});                                           %create list of unique dimensionles liquid flow rates
+end
 
 % create listboxes and their titles
 ListGroup  = uicontrol(hFig, 'Style','listbox',...                          %create listbox for avalible data
@@ -82,7 +95,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
 
 
 %% Creating callbacks
-
+% function that handles the GROUP list, just getting values a modifying the
+% Availible variable for further processing
     function ListGroup_Callback(hObject,~,~)
         selGR = get(hObject,'Value');                                       %get selected value(s)
         % automatic creation of the content of ListData
@@ -105,6 +119,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         appdata.prgmcontrol.comp     = 0;                                   %all data are restored, set selected compatible crit. to 0
         guidata(hFig,appdata);                                              %update appdata
     end
+% function that handles the DATA list, needs to fill the MEASUREMENTS list
+% according to the selected DATAs
     function ListData_Callback(hObject,~,~)
         % actualize list according to selection
         appdata = guidata(hObject);                                         %get app data
@@ -138,7 +154,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
             appdata.metricdata.strCellDT = strCellNDT;
             guidata(hObject,appdata);
         end
-        % fill in table accordingly to selected data
+        % fill in data variable accordingly to selected data
         strCellDT = appdata.metricdata.strCellDT;
         if comp == 1                                                        %this case occurs if there are only compatible data present in lstbx
             selGR = appdata.prgmcontrol.selGR;                              %selected groups
@@ -152,6 +168,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 end
             end
             % automatic creation of the content of ListMsrt
+            % needed to be put together from liquid dimensionless
+            % flow rates and numbers of experiments
             shTable  = appdata.prgmcontrol.shTable;                         %variable defining the regime/type of shown data
             stInd    = ones(1,numel(selGR)+1);                              %variable for storing length of selected data
             strCellMS= {};                                                  %prepare empty cell
@@ -162,10 +180,12 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         imNames = Availible{k}.imNames;                     %names of the measurements to show ~ names of the images
                         stInd(j+1)  = stInd(j) + numel(imNames);            %starting position of the next data group
                         for l = 1:numel(imNames)
-                            imNames{l} = imNames{l}(1:end-4);               %get rid of the file suffix
+                            MsrtStr{l} = ['M = '...                         %compose the string to write into the list
+                                num2str(MList{k}(l),'%5.2f') ', '...       %dimensionless flow rate
+                                imNames{l}(5:end-4)];                       %number of experiment
                         end
                         strCellMS = [strCellMS strCellGR(k) separators(1)...
-                            imNames separators(2)];
+                            MsrtStr separators(2)];
                         set(ListMsrt,'Enable','on');
                     case 'IFACorr'                                          %correlations are to be shown
                         strCellMS = [strCellMS strCellGR(k) separators(1)...
@@ -179,7 +199,10 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         appdata.prgmcontrol.GR       =...
                             cellstr(num2str(selGR',1))';                    %needed for making legend strings
                     case 'Other'                                            %mSpeed, rivWidth and/or rivHeight are to be shown
-                        Msrt = dataSH{j}{end};                              %get list of regimes saved into 'other' variables
+                        Msrt = cellstr(num2str(MUList{j},'%5.2f'))';        %get list of unique dimensionless flow rates, pumpe regimes
+                        for l = 1:numel(Msrt)
+                            Msrt{l} = ['M = ' Msrt{l}];
+                        end
                         strCellMS = [strCellMS strCellGR(k) separators(1)...
                             Msrt separators(2)];
                         stInd(j+1) = stInd(j) + numel(Msrt);
@@ -295,14 +318,14 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         rdblCellStr = cell(1,numel(selGR));                                 %create empty var
         k           = 1;l = 1;                                              %auxiliary indexes
         for j = 1:numel(selMS)
-            if l > numel(GR{k})                                             %distinct to which groups are the data appartening
+            if l >= numel(GR{k}) && j ~= 1                                  %distinct to which groups are the data appartening
                 k = k+1;
                 l = 1;
             else
                 l = l+1;
             end
             tmpVar = regexp(Availible{selGR(k)}.ID,'_','split');            %cut the string between '_'
-            tmpVar = tmpVar(1:3);                                           %take only usefull data (liquid type, gas vol.flow and plt. incl. an.)
+            tmpVar = tmpVar(1:3);                                           %take only usefull data (liquid type, gas f-fact. and plt. incl. an.)
             tmpVar{1} = ['Liq. tp.: ' tmpVar{1}];                           %liquid type
             tmpVar{2} = ['F = ' tmpVar{2} ' Pa^{0.5}'];                     %f-factor
             tmpVar{3} = ['\alpha = ' tmpVar{3} '\circ{}'];                  %plate inclination angle
@@ -310,6 +333,11 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 tmpVar{2} 10 ...
                 tmpVar{3}] ;                                                %append string to legend
         end
+        assignin('base','selGR',selGR)
+        assignin('base','selMS',selMS)
+        assignin('base','rdblCellStr',rdblCellStr)
+        assignin('base','Availible',Availible)
+        assignin('base','GR',GR)
         switch shTable
             case 'Profiles'
                 set(hPlFig,'Name','Mean prof. in cuts');                    %set name of the plot
@@ -365,7 +393,6 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         plot(hPlAxes(j),tmpVar(brks(k):brks(k+1)-1,1),...
                             tmpVar(brks(k):brks(k+1)-1,2),'Color',color(k,:),...
                             'LineWidth',2)
-%                         xlim(hPlAxes(j),[0 plateSize(1)]);                  %width of the plate is the x-coordinate
                         axis(hPlAxes(j),[0 plateSize(1) yMin yMax]);        %set axis of the current subplot
                     end
                 end
@@ -409,7 +436,9 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     'Units','Normal',...
                     'Callback',@PopUpXAxsCorr_Callback,...
                     'Position',[0.3 0.01 0.4 0.08],'Value',1);              %create popup menu for choosing x axes
-                brks = [1 find(diff(Data(:,4))<0)'+1 numel(Data(:,4))+1];   %indexes of new data starts (diff in dimless fl. rate < 0)
+                brks1 = [1 find(diff(Data(:,4))<0)'+1 numel(Data(:,4))+1];  %indexes of new data starts (diff in dimless fl. rate < 0)
+                brks2 = find(diff(Data(:,1)~=0))'+1;                        %indexes of new liquid starts (diff in surf tens ~=0)
+                brks  = unique([brks1 brks2]);                              %combine starts of new data with starts of new liquids
                 hold(hPlAxes,'on');
                 color = distinguishable_colors(numel(brks)-1);              %allocate matrix for used colors and fill it with colors
                 for j = 1:numel(brks)-1

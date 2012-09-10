@@ -245,7 +245,7 @@ handles.statusbar.ProgressBar.setValue(i);
     tmpIM  = tmpIM(:,trLeft:end);                                           %cut of unwanted part of the image and save temp. image var.
     tmpIM  = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                 %temporary image variable, enhance contrasts
     tmpIM  = im2bw(tmpIM, im2bwCuvTr);                                      %temporary black and white image, convert image to BW
-%     sizeIM = size(tmpIM);                                                   %save size of the image
+    sizeIM = size(tmpIM);                                                   %save size of the image
     [B,L]  = bwboundaries(tmpIM,'noholes');clear tmpIM;                     %find boundaries of each element, clear tmpIM
     % preallocation of variables
     Vec    = zeros(1,numel(B));                                             %temporary indexing vector
@@ -256,9 +256,9 @@ handles.statusbar.ProgressBar.setValue(i);
         stmt1 = nB >= 800 && nB < 3000;                                     %get rid of too big and too small regions (hardcoded, 2B polished)
         % i dont want elements close to the borders (would be better to
         % code distances in relative way)
-%         stmt2 = min(B{j}(:,1)) > 200 && max(B{j}(:,1)) < sizeIM(1)-200;     %get rid of the elements to much on the top and bottom
-%         stmt3 = min(B{j}(:,2)) > 200 && max(B{j}(:,2)) < sizeIM(2)-200;     %get rid of the elements to much on the left and right
-        if stmt1 == 1 %&& stmt2 == 1 && stmt3 == 1
+        stmt2 = min(B{j}(:,1)) > 100 && max(B{j}(:,1)) < sizeIM(1)-100;     %get rid of the elements to much on the top and bottom
+        stmt3 = min(B{j}(:,2)) > 100 && max(B{j}(:,2)) < sizeIM(2)-100;     %get rid of the elements to much on the left and right
+        if stmt1 == 1 && stmt2 == 1 && stmt3 == 1
             Vec(j) = j;
             rectA  = (max(B{j}(:,1)) - min(B{j}(:,1)))*...
                 (max(B{j}(:,2)) - min(B{j}(:,2)));                          %Area if the element if it would be rectangle
