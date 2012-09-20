@@ -44,7 +44,7 @@ function EdgCoord = modifyFunction(metricdata)
 
 % check if it is necessary to run the function
 if isempty(metricdata.prbMsg) == 1                                          %no problem, than return
-    EdgCoord = metricdata.EdgCoord;                                         %assign output variable
+    EdgCoord = mean(metricdata.EdgCoord);                                   %assign output variable as mean of matrix columns
     return
 end
 
@@ -68,35 +68,6 @@ prbCoord = zeros(numel(prbMsg),2);                                          %pre
 parfor i = 1:numel(prbMsg)
     prbCoord(i,:) = prbMsg(i).coords;
 end
-
-% % write out results of edge finding and ask user what to do
-% if sum(state) ~= 0                                                          %there are some problems
-%     options.Default = 'From mean values';
-%     options.Interpreter = 'tex';
-%     stringCell= [sumMsg.string{:} {'Do you want to modify these edges:'}];
-%     choice = myQst('autstr',stringCell);
-%     if strcmp(choice,'Show EdgCoord') == 1                                  %user wants to show the EdgeCoord matrix
-%         coefVec= 7./kurtosis(EdgCoord);
-%         hFig = figure;                                                      %open figure window
-%         set(hFig,'Units','Pixels','Position',[0 0 1000 750],...
-%             'Name','EdgCoord','MenuBar', 'none','NumberTitle', 'off');      %set window size +- matching the EdgeCoord needs
-%         openUITable(hFig,EdgCoord,prbCoord,coefVec,0);
-%         choice = menu('Modify selected values',...
-%             'From mean values','Manually','Don`t modify');                  %questdlg is prettier, but menu is not modal
-%         switch choice
-%             case 1
-%                 choice = 'From mean values';
-%             case 2
-%                 choice = 'Manually';
-%             case 3
-%                 choice = 'Don`t modify';
-%         end
-%     end
-% else
-%     msgbox('Edges of the plate and cuvettes were found','modal');
-%     uiwait(gcf);
-%     choice = 'Don`t modify';
-% end
 
 % calculate mean values and std of not-NaN and not-outliers for each column
 propVals = round(mean(EdgCoord));                                           %calculate mean for all values
@@ -317,9 +288,6 @@ rowNames = reshape(strtrim(cellstr(num2str(rowNames(:)))), size(rowNames));
 rowNames = [rowNames...
     {'Mean Value' 'Std. dev.' 'Kurtosis' 'Used coef.' 'Prop. Values'}];
 if allowEdit == 1                                                           %want I let user to change columns
-%     ColumnEditable = zeros(1,numel(EdgCoord(1,:)));
-%     ColumnEditable(unique(prbCoord(:,2))) = 1;                              %make columns with NaNs and outliers editable
-%     ColumnEditable = logical(ColumnEditable);
     ColumnEditable = true(1,numel(EdgCoord(1,:)));                          %make all columns of the table editable
 else
     ColumnEditable = [];
@@ -340,7 +308,7 @@ if allowEdit == 1
 else
     modData = get(hTable,'Data');
     modData = regexp(modData(end,:),'([1-9])[\d.]\d+','match');             %'unformat' modified proposed values
-    modData = cellfun(@str2double,modData);                                 %convert them to double
+    modData = cellfun(@str2double,modData,'UniformOutput',false);           %convert them to double
 end
 end
 

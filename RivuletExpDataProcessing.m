@@ -94,6 +94,8 @@ function varargout = RivuletExpDataProcessing(varargin)
 % 3. rivuletProcessing.m (main function for data evaluation)
 % 4. save_to_base.m (function for saving data into base workspace)
 % 5. fluidDataFcn.m (database with fluid data)
+% - Program needs image processing, neural networks, statistics and curve
+% fitting toolboxes installed on your system
 %
 %==========================================================================
 % LICENSE
@@ -1336,7 +1338,7 @@ handles.metricdata.RivProcPars = {[0.15 0.30] 60 [1.93 0.33 6 2.25 80]...   % Pl
 angle = handles.metricdata.RivProcPars{2};                                  %plate inclination angle
 string= 'DC 5';
 handles.metricdata.fluidData = fluidDataFcn(string,angle);                  %set vaules into handles
-handles.metricdata.Treshold     = 0.1;                                      %set value
+handles.metricdata.Treshold     = 1e-3;                                     %set value
 handles.metricdata.FSensitivity = 10;
 % mandatory input fields - fill edit boxes
 set(handles.EditTreshold, 'String', handles.metricdata.Treshold);           %fill in the field
@@ -1755,6 +1757,9 @@ else
     subsImDir = handles.metricdata.subsImDir;
 end
 
+% getting the image processing parameters
+im2bwTr    = handles.metricdata.IMProcPars{5};                              %treshold for im2bw transformation
+
 % setting up the statusbar
 handles.statusbar = statusbar(handles.MainWindow,...
     'Waiting for user response');
@@ -1774,7 +1779,7 @@ else
 end
 tmpIM   = imtophat(tmpIM,se);
 tmpIM   = imadjust(tmpIM,stretchlim(tmpIM),[1e-2 0.99]);                    %enhance contrasts
-tmpIM   = im2bw(tmpIM,0.16);                                                %conversion to black and white
+tmpIM   = im2bw(tmpIM,im2bwTr);                                             %conversion to black and white
 figure;imshow(tmpIM);                                                       %show image to work with
 cutMat  = round(ginput(2));close(gcf);                                      %let the user specify approximate position of the plate
 cutLeft = cutMat(1,1);cutRight = cutMat(2,1);

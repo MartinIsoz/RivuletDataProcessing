@@ -5,7 +5,7 @@ function OUT = rivuletProcessing(handles)
 % My modification of Andres function for evaluation of rivulet-LIF images
 % Required parameters:
 % 1 Threshold for distinguishing between background and rivulet in mm
-% Threshold recommended: 1/10 mm
+% Threshold recommended: 1e-3
 % 2 Filter sensitivity for smoothing the image
 % Recommended Sensitivity: 10
 %
@@ -29,7 +29,8 @@ function OUT = rivuletProcessing(handles)
 %                   processed
 % ------------------
 % Treshold  ...     treshold for distinguishing between the rivulet and the
-%                   noise on the plate
+%                   noise on the plate (base on the derivative of the
+%                   profile, dY/dX < Treshold -> dY/dX == 0
 % FSensitivity.     filter sensitivity for image smoothing
 % EdgCoord  ...     coordinates of plate and cuvette edges on each image,
 %                   matrix 1 x 10 -> !! cammera cannot be moved during
@@ -245,10 +246,46 @@ end
 % cell of size (1,nImages) and each of its elements is a matrix with same
 % size (xR - xL, yB - yT)
 
+%% Read the individual profiles over the length of the plate -> rivulet
+%% area
+% !! Rivulet height maximum should be in the rivulet, not around !!
+% read the profile from the maximum to the left and right, stop after the
+% fall under treshold thickness
+% lets draw the rivulet (from the maximum to the treshold, for each row)
+
+% subtract background/noise from the image, calculate rivulets interfacial
+% areas and obtain matrixes of indexes containing the rivulet borders
+
+if DNTLoadIM == 1
+    IFArea = zeros(numel(files),1);                                         %images are not loaded, preallocat variable
+    minLVec= cell(1,nImages);minRVec = minLVec;                             %preallocate variable for vector sides
+    for i = 1:nImages
+        handles.statusbar = statusbar(handles.MainWindow,...
+            'Calculating interfacial area of rivulet %d of %d (%.1f%%)',... %updating statusbar
+            i,nImages,100*i/nImages);
+        handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
+        handles.statusbar.ProgressBar.setMinimum(0);
+        handles.statusbar.ProgressBar.setMaximum(nImages);
+        handles.statusbar.ProgressBar.setValue(i);
+        load([tmpfDir '/' files{i}(1:end-4) '.mat']);                       %if images are not present in handles, load them from tmpfDir
+        [IFArea(i),tmpIM,~,~,minLVec{i},minRVec{i}]= ...
+            RivSurf({tmpIM'},Treshold,plateSize);                           %I need to transpose tmpIM -> coherence with YProfilPlatte
+        tmpIM            = tmpIM{:}';                                       %transpose back (this should be cleaned) and convert from cell to dbl
+        save([tmpfDir '/' files{i}(1:end-4) '.mat'],'tmpIM');               %resave image with subtracted "background/noise"
+    end
+    minLVec = reshape([minLVec{:}],numel(minLVec),[]);                      %convert cell to double (original vectors are saved in rows)
+    minRVec = reshape([minRVec{:}],numel(minRVec),[]);
+%     a = [1 1] + [1;1]
+else
+    handles.statusbar = statusbar(handles.MainWindows,...
+        'Calculating interfacial area of rivulets');                        %update statusbar
+    [IFArea,YProfilPlatte,~,~,minLVec,minRVec] =...
+        RivSurf(YProfilPlatte,Treshold,plateSize);                          %this function does not need graphical output
+end
+
 %% Creating visualizations of the rivulet
 % plot smoothed images
 if GR.contour == 1 || GR.profcompl == 1                                     %if any of the graphics are wanted, enter the cycle
-    
     for i=1:nImages                                                         %for each image
         % update statusbar
         handles.statusbar = statusbar(handles.MainWindow,...
@@ -269,8 +306,13 @@ if GR.contour == 1 || GR.profcompl == 1                                     %if 
         if DNTLoadIM == 1
             load([tmpfDir '/' files{i}(1:end-4) '.mat']);                   %if images are not present in handles, load them from tmpfDir
         else
-            tmpIM   = YProfilPlatte{i};                                     %if they are, just resave current image
+            tmpIM   = YProfilPlatte{i};                                     %if they are, just resave current image and cut out the rivulet
             YProfilPlatte{i} = YProfilPlatte{i}';                           %transpose image for next functions
+        end
+        % replace "non-rivulet" values by zeros
+        for j = 1:size(tmpIM,1)                                             %for each column of the tmpIM
+            tmpIM(j,setxor(minLVec(i,j):minRVec(i,j),1:size(tmpIM,2))) = 0;
+%             a = [1 1] + [1;1]
         end
         if GR.contour == 1                                                  %contour visualization
             % graphical output, look on the rivulets from top
@@ -282,12 +324,10 @@ if GR.contour == 1 || GR.profcompl == 1                                     %if 
             hFig = figure('Visible',Visible);figSet_size(hFig,[400 700]);
             hAxs = axes('OuterPosition',[0 0 1 1]);                         %this is usefull when user does something else on the computer
             set(hFig,'CurrentAxes',hAxs);
-            tic
             XProfilPlatte = linspace(0,plateSize(1),...
                 size(tmpIM,2));                                             %width coord, number of columns in YProfilPlatte
             ZProfilPlatte = linspace(0,plateSize(2),...
                 size(tmpIM,1));                                             %length coord, number of rows in YProfilPlatte
-            toc
             [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
             contour(hAxs,XX,ZZ,tmpIM);                                      %here I keep rivulet height in mm because it looks better
             title(hAxs,'\bf Look on rivulet from the top','FontSize',13);   %what is on the plot
@@ -313,7 +353,8 @@ if GR.contour == 1 || GR.profcompl == 1                                     %if 
             else                                                            %visible
                 Visible = 'on';
             end
-            hFig = figure('Visible',Visible);figSet_size(hFig,[1100 600]);
+%             hFig = figure('Visible',Visible);figSet_size(hFig,[1100 600]);
+            hFig = figure('Visible',Visible);figSet_size(hFig,[400 700]);
             hAxs = axes('OuterPosition',[0 0 1 1]);
             set(hFig,'CurrentAxes',hAxs);
             XProfilPlatte = linspace(0,plateSize(1),...
@@ -322,6 +363,7 @@ if GR.contour == 1 || GR.profcompl == 1                                     %if 
                 size(tmpIM,1));
             [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
             mesh(hAxs,XX,ZZ,tmpIM)
+            view(180,90);                                                   %set the viewpoint from the top
             axis tight
             xlabel(hAxs,'width of the plate, [m]')
             ylabel(hAxs,'length of the plate, [m]')
@@ -340,40 +382,14 @@ if GR.contour == 1 || GR.profcompl == 1                                     %if 
     end
 end
 
-%% Read the individual profiles over the length of the plate -> rivulet
-%% area
-% !! Rivulet height maximum should be in the rivulet, not around !!
-% read the profile from the maximum to the left and right, stop after the
-% fall under treshold thickness
-% lets draw the rivulet (from the maximum to the treshold, for each row)
-
-if DNTLoadIM == 1
-    IFArea = zeros(numel(files),1);                                         %images are not loaded, preallocat variable
-    for i = 1:nImages
-        handles.statusbar = statusbar(handles.MainWindow,...
-            'Calculating interfacial area of rivulet %d of %d (%.1f%%)',... %updating statusbar
-            i,nImages,100*i/nImages);
-        handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
-        handles.statusbar.ProgressBar.setMinimum(0);
-        handles.statusbar.ProgressBar.setMaximum(nImages);
-        handles.statusbar.ProgressBar.setValue(i);
-        load([tmpfDir '/' files{i}(1:end-4) '.mat']);                       %if images are not present in handles, load them from tmpfDir
-        IFArea(i)= RivSurf({tmpIM'},Treshold,plateSize);                    %I need to transpose tmpIM -> coherence with YProfilPlatte
-    end
-else
-    handles.statusbar = statusbar(handles.MainWindows,...
-        'Calculating interfacial area of rivulets');                        %update statusbar
-    IFArea = RivSurf(YProfilPlatte,Treshold,plateSize);                     %this function does not need graphical output
-end
-
 %% Calculate mean values of riv. heights over each rivLength/nCuts of the
 %% rivulet
 % the number of cuts (nCuts) << number of rows of the photo, so I will load
 % all the cutted rivulets into memory (the memory consumption shouldn be
 % extremely high - if the user will not choose like 300 cuts...)
 if DNTLoadIM == 1
-    YProfilPlatte = cell(1,numel(files));                                   %preallocate variable for YProfilPlatte
-    for i = 1:numel(files)
+    YProfilPlatte = cell(1,nImages);                                        %preallocate variable for YProfilPlatte
+    for i = 1:nImages
         handles.statusbar = statusbar(handles.MainWindow,...
             'Calculating mean profiles for image %d of %d (%.1f%%)',...     %updating statusbar
             i,nImages,100*i/nImages);
@@ -385,7 +401,7 @@ if DNTLoadIM == 1
         [YProfilPlatte(i),XProfilPlatte]=CutRiv({tmpIM'},nCuts,plateSize,...%call with calculation variables
             GR.profcut,GR.regime,GR.format,txtPars,storDir,rootDir,i);      %auxiliary variables for graphics and data manipulation
     end
-    rmdir(tmpfDir,'s');                                                     %remove unnecessary temporary folder with all contents
+    rmdir(tmpfDir,'s');                                                     %remove unnecessary temporary folder with all its contents
 else
     set(handles.statusbar,'Text','Calculating mean profiles along the rivulets');%update statusbar
     [YProfilPlatte,XProfilPlatte]=CutRiv(YProfilPlatte,nCuts,plateSize,...  %call with calculation variables
@@ -399,7 +415,7 @@ end
 
 handles.statusbar.ProgressBar.setVisible(false);                            %update statusbar
 set(handles.statusbar,'Text','Calculating output data of the program');
-[~,RivWidth2,RivHeight2,minLVec,minRVec] =...                               %calculates the mean widths of the rivulet and return indexes of
+[~,~,RivWidth2,RivHeight2,minLVec,minRVec] =...                             %calculates the mean widths of the rivulet and return indexes of
     RivSurf(YProfilPlatte,Treshold,plateSize);                              %the "edges" of the rivulet + calculates max height of each part of
                                                                             %the rivulet
 %% Mean speed determination from average profiles
@@ -778,7 +794,7 @@ end
 end
 
 %% Function for calculating the rivulet area and local width
-function [IFArea RivWidth RivHeight minLVec minRVec] = ...
+function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec] = ...
     RivSurf(YProfilPlatte,Treshold,plateSize)
 %
 %   function [IFArea RivWidth RivHeight minLVec minRVec] = ...
@@ -788,13 +804,17 @@ function [IFArea RivWidth RivHeight minLVec minRVec] = ...
 % calculation
 %
 % INPUT variables
-% YProfilPlatte     ... variable with heights of the rivulet (in mm?)
-% Treshold          ... Treshold for distinguishing between bcgrnd and riv.
+% YProfilPlatte     ... variable with heights of the rivulet, in mm
+% Treshold          ... Treshold for finding ~ 0 values of the profile
+%                       derivation, usually it is < 5e-5, so default value
+%                       1e-3 is setted with big enough tollerance
 % plateSize         ... size of the plate [width length], in m
 %
 % OUTPUT variables
 % IFArea            ... liquid/gas interfacial area of the rivulet, m^2,
 %                       vector of scalar values for each image
+% YProfilPlatte     ... YProfilPlatte with subtracted background noise
+%                       (sets the treshold)
 % RivWidth          ... local width of the rivulet, matrix
 %                       (numel(YProfilPlatte) x numel(ZDim))
 % RivHeight         ... local max. height of the rivulet (for each cut)
@@ -806,58 +826,110 @@ function [IFArea RivWidth RivHeight minLVec minRVec] = ...
 % Y -> height of the film
 % Z -> length of the plate, m
 %
-% Rq: some changes to the code had to be made because of different plates
-% dimensions (as a results of automatic plate size estimation)
-% => very carefully control the code for obtaining the interfacial area
-
-% processing input
-Treshold= Treshold*1e-3;                                                    %convert treshold to m
 
 % allocating space for variables
 [m,n] = size(YProfilPlatte{1});                                             %all the YProfilPlatte elements have the same size
-IFArea  = zeros(numel(YProfilPlatte),1);
-RivWidth= zeros(numel(YProfilPlatte),n);
-RivHeight=zeros(numel(YProfilPlatte),n);
-minLVec = zeros(numel(YProfilPlatte),n);
-minRVec = zeros(numel(YProfilPlatte),n);
+IFArea  = zeros(numel(YProfilPlatte),1);                                    %variable for interfacial area
+RivWidth= zeros(numel(YProfilPlatte),n);                                    %variable for rivulet width
+RivHeight=zeros(numel(YProfilPlatte),n);                                    %variable for rivulet height
+minLVec = zeros(numel(YProfilPlatte),n);                                    %left sides of the rivulet
+minRVec = zeros(numel(YProfilPlatte),n);                                    %right sides of the rivulet
+
+TrVec=zeros(1,n);                                                           %background/noise liquid height
 
 % for all the images
 % calculating the deltaX (distance between 2 pixels)
 deltaX  = plateSize(1)/m;                                                   %distance between 2 points on X-axis (in m)
 deltaZ  = plateSize(2)/n;                                                   %distance between 2 points on Z-axis (in m)
 
+% mean X coordinate of the pictures
+IndXMean= round(m/2);                                                       %X coordinate of the plate center (horizontal)
+
 % for each image
-for i = 1:numel(YProfilPlatte)  
+for i = 1:numel(YProfilPlatte) 
     YProfilPlatte{i} = YProfilPlatte{i}*1e-3;                               %mm -> m
-    % find width of the rivulet
-    [MaxVec,IndX] = max(YProfilPlatte{i});                                  %find maximum in every horizontal row and save its position
-    for j = 1:numel(MaxVec)
-        tmpVecL      = YProfilPlatte{i}(1:IndX(j),j);                       %left side of the rivulet
-        tmpVecR      = YProfilPlatte{i}(IndX(j)+1:end,j);                   %right side of the rivulet
-        tmpIndL      = find(tmpVecL <= Treshold,1,'last');                  %find the last element lower then Treshold in L side of the rivulet
-        tmpIndR      = find(tmpVecR <= Treshold,1,'first');                 %find the first element lower then Treshold in R side of the rivulet
-        if isempty(tmpIndL) == 1 || tmpIndL == 1                            %all the left side of the rivulet is higher than treshold
-            tmpIndL = numel(tmpVecL);
-            warning('Pers:HoPiL',['Treshold is higher than liquid heigh'...
-                ' for all the left side of the rivulet'])
-        elseif isempty(tmpIndR) == 1 || tmpIndR == numel(tmpVecR)           %all the right side of the rivulet is higher than treshold
-            tmpIndR = numel(tmpVecR);
-            warning('Pers:HoPiR',['Treshold is higher than liquid heigh'...
-                ' for all the right side of the rivulet'])
-        elseif tmpIndL == numel(tmpVecL)                                    %last lower than treshold is max height of the cut
-            warning('Pers:LoPiL',['Treshold is lower than liquid heigh'...
-                ' for all the left side of the rivulet'])
-        elseif tmpIndR == 1                                                 %first lower than treshold is max height of the cut
-            warning('Pers:LoPiR',['Treshold is lower than liquid heigh'...
-                ' for all the right side of the rivulet'])
+    YMin = 0;
+    YMax = max(max(YProfilPlatte{i}));
+    for j = 1:n                                                             %for all the columns of YProfilPlatte (Z-coordinates)
+        % find the maximal height of the rivulet in current YPP column
+        tmpProf      = smooth(YProfilPlatte{i}(:,j),30);                    %very hard smoothing of current profile (only highest peaks wanted)
+        [~,IndX]     = findpeaks(tmpProf,'MinPeakHeight',...                %find all peaks in smoothed profile higher then its max/2
+            max(tmpProf)/2);
+        IndX         = IndX(abs(IndX-IndXMean) == min(abs(IndX-IndXMean))); %take the first of the peaks nearest to the center of the plate
+        RivHeight(i,j)=YProfilPlatte{i}(IndX,j);                            %save current rivulet height
+        tmpVecL      = tmpProf(1:IndX);                                     %left side of the SMOOTHED rivulet
+        tmpVecR      = tmpProf(IndX+1:end);                                 %right side of the SMOOTHED rivulet
+        % calculate numeric derivative of the profile (on treshold,
+        % dy/dx~=0), I use a smoothed profile -> get rid of the oscilations
+        diffVecL     = abs(diff(tmpVecL)/deltaX);                           %abs. val. of numeric derivation of the left side of the profile
+        diffVecR     = abs(diff(tmpVecR)/deltaX);                           %abs. val. of numeric derivation of the right side of the profile
+        tmpIndL      = find(diffVecL<=Treshold,60,'last');                  %find last 60 values with dy/dx~0 on the left side of the riv.
+        tmpIndR      = find(diffVecR<=Treshold,60,'first');                 %find first 60 values with dy/dx~0 on the right side of the riv.
+        % reduce tmpIndL and ..R to the pieces longer than 10 elements
+        % finding tmpIndL
+        aux          = tmpIndL'-(1:numel(tmpIndL));                         %define auxiliary variable to identify jumps
+        aux          = [true; diff(aux(:)) ~= 0; true];                     %identify starting indexes of new groups
+        split        = mat2cell(tmpIndL(:).', 1, diff(find(aux)));          %split the vector according to the found indexes
+        split        = split(cellfun(@numel,split)>=10);                    %reduce splited vector to the elements with numel >= 10
+        split        = [split{:}];                                          %convert cell to vector
+        if isempty(split) == 1                                              %if there were no edges found
+            warning('MyWrng:REdgNF','Did not find the left edge of rivulet');
+            split    = 1;                                                   %take whole left side of the rivulet
         end
+        tmpIndL      = split(end);                                          %tmpIndL is the last value in the split vector
+        TrVec(j)     = min(YProfilPlatte{i}(split,j));                      %treshold is the lowest value of the contstant part of the profile
+        %finding tmpIndR
+        aux          = tmpIndR'-(1:numel(tmpIndR));                         %define auxiliary variable to identify jumps
+        aux          = [true; diff(aux(:)) ~= 0; true];                     %identify starting indexes of new groups
+        split        = mat2cell(tmpIndR(:).', 1, diff(find(aux)));          %split the vector according to the found indexes
+        split        = split(cellfun(@numel,split)>=10);                    %reduce splited vector to the elements with numel >= 10
+        split        = [split{:}] + numel(tmpVecL);                         %convert cell to vector and add length of the profiles left side
+        if isempty(split) == 1                                              %no edges found
+            warning('MyWrng:LEdgNF','Did not find the right edge of rivulet');
+            split    = m-1;                                                 %take the whole right side of the rivulet
+        end
+        tmpIndR      = split(1);                                            %tmpIndR is the first value in the split vector
+        TrVec(j)     = min([TrVec(j);YProfilPlatte{i}(split,j)]);           %treshold is the lowest value of the contstant part of the profile
+        % save left and right side of the rivulet
         minLVec(i,j) = tmpIndL;
-        minRVec(i,j) = tmpIndR + numel(tmpVecL);                            %I need to add length of the left side of the rivulet
+        minRVec(i,j) = tmpIndR;
+%         if j == 1
+%             figHandle = figure;
+%         end
+%         figure(figHandle);
+%         plot(1:numel(tmpProf),YProfilPlatte{i}(:,j));
+%         hold on
+%         plot(1:numel(tmpProf),tmpProf,'r');
+%         plot(tmpIndL,tmpProf(tmpIndL),'r^','MarkerFaceColor','Red')
+%         plot(tmpIndR,tmpProf(tmpIndR),'r^','MarkerFaceColor','Red')
+%         xlabel(['{\bf diff LEFT:} ' num2str(diffVecL(tmpIndL)) ...
+%             '{\bf diff RIGHT:}' num2str(diffVecR(tmpIndR-numel(tmpVecL)))])
+%         title(['\bf Profile ' num2str(j) ' of ' num2str(n)]);
+%         ylim([YMin YMax]);
+%         xlim([1 numel(tmpProf)])
+%         hold off
+%         drawnow
+%         if n < 100
+%             pause(1)
+%         end
     end
+    if n > 300                                                              %for large number of cuts (probably the whole image)
+        % smooth the found rivulet edges - remove jumps in rivulet width
+        % pictures are high-res enough not to contain any big jums in the
+        % rivulet edges positions
+        minLVec(i,:) = round(smooth(minLVec(i,:),100));                     %values need to be rounded (they are indexes) -> integers
+        minRVec(i,:) = round(smooth(minRVec(i,:),100));                     %n > 1600 (usually), so 100 neighbouring values isnt that many
+    end
+    % subtract the treshold from the current profile (it is a bacground
+    % noise)
+    % note: in second and following runs of the function, TresholdC->0
+    TresholdC        = mean(TrVec);                                         %calculate mean value of the treshold/background liquid height
+    YProfilPlatte{i} = YProfilPlatte{i} - TresholdC;                        %subtract it from the profile
+    RivHeight(i,:)   = RivHeight(i,:) - TresholdC;                          %subtract it from the rivulet Heights
 
     % calculate local widths and heights of i-th rivulet
     RivWidth(i,:) = (minRVec(i,:) - minLVec(i,:))*deltaX;                   %number of elements in rivulet x width of element
-    RivHeight(i,:)= MaxVec;                                                 %saves maximum height of each part of the rivulet, in m
+    meanRW        = mean(RivWidth(i,:));                                    %calculate mean rivulet width
     
     % calculate the interfacial area of the rivulet
     % IFArea = lengthOfArc x lengthOfPlate(between 2 arcs)
@@ -871,14 +943,15 @@ for i = 1:numel(YProfilPlatte)
             deltaY = YProfilPlatte{i}(k+1,j) - YProfilPlatte{i}(k,j);
             lArc = lArc + sqrt(deltaY.^2 + deltaX.^2);                      %total length of arc + aproximate length of an element
         end
-        if RivWidth(i,j) > 0.4*plateSize(1)                                 %this is necessary for IFArea correlations but
-            warning('Pers:RIV2W',['breaking at line ' mat2str(j) ' of '...  %cannot be use for mass transfer calculations
+        if RivWidth(i,j) > 3*meanRW                                         %this is necessary for IFArea correlations but
+            warning('Pers:RIV2W',['skipping line ' mat2str(j) ' of '...     %cannot be use for mass transfer calculations
                 mat2str(n)...
-                ' widht of the rivulet > ' mat2str(0.4*plateSize(1))])
-            break
+                ' widht of the rivulet > 3 x mean riv. width']);
+            continue                                                        %if rivulet is too wide, skip current line
         end
         IFArea(i) = IFArea(i) + lArc*deltaZ;                                %length of j-th arc x length of an element of the plate length
     end
+    YProfilPlatte{i} = YProfilPlatte{i}*1e3;                                %convert YPP back to mm (m -> mm)
 end
 end
 
@@ -972,11 +1045,12 @@ deltaDis  = plateSize(2)/(nCuts+1);                                         %dis
 DistVec   = linspace(deltaDis,plateSize(2)-deltaDis,nCuts);                 %dont measure 0 and plateSize(2) (edges)
 n         = numel(DistVec);                                                 %number of lines in the file
 
-% for each regime (001/005) create 1 file and save Var into this file
+% for each pumpe regime create 1 file and save Var into this file
 tmpVec = zeros(1,numel(files));                                             %temporary vector for slicing mVar
 for i = 1:numel(files)
-    tmpVec(i)  = str2double(regexp(files{i},'[0-9]+(?=.tif)', 'match'));    %create number from n digits before .tif in the file names
-    slInd      = [find(tmpVec == 1) numel(tmpVec)+1];                       %find slicing indexes, last index must be length of Vec + 1
+    tmpVec(i)  = str2double(...                                             %find all the characters in filename before first _
+        regexp(files{i}, '.+(?=\_[0-9]+.tif)', 'match'));                   %and convert them to double
+    slInd      = [1 find(diff(tmpVec) ~= 0)+1 numel(tmpVec)+1];             %find slicing indexes, last index must be length of Vec + 1
 end
 
 % preallocate output variable
@@ -994,8 +1068,9 @@ for i = 1:length(slInd)-1                                                   %for
     nameStr = [fileNm '_' volFl{:} '.txt'];                                 %create filename
     dlmwrite(nameStr,tmpMat,'delimiter','\t','precision','%5.6e')           %write write data matrix into file, SI unist
     VarOUT{i} = tmpMat;                                                     %save i-th regime into cell output
-    VarOUT{end}(i) = {files{slInd(i)}(1:3)};
+    VarOUT{end}(i) = regexp(files{slInd(i)}, '.+(?=\_[0-9]+.tif)', 'match');
 end
+% save_to_base(1)
 end
 
 function CorMat = saveCorrData(varOUT,varIN,fileNM)

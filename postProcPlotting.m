@@ -162,7 +162,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
             for j = 1:numel(selGR)                                          %for all selected groups
                 k = selGR(j);
                 plateSize(j,:) = Availible{k}.plateSize;                    %save plate size for selected groups
-                for l = 1:numel(selDT)                                      %for all selected datas
+                for l = 1:numel(selDT)                                      %for all selected datas, finally, can be only 1
                     m = selDT(l);
                     dataSH{j,l} = Availible{k}.(strCellDT{m});              %save all data to be ploted into 1 cell, row -> group, column ->msrmt
                 end
@@ -179,9 +179,10 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     case 'Profiles'                                         %profiles are to be shown
                         imNames = Availible{k}.imNames;                     %names of the measurements to show ~ names of the images
                         stInd(j+1)  = stInd(j) + numel(imNames);            %starting position of the next data group
+                        MsrtStr     = cell(1,numel(imNames));               %restart MsrtStr variable
                         for l = 1:numel(imNames)
                             MsrtStr{l} = ['M = '...                         %compose the string to write into the list
-                                num2str(MList{k}(l),'%5.2f') ', '...       %dimensionless flow rate
+                                num2str(MList{k}(l),'%5.2f') ', '...        %dimensionless flow rate
                                 imNames{l}(5:end-4)];                       %number of experiment
                         end
                         strCellMS = [strCellMS strCellGR(k) separators(1)...
@@ -199,7 +200,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         appdata.prgmcontrol.GR       =...
                             cellstr(num2str(selGR',1))';                    %needed for making legend strings
                     case 'Other'                                            %mSpeed, rivWidth and/or rivHeight are to be shown
-                        Msrt = cellstr(num2str(MUList{j},'%5.2f'))';        %get list of unique dimensionless flow rates, pumpe regimes
+                        Msrt = cellstr(num2str(MUList{k},'%5.2f'))';        %get list of unique dimensionless flow rates, pumpe regimes
                         for l = 1:numel(Msrt)
                             Msrt{l} = ['M = ' Msrt{l}];
                         end
@@ -207,6 +208,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                             Msrt separators(2)];
                         stInd(j+1) = stInd(j) + numel(Msrt);
                         set(ListMsrt,'Enable','on');
+%                         a = [1 1]+ [1;1];
                 end
             end
             set(ListMsrt,'Max',numel(strCellMS),'String',strCellMS,...
@@ -266,7 +268,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         switch shTable
             case 'Profiles'
                 plateSize = appdata.metricdata.plateSize;
-                [dTopsU dTopsC] =...
+                [dTopsU dTopsC] =...                                        %unique ad commond distances from the top of the plate
                     fillProfilesUITable(TableData,dataSH,plateSize);
                 if isempty(dTopsC) == 1
                     set(PushPlot,'Enable','off');                           %if data are not plottable, disable plot button
@@ -315,15 +317,18 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
         end
         clear('Children');
         % decode the ID string
+        switch shTable
+            case 'Profiles'
+                stIndVec    = cumsum(cellfun(@numel,MList(selGR)))+1;       %starting indexes of new groups for profiles
+            case 'Other'
+                stIndVec    = cumsum(cellfun(@numel,MUList(selGR)))+1;      %starting indexes of new groups for other data    
+            case 'IFACorr'
+                stIndVec    = selMS + 1;                                    %starting indexes of new measurements (for IFACorr)
+        end
         rdblCellStr = cell(1,numel(selGR));                                 %create empty var
-        k           = 1;l = 1;                                              %auxiliary indexes
         for j = 1:numel(selMS)
-            if l >= numel(GR{k}) && j ~= 1                                  %distinct to which groups are the data appartening
-                k = k+1;
-                l = 1;
-            else
-                l = l+1;
-            end
+            k      = find(selMS(j)<stIndVec,1,'first');                     %find in which group k (auxiliary group index) is
+            if isempty(k),k = max(selGR);end                                %control for the last group
             tmpVar = regexp(Availible{selGR(k)}.ID,'_','split');            %cut the string between '_'
             tmpVar = tmpVar(1:3);                                           %take only usefull data (liquid type, gas f-fact. and plt. incl. an.)
             tmpVar{1} = ['Liq. tp.: ' tmpVar{1}];                           %liquid type
@@ -333,11 +338,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 tmpVar{2} 10 ...
                 tmpVar{3}] ;                                                %append string to legend
         end
-        assignin('base','selGR',selGR)
-        assignin('base','selMS',selMS)
-        assignin('base','rdblCellStr',rdblCellStr)
-        assignin('base','Availible',Availible)
-        assignin('base','GR',GR)
+%         a = [1 1] + [1;1];
         switch shTable
             case 'Profiles'
                 set(hPlFig,'Name','Mean prof. in cuts');                    %set name of the plot
@@ -365,8 +366,6 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 spV     = 0.5;                                              %space from the bottom of the figure
                 % find maximal and minimal y values
                 yMax    = max(max(Data(:,2:2:end)));                        %y-values are in the pair columns, find maximal
-%                 yMin    = Data(:,2:2:end);                                  %need to find minimum only from nonzero elements
-%                 yMin    = min(min(yMin(yMin~=0)));                          %find minimum from nonzeros, consult this !! (leave 0?)
                 yMin    = 0;                                                %to see how big part of the rivulet was left of with Treshold
                 for j = 1:nSubPl                                            %for all the subplots
                     if j == ceil(nSubPl/2)+1;                               %end of the first row
@@ -399,8 +398,9 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 % create legend, I need to help myself with little hack
                 % using ghost figure
                 lgStr = cell(1,numel(selMS));
-                parfor j = 1:numel(selMS)                                   %create legend for each chosen picture
-                    lgStr{j} = ['Sel. ' num2str(j) 10 rdblCellStr{j}];
+                flRates=cell2mat(cellfun(@transpose,MList,'UniformOutput',0));%create list of flow rates to be shown
+                for j = 1:numel(selMS)                                      %create legend for each chosen picture
+                    lgStr{j} = ['M = ' num2str(flRates(selMS(j)),'%3.1f') 10 rdblCellStr{j}];
                 end
                 if mod2 ~= 0                                                %if there is left space, use it for legend
                     hGhostAx = axes('OuterPosition',...                     %create ghost axes
@@ -507,7 +507,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 brks = [1 find(diff(Data(:,end))<0)'+1 numel(Data(:,end))+1];%indexes of new data starts (diff in distances from top < 0)
                 % create leged entries (ID strings of data groups)
                 legendCellStr = {};
-                flRates       = Data(:,8);                                  %get present dimless flow rates
+                flRates       = Data(:,end-2);                              %get present dimless flow rates
                 flRates       = flRates(flRates~=0);                        %get rid of zeros
                 color = distinguishable_colors(numel(brks)-1);              %allocate matrix for used colors and fill in with colors
                 hold(hPlAxes,'on');
@@ -913,7 +913,7 @@ for i = 1:numel(dataSH)                                                  %for al
         numMS(i,j) = size(dataSH{i}{j},2)-6;                                %number of images can differ 1 pumpe regime to another
     end
 end                                                                         %last 6 columns are added data, not measurements
-ColNames = 1:max(numMS);                                                    %need space for all the data
+ColNames = 1:max(max(numMS));                                               %need space for all the data
 ColNames = reshape(strtrim(cellstr(num2str(ColNames(:)))), size(ColNames)); %vector -> cell of strings
 ColNames = [ColNames {'' 'Mean|value' 'Standard|deviation'...               %add names for last 6 columns
     'Dimensionless|flow rate, [-]' 'F-Factor,|[m3/s]',...

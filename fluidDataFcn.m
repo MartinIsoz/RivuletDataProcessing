@@ -35,27 +35,30 @@ switch LiquidName
         sigma   = 17.57e-3;
         rho     = 920;
         eta     = 5.073e-3;
-        reg     = [0.00268867271984935...
-                   0.0165546451606565...
-                   0.0738965243420832];
+%         reg     = [0.00268867271984935...                                   %calibration, Andre Marek
+%                    0.0165546451606565...
+%                    0.0738965243420832];
+        reg     = [0.0049986225273888 ...                                   %calibration, Martin Isoz
+                   0.0163080625029897...
+                   0.222059315865721];
     case 'DC 10'
         sigma   = 17.89e-3;
         rho     = 940;
         eta     = 10.419e-3;
-        reg     = [0.00268867271984935...
-                   0.0165546451606565...
-                   0.0738965243420832];
+        reg     = [0.00164145658263305...                                   %calibration, Martin Isoz
+                   0.0537997623291741...
+                   0.109861217214158];
     case 'Water'
         sigma   = 55.18e-3;
         rho     = 998;
         eta     = 1.178e-3;
-        reg     = [0.274879879879880...                                     %this calibration looks quite good even with linear regression
+        reg     = [0.274879879879880...                                     %calibration, Martin Isoz
                    0.271921921921918];
     case 'Tenzids'
         sigma   = 29.36e-3;
         rho     = 998;
         eta     = 1.114e-3;
-        reg     = [0.274879879879880...                                     %this calibration looks quite good even with linear regression
+        reg     = [0.274879879879880...                                     %calibration, Martin Isoz
                    0.271921921921918];
 end
 
