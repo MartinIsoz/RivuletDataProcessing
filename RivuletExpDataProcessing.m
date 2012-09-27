@@ -1338,7 +1338,7 @@ handles.metricdata.RivProcPars = {[0.15 0.30] 60 [1.93 0.33 6 2.25 80]...   % Pl
 angle = handles.metricdata.RivProcPars{2};                                  %plate inclination angle
 string= 'DC 5';
 handles.metricdata.fluidData = fluidDataFcn(string,angle);                  %set vaules into handles
-handles.metricdata.Treshold     = 1e-3;                                     %set value
+handles.metricdata.Treshold     = 3e-5;                                     %set value
 handles.metricdata.FSensitivity = 10;
 % mandatory input fields - fill edit boxes
 set(handles.EditTreshold, 'String', handles.metricdata.Treshold);           %fill in the field
@@ -1842,7 +1842,7 @@ function SaveRPPars_Callback( ~, ~, handles)
 %
 % Shortcut: ..
 
-if isfield(handles.metricdata,'RivProcPars') == 0
+if isfield(handles.metricdata,'RivProcPars') == 1
     RivProcPars = handles.metricdata.RivProcPars; %#ok<NASGU>               %this variable is used "indirectly"
     uisave('RivProcPars','RivProcPars')
     set(handles.statusbar,'Text',...

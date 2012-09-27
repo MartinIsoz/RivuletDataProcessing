@@ -217,7 +217,7 @@ else                                                                        %oth
     cutBottom=handles.metricdata.AppPlatePos(4);
 end
 trnVec  = [cutLeft cutTop cutLeft cutTop];                                  %translation vector for moving the found coordinates
-epsX    = 15; epsY     = 15;                                                %maximal non-verticality/non-horizontality of found lines
+epsX    = 30; epsY     = 30;                                                %maximal non-verticality/non-horizontality of found lines
 edgXL   = round((cutRight - cutLeft)*0.10);                                 %max. distance from left edge of the picture
 edgXR   = cutRight - cutLeft - edgXL;                                       %max. distance from right edge of the picture
 edgYT   = round((cutBottom - cutTop)*0.02);                                 %....          from top ....
@@ -453,7 +453,7 @@ if AUTO ~= 0 && isfield(lines,'point1') == 1                                %if 
                 strLine4 = ['Rq: Automatical estimation of the edge '...    %remarque on the solution method
                     'position uses weighted mean values of coordinates '...
                     'of similar lines'];
-                set(handles.statusbar,'Waiting for user response')          %update statusbar
+                set(handles.statusbar,'Text','Waiting for user response')   %update statusbar
                 choice = questdlg(sprintf('%s\n\n%s\n%s\n\n',...            %create question dialog
                     strLine1,strLine2,strLine3,strLine4), ...
                     'Choose edges of the plate', ...
@@ -485,7 +485,7 @@ if AUTO ~= 0 && isfield(lines,'point1') == 1                                %if 
             elseif estEdg == 1 && isempty(coordsCell{k}) == 1               %i want to automatically specify non-found edge
                 indDNF(k) = k;
             else                                                            %if manually, call outside function with appropriate parameters
-                set(handles.statusbar,'Waiting for user response')          %update statusbar
+                set(handles.statusbar,'Text','Waiting for user response')   %update statusbar
                 tmpPars = [edgXL edgXR edgYT edgYB epsX epsY i];            %contruct vector of parameters for plotLines
                 coordVec(k) = plotLines(tmpIM,lines,tmpPars,k);             %call plotLines with fourth parameter (viz function comments)
                 clear tmpPars

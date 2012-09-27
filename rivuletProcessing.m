@@ -309,11 +309,10 @@ if GR.contour == 1 || GR.profcompl == 1                                     %if 
             tmpIM   = YProfilPlatte{i};                                     %if they are, just resave current image and cut out the rivulet
             YProfilPlatte{i} = YProfilPlatte{i}';                           %transpose image for next functions
         end
-        % replace "non-rivulet" values by zeros
-        for j = 1:size(tmpIM,1)                                             %for each column of the tmpIM
-            tmpIM(j,setxor(minLVec(i,j):minRVec(i,j),1:size(tmpIM,2))) = 0;
-%             a = [1 1] + [1;1]
-        end
+%         % replace "non-rivulet" values by zeros
+%         for j = 1:size(tmpIM,1)                                             %for each column of the tmpIM
+%             tmpIM(j,setxor(minLVec(i,j):minRVec(i,j),1:size(tmpIM,2))) = 0;
+%         end
         if GR.contour == 1                                                  %contour visualization
             % graphical output, look on the rivulets from top
             if GR.regime == 1
@@ -353,8 +352,8 @@ if GR.contour == 1 || GR.profcompl == 1                                     %if 
             else                                                            %visible
                 Visible = 'on';
             end
-%             hFig = figure('Visible',Visible);figSet_size(hFig,[1100 600]);
-            hFig = figure('Visible',Visible);figSet_size(hFig,[400 700]);
+            hFig = figure('Visible',Visible);figSet_size(hFig,[1100 600]);
+%             hFig = figure('Visible',Visible);figSet_size(hFig,[400 700]);
             hAxs = axes('OuterPosition',[0 0 1 1]);
             set(hFig,'CurrentAxes',hAxs);
             XProfilPlatte = linspace(0,plateSize(1),...
@@ -363,7 +362,7 @@ if GR.contour == 1 || GR.profcompl == 1                                     %if 
                 size(tmpIM,1));
             [XX,ZZ] = meshgrid(XProfilPlatte,ZProfilPlatte);
             mesh(hAxs,XX,ZZ,tmpIM)
-            view(180,90);                                                   %set the viewpoint from the top
+%             view(180,90);                                                   %set the viewpoint from the top
             axis tight
             xlabel(hAxs,'width of the plate, [m]')
             ylabel(hAxs,'length of the plate, [m]')
@@ -826,6 +825,17 @@ function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec] = ...
 % Y -> height of the film
 % Z -> length of the plate, m
 %
+% Note: with change of the algorithm from Treshold to finding where the
+% function becames constant, another 'simple' algorithm was introduced ->
+% treshold is estimated automatically based on first quartile of each
+% profile (TresholdUsed = q0.25 + Treshold). Changes should be made to gui
+%
+% -> advised values of treshold:
+%    complex algorithm: 1e-3;
+%    simple  algorithm: 5e-5;
+
+% choose algorithm type
+algtype = 'simple';                                                         % 'simple' vs 'complex'
 
 % allocating space for variables
 [m,n] = size(YProfilPlatte{1});                                             %all the YProfilPlatte elements have the same size
@@ -848,70 +858,171 @@ IndXMean= round(m/2);                                                       %X c
 % for each image
 for i = 1:numel(YProfilPlatte) 
     YProfilPlatte{i} = YProfilPlatte{i}*1e-3;                               %mm -> m
-    YMin = 0;
-    YMax = max(max(YProfilPlatte{i}));
+%     YMin = 0;
+%     YMax = max(max(YProfilPlatte{i}));
+    smtProf          = smooth(YProfilPlatte{i}(:),30);                      %smooth all the data at once
+    smtProf          = reshape(smtProf,m,n);                                %reshape to the original size
+    q025Mat          = quantile(smtProf,0.25);                              %calculate 25% quantile of the each column of smtProf
     for j = 1:n                                                             %for all the columns of YProfilPlatte (Z-coordinates)
         % find the maximal height of the rivulet in current YPP column
-        tmpProf      = smooth(YProfilPlatte{i}(:,j),30);                    %very hard smoothing of current profile (only highest peaks wanted)
-        [~,IndX]     = findpeaks(tmpProf,'MinPeakHeight',...                %find all peaks in smoothed profile higher then its max/2
-            max(tmpProf)/2);
-        IndX         = IndX(abs(IndX-IndXMean) == min(abs(IndX-IndXMean))); %take the first of the peaks nearest to the center of the plate
-        RivHeight(i,j)=YProfilPlatte{i}(IndX,j);                            %save current rivulet height
-        tmpVecL      = tmpProf(1:IndX);                                     %left side of the SMOOTHED rivulet
-        tmpVecR      = tmpProf(IndX+1:end);                                 %right side of the SMOOTHED rivulet
-        % calculate numeric derivative of the profile (on treshold,
-        % dy/dx~=0), I use a smoothed profile -> get rid of the oscilations
-        diffVecL     = abs(diff(tmpVecL)/deltaX);                           %abs. val. of numeric derivation of the left side of the profile
-        diffVecR     = abs(diff(tmpVecR)/deltaX);                           %abs. val. of numeric derivation of the right side of the profile
-        tmpIndL      = find(diffVecL<=Treshold,60,'last');                  %find last 60 values with dy/dx~0 on the left side of the riv.
-        tmpIndR      = find(diffVecR<=Treshold,60,'first');                 %find first 60 values with dy/dx~0 on the right side of the riv.
-        % reduce tmpIndL and ..R to the pieces longer than 10 elements
-        % finding tmpIndL
-        aux          = tmpIndL'-(1:numel(tmpIndL));                         %define auxiliary variable to identify jumps
-        aux          = [true; diff(aux(:)) ~= 0; true];                     %identify starting indexes of new groups
-        split        = mat2cell(tmpIndL(:).', 1, diff(find(aux)));          %split the vector according to the found indexes
-        split        = split(cellfun(@numel,split)>=10);                    %reduce splited vector to the elements with numel >= 10
-        split        = [split{:}];                                          %convert cell to vector
-        if isempty(split) == 1                                              %if there were no edges found
-            warning('MyWrng:REdgNF','Did not find the left edge of rivulet');
-            split    = 1;                                                   %take whole left side of the rivulet
+        tmpIndL      = [];tmpIndR = [];                                     %variables initialization
+        tmpKoef      = 2;repCounter = 0;IndX = IndXMean;
+        tmpProf      = smtProf(:,j);q025Prof = q025Mat(j);                  %assign temporary profile and its lower quartile
+        switch algtype                                                      %choose which of the 2 algorithms should be used
+            case 'complex'                                                  %complex 1 -> find constant regions of the current profile
+                while isempty(tmpIndL) == 1 || isempty(tmpIndR) == 1 ||...  %loop for controling if the profile maxima was found
+                        tmpProf(IndX) < max(tmpProf)/5                      %or if found maxima is to low
+                    [~,IndX]     = findpeaks(tmpProf,'MinPeakHeight',...    %find all peaks in smoothed profile higher then its max/2
+                        max(tmpProf(max([1 (tmpKoef-repCounter)...          %rivulet maxima should be in the center fifth of the plate
+                        *round(numel(tmpProf)/(5-2*repCounter))]):...       %at first, look in the central 1 fifth of the plate, then in
+                        (tmpKoef+1-repCounter)...                           %1 third and then take the whole plate -> there will be always peaks
+                        *round(numel(tmpProf)/(5-2*repCounter))))/2);       %BUT attention onx too curvy rivulets
+                    IndX         = IndX(abs(IndX-IndXMean)==...
+                        min(abs(IndX-IndXMean)));                           %take the first of the peaks nearest to the center of the plate
+                    repCounter   = repCounter + 1;                          %increase repetition counter of while cycle
+                    if numel(IndX)>1,IndX=IndX(tmpProf(IndX)==max(tmpProf(IndX)));end%if there is more than 1 index found, take the higher value
+                    RivHeight(i,j)=YProfilPlatte{i}(IndX,j);                %save current rivulet height
+                    tmpVecL      = tmpProf(1:IndX);                         %left side of the SMOOTHED rivulet
+                    tmpVecR      = tmpProf(IndX+1:end);                     %right side of the SMOOTHED rivulet
+                    % calculate numeric derivative of the profile (on treshold,
+                    % dy/dx~=0), I use a smoothed profile -> get rid of the
+                    % oscilations
+                    diffVecL     = abs(diff(tmpVecL)/deltaX);               %abs. val. of numeric derivation of the left side of the profile
+                    diffVecR     = abs(diff(tmpVecR)/deltaX);               %abs. val. of numeric derivation of the right side of the profile
+                    tmpIndL      = find(diffVecL<=Treshold,60,'last');      %find last 60 values with dy/dx~0 on the left side of the riv.
+                    tmpIndR      = find(diffVecR<=Treshold,60,'first');     %find first 60 values with dy/dx~0 on the right side of the riv.
+                end
+                if repCounter > 1                                           %control if there were problem when finding profile maximu (peak)
+                    warning('MyWrng:Riv2Cur',['Rivulet may be to curvy, '...
+                        'needed to expand search interval for the profile max '...
+                        'from 1/5 to 1/' num2str((5-2*(repCounter-1)),'%3.1d')]);
+                end
+                % reduce tmpIndL and ..R to the pieces longer than 10 elements
+                % finding tmpIndL
+                aux          = tmpIndL'-(1:numel(tmpIndL));                 %define auxiliary variable to identify jumps
+                aux          = [true; diff(aux(:)) ~= 0; true];             %identify starting indexes of new groups
+                split        = mat2cell(tmpIndL(:).', 1, diff(find(aux)));  %split the vector according to the found indexes
+                split        = split(cellfun(@numel,split)>=10);            %reduce splited vector to the elements with numel >= 10
+                split        = [split{:}];                                  %convert cell to vector
+                if isempty(split) == 1                                      %if there were no edges found
+                    warning('MyWrng:REdgNF',['Did not find the left edge of'...
+                        ' rivulet on line ' num2str(j) ' of ' num2str(n)]);
+                    split    = 1;                                           %take whole left side of the rivulet
+                end
+                tmpIndL      = split(end);                                  %tmpIndL is the last value in the split vector
+                % --- not very elegant part of the code ---
+                safety       = 1;
+                while abs(tmpProf(tmpIndL)-q025Prof) > (RivHeight(i,j)-q025Prof)/50 ...
+                        && tmpIndL ~= 1 && safety < 10                      %check if it wasnt found the local minimum in the rivulet center
+                    %             warning('MyWrng:PrbL',['Possible problem with the left '...
+                    %                 'side of the rivulet on line ' num2str(j) ' of ' ...
+                    %                 num2str(n)]);
+                    IndX         = tmpIndL;                                 %take the center as IndX
+                    tmpVecL      = tmpProf(1:max([IndX-30 1]));
+                    diffVecL     = abs(diff(tmpVecL)/deltaX);               %abs. val. of numeric derivation of the left side of the profile
+                    tmpIndL      = find(diffVecL<=Treshold,60,'last');      %find last 60 values with dy/dx~0 on the left side of the riv.
+                    if numel(tmpIndL)<10,tmpIndL = (1:10)';end              %check for bad luck
+                    aux          = tmpIndL'-(1:numel(tmpIndL));
+                    aux          = [true; diff(aux(:)) ~= 0; true];
+                    split        = mat2cell(tmpIndL(:).', 1, diff(find(aux)));
+                    split        = split(cellfun(@numel,split)>=10);
+                    split        = [split{:}];
+                    if isempty(split)==1,split = tmpIndL(end);end
+                    tmpIndL      = split(end);
+                    safety       = safety + 1;
+                end
+                % --- end of ugly code ---
+                TrVec(j)     = min(YProfilPlatte{i}(split,j));              %treshold is the lowest value of the contstant part of the profile
+                %finding tmpIndR
+                aux          = tmpIndR'-(1:numel(tmpIndR));                 %define auxiliary variable to identify jumps
+                aux          = [true; diff(aux(:)) ~= 0; true];             %identify starting indexes of new groups
+                split        = mat2cell(tmpIndR(:).', 1, diff(find(aux)));  %split the vector according to the found indexes
+                split        = split(cellfun(@numel,split)>=10);            %reduce splited vector to the elements with numel >= 10
+                split        = [split{:}] + IndX - 1;                       %convert cell to vector and add length of the profiles left side
+                if isempty(split) == 1                                      %no edges found
+                    warning('MyWrng:LEdgNF',['Did not find the right edge of'...
+                        ' rivulet on line ' num2str(j) ' of ' num2str(n)]);
+                    split    = m-1;                                         %take the whole right side of the rivulet
+                end
+                tmpIndR      = split(1);                                    %tmpIndR is the first value in the split vector
+                % --- not very elegant part of the code ---
+                safety       = 1;
+                while abs(tmpProf(tmpIndR)-q025Prof) > (RivHeight(i,j)-q025Prof)/50 ...
+                        && tmpIndR ~= m-1 && safety < 10                    %check if it wasnt found the local minimum in the rivulet center
+                    %             warning('MyWrng:PrbR',['Possible problem with the right '...
+                    %                 'side of the rivulet on line ' num2str(j) ' of ' ...
+                    %                 num2str(n)]);
+                    IndX         = tmpIndR;                                 %take the center as IndX
+                    tmpVecR      = tmpProf(min([IndX+30 numel(tmpProf)]):end);
+                    diffVecR     = abs(diff(tmpVecR)/deltaX);               %abs. val. of numeric derivation of the left side of the profile
+                    tmpIndR      = find(diffVecR<=Treshold,60,'first');     %find first 60 values with dy/dx~0 on the right side of the riv.
+                    if numel(tmpIndR)<10,tmpIndR = (m-10:m)'-IndX;end       %check for bad luck
+                    aux          = tmpIndR'-(1:numel(tmpIndR));
+                    aux          = [true; diff(aux(:)) ~= 0; true];
+                    split        = mat2cell(tmpIndR(:).', 1, diff(find(aux)));
+                    split        = split(cellfun(@numel,split)>=10);
+                    split        = [split{:}] + IndX - 1;
+                    if isempty(split)==1,split = tmpIndR(1);end
+                    tmpIndR      = split(1);
+                    safety       = safety + 1;
+                end
+                TrVec(j)     = min([TrVec(j);YProfilPlatte{i}(split,j)]);   %treshold is the lowest value of the contstant part of the profile
+                % --- end of ugly code ---
+            case 'simple'                                                   %simple -> estimate treshold as 2*q0.25
+                [~,IndX]     = findpeaks(tmpProf-q025Prof,'MinPeakHeight',...%take into account only the actual height of the rivulet
+                    max(tmpProf-q025Prof)/2);
+                IndX         = IndX(abs(IndX-IndXMean)==...
+                    min(abs(IndX-IndXMean)));                               %take the first of the peaks nearest to the center of the plate
+                if numel(IndX)>1,IndX=IndX(tmpProf(IndX)==max(tmpProf(IndX)));end%if there is more than 1 index found, take the highest value
+                RivHeight(i,j)=YProfilPlatte{i}(IndX,j);                    %save current rivulet height
+                TrVec(j)     = q025Prof + Treshold;                         %calculate treshold to be used
+                tmpVecL      = tmpProf(1:IndX);                             %left side of the SMOOTHED rivulet
+                tmpVecR      = tmpProf(IndX+1:end);                         %right side of the SMOOTHED rivulet
+                tmpIndL      = max([1 find(tmpVecL <= TrVec(j),1,'last')]); %find the last element lower then Treshold in L side of the rivulet
+                tmpIndR      = min([find(tmpVecR <= TrVec(j),1,'first')+IndX...
+                    numel(tmpProf)]);                                       %find the first element lower then Treshold in R side of the rivulet
+                TrVec(j)     = q025Prof;                                    %resave treshold for subtracting from profile
         end
-        tmpIndL      = split(end);                                          %tmpIndL is the last value in the split vector
-        TrVec(j)     = min(YProfilPlatte{i}(split,j));                      %treshold is the lowest value of the contstant part of the profile
-        %finding tmpIndR
-        aux          = tmpIndR'-(1:numel(tmpIndR));                         %define auxiliary variable to identify jumps
-        aux          = [true; diff(aux(:)) ~= 0; true];                     %identify starting indexes of new groups
-        split        = mat2cell(tmpIndR(:).', 1, diff(find(aux)));          %split the vector according to the found indexes
-        split        = split(cellfun(@numel,split)>=10);                    %reduce splited vector to the elements with numel >= 10
-        split        = [split{:}] + numel(tmpVecL);                         %convert cell to vector and add length of the profiles left side
-        if isempty(split) == 1                                              %no edges found
-            warning('MyWrng:LEdgNF','Did not find the right edge of rivulet');
-            split    = m-1;                                                 %take the whole right side of the rivulet
-        end
-        tmpIndR      = split(1);                                            %tmpIndR is the first value in the split vector
-        TrVec(j)     = min([TrVec(j);YProfilPlatte{i}(split,j)]);           %treshold is the lowest value of the contstant part of the profile
         % save left and right side of the rivulet
         minLVec(i,j) = tmpIndL;
         minRVec(i,j) = tmpIndR;
 %         if j == 1
 %             figHandle = figure;
 %         end
+% %         if j > 1000        
 %         figure(figHandle);
 %         plot(1:numel(tmpProf),YProfilPlatte{i}(:,j));
 %         hold on
 %         plot(1:numel(tmpProf),tmpProf,'r');
 %         plot(tmpIndL,tmpProf(tmpIndL),'r^','MarkerFaceColor','Red')
 %         plot(tmpIndR,tmpProf(tmpIndR),'r^','MarkerFaceColor','Red')
-%         xlabel(['{\bf diff LEFT:} ' num2str(diffVecL(tmpIndL)) ...
-%             '{\bf diff RIGHT:}' num2str(diffVecR(tmpIndR-numel(tmpVecL)))])
-%         title(['\bf Profile ' num2str(j) ' of ' num2str(n)]);
+%         plot(IndX,tmpProf(IndX),'g^','MarkerFaceColor','Green')
+%         switch algtype
+%             case 'complex'
+%         xlabel({['{\bf diff LEFT: } ' num2str(diffVecL(tmpIndL),'%5.5e') ...
+%             '{\bf diff RIGHT: }' num2str(diffVecR(tmpIndR-IndX+1),'%5.5e')]...
+%             ['{\bf tmpProf LEFT: }' num2str(tmpProf(tmpIndL),'%5.5e')...
+%             '{\bf tmpProf RIGHT: }' num2str(tmpProf(tmpIndR),'%5.5e')]...
+%             ['{\bf Q_{025}(tmpProf): }' num2str(q025Prof,'%5.5e')...
+%             '{\bf RivHeight: }' num2str(RivHeight(i,j),'%5.5e')]})
+%             case 'simple'
+%         xlabel({['{\bf tmpProf LEFT: }' num2str(tmpProf(tmpIndL),'%5.5e')...
+%             '{\bf tmpProf RIGHT: }' num2str(tmpProf(tmpIndR),'%5.5e')]...
+%             ['{\bf Q_{025}(tmpProf): }' num2str(q025Prof,'%5.5e')...
+%             '{\bf RivHeight: }' num2str(RivHeight(i,j),'%5.5e')]...
+%             ['{\bf Treshold:}' num2str(q025Prof+Treshold,'%5.5e')]});   
+%         end
+%         title(['{\bf Profile ' num2str(j) ' of ' num2str(n) '}']);
 %         ylim([YMin YMax]);
 %         xlim([1 numel(tmpProf)])
 %         hold off
 %         drawnow
 %         if n < 100
 %             pause(1)
+% %         else
+% %             pause(0.05)
 %         end
+% %         end
     end
     if n > 300                                                              %for large number of cuts (probably the whole image)
         % smooth the found rivulet edges - remove jumps in rivulet width
@@ -919,13 +1030,13 @@ for i = 1:numel(YProfilPlatte)
         % rivulet edges positions
         minLVec(i,:) = round(smooth(minLVec(i,:),100));                     %values need to be rounded (they are indexes) -> integers
         minRVec(i,:) = round(smooth(minRVec(i,:),100));                     %n > 1600 (usually), so 100 neighbouring values isnt that many
+        % subtract the treshold from the current profile (it is a bacground
+        % noise)
+        % note: in second and following runs of the function, TresholdC->0
+        TresholdC        = mean(TrVec);                                     %calculate mean value of the treshold/background liquid height
+        YProfilPlatte{i} = YProfilPlatte{i} - TresholdC;                    %subtract it from the profile
+        RivHeight(i,:)   = RivHeight(i,:) - TresholdC;                      %subtract it from the rivulet Heights
     end
-    % subtract the treshold from the current profile (it is a bacground
-    % noise)
-    % note: in second and following runs of the function, TresholdC->0
-    TresholdC        = mean(TrVec);                                         %calculate mean value of the treshold/background liquid height
-    YProfilPlatte{i} = YProfilPlatte{i} - TresholdC;                        %subtract it from the profile
-    RivHeight(i,:)   = RivHeight(i,:) - TresholdC;                          %subtract it from the rivulet Heights
 
     % calculate local widths and heights of i-th rivulet
     RivWidth(i,:) = (minRVec(i,:) - minLVec(i,:))*deltaX;                   %number of elements in rivulet x width of element
