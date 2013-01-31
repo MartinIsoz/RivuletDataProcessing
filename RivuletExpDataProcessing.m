@@ -108,7 +108,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 %
 % See also FINDEDGES RIVULETPROCESSING
 
-% Last Modified by GUIDE v2.5 10-Sep-2012 12:56:51
+% Last Modified by GUIDE v2.5 31-Jan-2013 14:04:59
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -144,6 +144,7 @@ function progGUI_OpeningFcn(hObject, eventdata, handles, varargin)
     initializeGUI(hObject, eventdata, handles,'all');                       %call initialize function for all availible data
 
 set(handles.MainWindow,'DockControl','off');                                %I want to make the window undockable
+set(handles.MainWindow,'HandleVisibility','off');                           %dont want to close the main program (just to be sure)
 
 % Choose default command line output for progGUI
 handles.output = hObject;
@@ -407,6 +408,7 @@ msgbox({'Background is loaded,'...
             start_path);
 if imDir ~= 0                                                               %basic input control
     subsImDir = [storDir '/Subtracted'];                                    %directory with subtracted images
+    handles.metricdata.imSourceDir = imDir;                                 %save the image source directory
 if isa(imNames,'char') == 1
     imNames = {imNames};                                                    %if only 1 is selected, convert to cell
 end
@@ -1102,9 +1104,8 @@ function PushClosePlots_Callback(~, ~, handles)
 % function for closing all the figure windows except of the main program
 % (its handle is currently made invisible)
 
-set(handles.MainWindow,'HandleVisibility','off');                              %dont want to close the main program
+set(handles.MainWindow,'HandleVisibility','off');                           %dont want to close the main program (just to be sure)
 close all                                                                   %close every other figure
-set(handles.MainWindow,'HandleVisibility','on');
 
 %% Pushbuttons - Outputs overview
 
@@ -2020,3 +2021,27 @@ else
     msgbox('There are no availible processed data yet','modal');uiwait(gcf);
 end
 
+
+
+% --------------------------------------------------------------------
+function OtherFunc_Callback(~, ~, ~)
+% other functions that can be used to obtain informations about the rivulet
+
+
+% --------------------------------------------------------------------
+function normDistParsFit_Callback(~, ~, handles)
+% function to fit parameters of normal distribution (which describe quite
+% well the profile), as proposed by Shetty 95
+
+% check if all the required fields are present into handles
+if isfield(handles.metricdata,'imNames') == 0
+    errordlg('You must load the images at first','Images missing','modal');
+    return
+elseif isfield(handles.metricdata,'EdgCoord') == 0
+    errordlg('The plate and cuvettes edges have to be specified',...
+        'EdgCoord not specified','modal');
+    return
+end
+
+normDistParsFit('metricdata',handles.metricdata,'prgmcontrol',...
+    handles.prgmcontrol)

@@ -22,7 +22,7 @@ function varargout = normDistParsFit(varargin)
 
 % Edit the above text to modify the response to help normDistParsFit
 
-% Last Modified by GUIDE v2.5 30-Jan-2013 11:51:36
+% Last Modified by GUIDE v2.5 31-Jan-2013 14:55:24
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -79,11 +79,19 @@ set(handles.avImList,'String',strCellIm,'Max',numel(strCellIm));            %upd
 handles.metricdata = metricdata;
 handles.prgmcontrol= prgmcontrol;
 
+% Initialize necessary variables
+handles.prgmcontrol.expDelta = 0;
+handles.prgmcontrol.expMFit  = 0;
+handles.prgmcontrol.expGOF   = 0;
+
 % Choose default command line output for normDistParsFit
 handles.output = hObject;
 
 % Update handles structure
 guidata(hObject, handles);
+
+% Make the GUI invisible (so it cannot be closed from MATLAB)
+set(handles.figure1,'Visible','off');
 
 % UIWAIT makes normDistParsFit wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
@@ -142,6 +150,144 @@ function expDataButton_Callback(hObject, eventdata, handles)
 % hObject    handle to expDataButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+% get which data are to be exported
+expDelta = handles.prgmcontrol.expDelta;
+expMFit  = handles.prgmcontrol.expMFit;
+expGOF   = handles.prgmcontrol.expGOF;
+
+% get the program runtime variables
+storDir  = handles.metricdata.storDir;                                      %directory for storing results
+imSourceDir = handles.metricdata.imSourceDir;                               %directory with original images
+
+% get the experimental set up parameters
+fluidType= handles.metricdata.fluidType;                                    %fluid type
+RivProcPars = handles.metricdata.RivProcPars;                               %other exp. data
+plateSize= RivProcPars{1};
+inclAngle= RivProcPars{2};
+FFact    = RivProcPars{6};
+
+% get the selected images names
+imNames  = handles.metricdata.imNames;
+selImU   = handles.metricdata.selImU;
+imNames  = imNames(selImU);
+
+% get data to export
+Delta    = handles.metricdata.resFitCell{1};                                %matrix
+MFit     = handles.metricdata.resFitCell{2};                                %matrix
+GOF      = handles.metricdata.resFitCell{3};                                %cell of structures
+
+% if it doesn't exists, create a folder to export data (will be located in
+% the './storDir/normDistPars
+d         = dir(storDir);                                                   %create list of subdirectories in checked dir
+isub      = [d(:).isdir];                                                   %returns logical vector
+namesFolds = {d(isub).name};                                                %get list of names of folders
+namesFolds(ismember(namesFolds,{'.','..'})) = [];                           %remove . and .. from the list
+if sum(strcmp(namesFolds,'normDistPars')) == 0                              %if the subdirectory is not present in current dir
+        mkdir([storDir '/normDistPars']);                                   %create it
+end
+
+expDir  = [storDir '/normDistPars'];                                        %save the name of the directory where to save data
+
+% create the file to export data
+dataInd = [expDelta expMFit expGOF];
+nameCell = {'-Delta' '-MFit' '-GOF'};
+fileName = ['Exp' nameCell{dataInd~=0} '_' ...                              %create the fileName - exproted data + current date
+    datestr(now,'HH-MM-SS_dd-mm-yy')...
+    '.txt'];
+
+% open or create file for writing (the probability of opening and rewriting
+% existing file is extremely low, but...)
+file2Wr  = fopen([expDir '/' fileName],'w+');
+
+% writing the head of the file
+fprintf(file2Wr,'===HEAD==================================================\n\n');
+fprintf(file2Wr,...
+    ['Exported data from the normDistPars.m program\n\n' ...
+    'This file contains following data:\n']);
+fprintf(file2Wr,...
+    '%s\n\n',nameCell{dataInd==1});
+fprintf(file2Wr,...
+    ['Where:\n'...
+    'Delta is local maximal height of the rivulet along its vertical\n'...
+    'coordinate obtained from measurements at it is described for example\n'...
+    'in [1]\n'...
+    'MFit is standard deviation as used in equation (1) (m(z)), these\n'...
+    'values are obtained by fitting the local profile using the relation (1)\n'...
+    'with m(z) as fitted coefficient and delta0(z) as problem dependent\n'...
+    'parameter.\n'...
+    'GOF are goodness-of-fit information for each fitted profile as\n'...
+    'provided by MATLAB function FIT\n\n']);
+fprintf(file2Wr,'Equation used for fitting:\n');
+fprintf(file2Wr,...
+   ['                          +       2   +\n'...
+    '                          |      x    |\n'...
+    ' delta(x,z) = delta0(z)exp|- ---------|,        (1)\n'...
+    '                          |          2|\n'...
+    '                          +   2*m(z)  +\n\n']);
+fprintf(file2Wr,...
+    ['where delta(x,z) is the local height of the rivulet, delta0(z) is\n'...
+    'the measured problem dependent parameter, saved as Delta, and m(z) is\n'...
+    'the fitted coefficient.\n\n']);
+fprintf(file2Wr,'File creation time: %s\n\n',datestr(now,'HH-MM-SS_dd-mm-yyyy'));
+fprintf(file2Wr,'Image source directory: %s\n\n',imSourceDir);
+fprintf(file2Wr,'Procesed images (in order):\n');
+fprintf(file2Wr,'%s\n',imNames{:});fprintf(file2Wr,'\n');
+fprintf(file2Wr,'Experimental set up data:\n');
+fprintf(file2Wr,'Plate size: %f x %f m\n',plateSize(1),plateSize(2));
+fprintf(file2Wr,'Plate inclination angle: %d deg\n',inclAngle);
+fprintf(file2Wr,'Fluid type: %s\n',fluidType);
+fprintf(file2Wr,'Gas f-factor: %5.3f Pa^0.5\n\n',FFact);
+fprintf(file2Wr,'References:\n');
+fprintf(file2Wr,'[1] Isoz, M. RivuletExpDataProcessing Program Documentation, 0.9th ed.; Freiberg, 2012.\n');
+fclose(file2Wr);                                                            %close file
+
+% exporting the delta(z) data
+if expDelta == 1
+    file2Wr  = fopen([expDir '/' fileName],'a');                            %open file and append
+    fprintf(file2Wr,'\n===DELTA=(m)==============================================\n\n');
+    fclose(file2Wr);                                                        %close file for use in dlmwrite
+    dlmwrite([expDir '/' fileName],Delta','delimiter','\t',...
+        'precision','%5.5e','-append')
+    
+end
+
+% exporting the m(z) data
+if expMFit == 1
+    file2Wr  = fopen([expDir '/' fileName],'a');                            %open file and append
+    fprintf(file2Wr,'\n===MFIT=(m)===============================================\n\n');
+    fclose(file2Wr);                                                        %close file for use in dlmwrite
+    dlmwrite([expDir '/' fileName],MFit','delimiter','\t',...
+        'precision','%10.5e','-append')
+end
+
+% exporting the GOF data
+fieldsList = fields(GOF{1}{1});                                             %get list of the fields
+printList  = fieldsList;                                                    %initialize list of names to print
+maxChar    = max(cellfun(@numel,fieldsList));                               %get maximal length of the word
+for i = 1:numel(fieldsList) %#ok<FORPF>
+    printList{i} = sprintf(['%' num2str(maxChar) 's'], printList{i});
+end
+if expGOF == 1
+    file2Wr  = fopen([expDir '/' fileName],'a');                            %open file and append
+    fprintf(file2Wr,'\n===GOF==================================================\n\n');
+    for i = 1:numel(GOF{1})                                                 %for all the lines
+        fprintf(file2Wr,'%04.f:\n',i);
+        for j = 1:numel(fieldsList)
+            fprintf(file2Wr,'%-s:\t\t',printList{j});                           %print the field name
+            for k = 1:numel(GOF)                                            %for all the images
+                fprintf(file2Wr,'%5.5e\t',GOF{k}{i}.(fieldsList{j}));       %print current field values
+            end
+            fprintf(file2Wr,'\n');                                          %end line
+        end
+    end
+    fclose(file2Wr);                                                        %close file for use in dlmwrite
+end
+
+% update statusbar
+handles.statusbar = statusbar(handles.figure1,...
+            ['Chosen data were exported to ' fileName]);
+handles.statusbar.ProgressBar.setVisible(false);
 end
 
 
@@ -160,16 +306,25 @@ zLinSpace  = linspace(0,plateSize(2),numel(delta0(1,:)));                   %cre
 imNames    = handles.metricdata.imNames;                                    %get the cell fith imNames
 selImU     = handles.metricdata.selImU;                                     %get indexes of selected images
 
+% create the colors
+Colors     = distinguishable_colors(numel(selImU));                         %create different colors for all the data
+
 % plot the max. rivulet height along the plate
 figure('Units','Pixels','Position',[20 20 800 600]);
-plot(zLinSpace,delta0)
+hold(gca,'on')
+for i = 1:numel(selImU) %#ok<FORPF>
+    plot(zLinSpace,delta0(i,:),'Color',Colors(i,:))
+end
 legend(imNames(selImU),'interpreter','none')
 xlabel('z, [m]');ylabel('\delta_0, [m]');
 axis tight
 
 % plot the standard deviation of the normal distribution along the plate
 figure('Units','Pixels','Position',[20 20 800 600]);
-plot(zLinSpace,mFit)
+hold(gca,'on')
+for i = 1:numel(selImU) %#ok<FORPF>
+    plot(zLinSpace,mFit(i,:),'Color',Colors(i,:))
+end
 legend(imNames(selImU),'interpreter','none')
 xlabel('z, [m]');ylabel('\sigma, [m]');
 axis tight
@@ -192,6 +347,9 @@ selImU     = handles.metricdata.selImU;                                     %get
 nImages    = numel(fitGoodCell);
 nData      = numel(fitGoodCell{1});
 
+% create the colors
+Colors     = distinguishable_colors(numel(selImU));                         %create different colors for all the data
+
 % data extraction
 sse    = zeros(nImages,nData);                                              %variable allocation
 rsquare= sse;dfe = sse;adjrsquare = sse;rmse = sse;
@@ -209,26 +367,50 @@ zLinSpace  = linspace(0,plateSize(2),nData);                   %create linspace 
 % plot the standard deviation of the normal distribution along the plate
 figure('Units','Pixels','Position',[20 20 800 600]);
 subplot(221)
-plot(zLinSpace,rsquare)
-legend(imNames(selImU),'interpreter','none','Location','Best')
+hold(gca,'on')
+for i = 1:numel(selImU) %#ok<FORPF>
+plot(zLinSpace,rsquare(i,:),'LineStyle','.','Color',Colors(i,:),'MarkerSize',1)
+end
+hLegend = legend(imNames(selImU),'interpreter','none','Location','Best');   %this is necessary to have visible legend
+legChil = get(hLegend,'Children');
+assignin('base','legChil',legChil)
+set(legChil(1:3:end),'MarkerSize',7);
 xlabel('z, [m]');ylabel('R^2, [m]');
 axis([0 plateSize(2) 0 1])
 
 subplot(222)
-plot(zLinSpace,sse)
-legend(imNames(selImU),'interpreter','none','Location','Best')
+hold(gca,'on')
+for i = 1:numel(selImU) %#ok<FORPF>
+plot(zLinSpace,sse(i,:),'LineStyle','.','Color',Colors(i,:),'MarkerSize',1)
+end
+hLegend = legend(imNames(selImU),'interpreter','none','Location','Best');   %this is necessary to have visible legend
+legChil = get(hLegend,'Children');
+assignin('base','legChil',legChil)
+set(legChil(1:3:end),'MarkerSize',7);
 xlabel('z, [m]');ylabel('sse, [m]');
 axis tight
 
 subplot(223)
-plot(zLinSpace,dfe)
-legend(imNames(selImU),'interpreter','none','Location','Best')
+hold(gca,'on')
+for i = 1:numel(selImU) %#ok<FORPF>
+plot(zLinSpace,dfe(i,:),'LineStyle','.','Color',Colors(i,:),'MarkerSize',1)
+end
+hLegend = legend(imNames(selImU),'interpreter','none','Location','Best');   %this is necessary to have visible legend
+legChil = get(hLegend,'Children');
+assignin('base','legChil',legChil)
+set(legChil(1:3:end),'MarkerSize',7);
 xlabel('z, [m]');ylabel('dfe, [m]');
 axis tight
 
 subplot(224)
-plot(zLinSpace,rmse)
-legend(imNames(selImU),'interpreter','none','Location','Best')
+hold(gca,'on')
+for i = 1:numel(selImU) %#ok<FORPF>
+plot(zLinSpace,rmse(i,:),'LineStyle','.','Color',Colors(i,:),'MarkerSize',1)
+end
+hLegend = legend(imNames(selImU),'interpreter','none','Location','Best');   %this is necessary to have visible legend
+legChil = get(hLegend,'Children');
+assignin('base','legChil',legChil)
+set(legChil(1:3:end),'MarkerSize',7);
 xlabel('z, [m]');ylabel('rmse, [m]');
 axis tight
 
@@ -240,6 +422,9 @@ function runButton_Callback(hObject, eventdata, handles)
 % hObject    handle to runButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+% enable the cancel button
+% set(handles.cancelButton,'Enable','on')
 
 % extraction of input data from handles
 DNTLoadIM = handles.prgmcontrol.DNTLoadIM;                                  %are the images present into handles?
@@ -286,38 +471,38 @@ if DNTLoadIM == 0                                                           %are
     cellfun(@imwrite,YProfilPlatte,tmpCell);                                %write images into smoothed folder (under original names)
 else                                                                        %otherwise, i need to do this image from image...
     mkdir(tmpfDir);                                                         %I need to create directory for temporary files
-    k = 1;                                                                  %auxiliary indexing variable
+    k = 1;l = 1;                                                            %auxiliary indexing variables
     for i = selIm                                                           %for all the selected images
         handles.statusbar = statusbar(handles.figure1,...
             ['Converting grayscale values into distaces ',...
             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
-            k,nImages,100*k/nImages);
+            l,nImages,100*l/nImages);
         handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
         handles.statusbar.ProgressBar.setMinimum(0);
-        handles.statusbar.ProgressBar.setMaximum(nImages);
-        handles.statusbar.ProgressBar.setValue(i);
+        handles.statusbar.ProgressBar.setMaximum(2*nImages);
+        handles.statusbar.ProgressBar.setValue(k);
         tmpIM = {imread([subsImDir '/' imNames{i}])};                       %load image from substracted directory and save it as cell
         tmpIM = ImConv(tmpIM,EdgCoord,filmTh,RegressionPlate);              %convert the image grayscale values to distances
         tmpIM = imfilter(tmpIM{:},...                                       %use selected filter
             fspecial('disk',FilterSensitivity));
+        k = k+1;                                                            %increase statusbar counter
         handles.statusbar = statusbar(handles.figure1,...
             ['Fitting local profiles ',...
             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
-            k,nImages,100*k/nImages);
+            l,nImages,100*l/nImages);
         handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
         handles.statusbar.ProgressBar.setMinimum(0);
-        handles.statusbar.ProgressBar.setMaximum(nImages);
-        handles.statusbar.ProgressBar.setValue(i);
+        handles.statusbar.ProgressBar.setMaximum(2*nImages);
+        handles.statusbar.ProgressBar.setValue(k);
         tempVar = FitProf({tmpIM'},Treshold,plateSize);                     %calculate the parameters of the normal distribution
-        resFitCell{1}(k,:) = tempVar{1}(1,:);                               %resave obtained deltaZ
-        resFitCell{2}(k,:) = tempVar{2}(1,:);                               %resave obtained deltaZ
-        resFitCell{3}{k}   = tempVar{3};                                    %resave obtained goodness-of-fit
+        resFitCell{1}(l,:) = tempVar{1}(1,:);                               %resave obtained deltaZ
+        resFitCell{2}(l,:) = tempVar{2}(1,:);                               %resave obtained deltaZ
+        resFitCell{3}{l}   = tempVar{3};                                    %resave obtained goodness-of-fit
         imwrite(tmpIM,[smImDir '/' imNames{i}]);                            %save it into 'Smoothed' folder (but under original name)
         save([tmpfDir '/' imNames{i}(1:end-4) '.mat'],'tmpIM');             %save obtained data matrix into temporary directory
-        k = k+1;                                                            %increase the counter
+        k = k+1;l = l+1;                                                    %increase the counter and statusbar mover
     end
 end
-assignin('base','resFitCell',resFitCell)
 rmdir(tmpfDir,'s')
 
 % update statusbar
@@ -325,28 +510,41 @@ handles.statusbar = statusbar(handles.figure1,...
             'Program run ended succesfully');
         
 % enable buttons for results overview and export
-set([handles.expDataButton ...
-     handles.plotResButton ...
+set([handles.plotResButton ...
      handles.plotFitButton],'Enable','on')
+ 
+% fil in the uitables with results
+ColNames = imNames(selIm);                                                  %initialize the variable for column names
+DataDelta= resFitCell{1}';                                                  %gather the data for tables
+DataMFit = resFitCell{2}';
+set(handles.deltaTable,'Data',DataDelta,'ColumnName',ColNames,...           %fill the tables
+    'ColumnWidth',{100});
+set(handles.mFitTable,'Data',DataMFit,'ColumnName',ColNames,...
+    'ColumnWidth',{100});
  
 % get the results and save them into handles
 handles.metricdata.resFitCell = resFitCell;
 handles.metricdata.selImU     = handles.metricdata.selIm;                   %save used images
 guidata(hObject,handles);
+
+% disable the cancel button
+% set(handles.cancelButton,'Enable','off')
 end
 
 
-% --- Executes on button press in skipButton.
-function skipButton_Callback(hObject, eventdata, handles)
-% hObject    handle to skipButton (see GCBO)
+% --- Executes on button press in exitButton.
+function cancelButton_Callback(~, ~, ~)
+% hObject    handle to exitButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+
 end
 
 
-% --- Executes on button press in cancelButton.
-function cancelButton_Callback(hObject, eventdata, handles)
-% hObject    handle to cancelButton (see GCBO)
+% --- Executes on button press in exitButton.
+function exitButton_Callback(hObject, eventdata, handles)
+% hObject    handle to exitButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
@@ -361,6 +559,22 @@ function expDeltaChBox_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of expDeltaChBox
+
+handles.prgmcontrol.expDelta = get(hObject,'Value');                        %get toggle state
+
+% get state of the other buttons
+expDelta = handles.prgmcontrol.expDelta;
+expMFit  = handles.prgmcontrol.expMFit;
+expGOF   = handles.prgmcontrol.expGOF;
+
+if sum([expDelta expMFit expGOF]) > 0 && ...                                %if at least 1 checkbox is checked
+        isfield(handles.metricdata,'resFitCell') == 1                       %and some results are availible 
+    set(handles.expDataButton,'Enable','on');                               %enable exp. data button
+else
+    set(handles.expDataButton,'Enable','off');                               %otherwise disable it
+end
+
+guidata(hObject,handles);                                                   %update handles
 end
 
 
@@ -371,6 +585,22 @@ function expFitChBox_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of expFitChBox
+
+handles.prgmcontrol.expGOF = get(hObject,'Value');                         %get toggle state
+
+% get state of the other buttons
+expDelta = handles.prgmcontrol.expDelta;
+expMFit  = handles.prgmcontrol.expMFit;
+expGOF   = handles.prgmcontrol.expGOF;
+
+if sum([expDelta expMFit expGOF]) > 0 && ...                                %if at least 1 checkbox is checked
+        isfield(handles.metricdata,'resFitCell') == 1                       %and some results are availible 
+    set(handles.expDataButton,'Enable','on');                               %enable exp. data button
+else
+    set(handles.expDataButton,'Enable','off');                               %otherwise disable it
+end
+
+guidata(hObject,handles);                                                   %update handles
 end
 
 
@@ -381,6 +611,22 @@ function expMChBox_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of expMChBox
+
+handles.prgmcontrol.expMFit = get(hObject,'Value');                         %get toggle state
+
+% get state of the other buttons
+expDelta = handles.prgmcontrol.expDelta;
+expMFit  = handles.prgmcontrol.expMFit;
+expGOF   = handles.prgmcontrol.expGOF;
+
+if sum([expDelta expMFit expGOF]) > 0 && ...                                %if at least 1 checkbox is checked
+        isfield(handles.metricdata,'resFitCell') == 1                       %and some results are availible 
+    set(handles.expDataButton,'Enable','on');                               %enable exp. data button
+else
+    set(handles.expDataButton,'Enable','off');                               %otherwise disable it
+end
+
+guidata(hObject,handles);                                                   %update handles
 end
 
 %% Data processing - calculation
@@ -436,10 +682,7 @@ XS  = linspace(filmTh(1),filmTh(2),yuS-yoS+1)';                             %thi
 CW  = filmTh(5)/2;                                                          %cuvette width/2
     
 % for each image
-for i = 1:numel(ImData)                                                     %for each file
-    if nargin < 10
-        imNumber = i;
-    end
+parfor i = 1:numel(ImData)                                                     %for each file
     % load i-th image
     Image = ImData{i};                                                      %temporary variablefor each image
     % find mean grayscale value for each row of the cuvette
