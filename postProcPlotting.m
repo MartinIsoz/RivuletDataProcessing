@@ -17,6 +17,8 @@ function postProcPlotting(Availible)
 % License: This code is published under MIT License, please do not abuse
 % it.
 %
+% Note: changes were made to obtain different types of graphics !!
+%
 % See also RIVULETEXPDATAPROCESSING SHOWPROCDATA
 
 % --- Disabling useless warnings
@@ -334,9 +336,9 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
             tmpVar{1} = ['Liq. tp.: ' tmpVar{1}];                           %liquid type
             tmpVar{2} = ['F = ' tmpVar{2} ' Pa^{0.5}'];                     %f-factor
             tmpVar{3} = ['\alpha = ' tmpVar{3} '\circ{}'];                  %plate inclination angle
-            rdblCellStr{j} = [tmpVar{1} 10 ...
-                tmpVar{2} 10 ...
-                tmpVar{3}] ;                                                %append string to legend
+            rdblCellStr{j} = [tmpVar{3} 10]; %...
+%                 tmpVar{2} 10 ...
+%                 tmpVar{3}] ;                                                %append string to legend
         end
 %         a = [1 1] + [1;1];
         switch shTable
@@ -436,6 +438,10 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     'Units','Normal',...
                     'Callback',@PopUpXAxsCorr_Callback,...
                     'Position',[0.3 0.01 0.4 0.08],'Value',1);              %create popup menu for choosing x axes
+                %===dimensionless flow rate -> mass flow rate
+                Data(:,4) = Data(:,4).*Data(:,3).*...                              %M->m
+                sqrt(Data(:,1)./(Data(:,2).*9.81.*sin(degtorad(Data(:,5)))));
+                %===dimensionless flow rate -> mass flow rate
                 brks1 = [1 find(diff(Data(:,4))<0)'+1 numel(Data(:,4))+1];  %indexes of new data starts (diff in dimless fl. rate < 0)
                 brks2 = find(diff(Data(:,1)~=0))'+1;                        %indexes of new liquid starts (diff in surf tens ~=0)
                 brks  = unique([brks1 brks2]);                              %combine starts of new data with starts of new liquids
@@ -457,15 +463,16 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     hPlot(j,2) = errorbar(hPlAxes,uniqueFlR,meanIFArea,...  %plot mean IF areas with errorbars
                         stdDevIFA,'^-');
                     set(hPlot(j,:),'Color',color(j,:),'MarkerFaceColor',... %set up colors
-                        color(j,:));
+                        color(j,:),'LineStyle','none','MarkerSize',10);
                 end
                 set(hPlot(:,1),'Visible','off');                            %make everything except mean values invisible
-                hTtl = title(hPlAxes,['Interfacial area as fun. of '...
-                    'dimensionless liq. flow rate']);
-                set(hTtl,'FontSize',13,'FontWeight','bold')                 %modify title properties
-                xlabel(hPlAxes,'dimensionless flow rate, [-]');
-                ylabel(hPlAxes,'interfacial area of the rivulet, [m^2]');
-                set(hPlot,'MarkerSize',7);
+%                 hTtl = title(hPlAxes,['Interfacial area as fun. of '...
+%                     'dimensionless liq. flow rate']);
+                  hTtl = title(hPlAxes,['Interfacial area as fun. of '...
+                    'liquid mass flow rate']);
+                set(hTtl,'FontSize',18,'FontWeight','bold')                 %modify title properties
+                xlabel(hPlAxes,'m, [kg s^{-1}]','FontSize',16);
+                ylabel(hPlAxes,'S_{l--g}, [m^2]','FontSize',16);
                 % create leged entries (ID strings of data groups)
                 hLegend = legend(hPlot(:,1),rdblCellStr,'Location','Best',...
                     'Interpreter','tex');
@@ -531,12 +538,13 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     'Location','EastOutside',...
                     'Interpreter','tex');
                 % modifying the plot
-                set(hPlot,'MarkerSize',7);
-                xlabel(hPlAxes,'Distance from the top of the plate, [m]');  %set xlabel (common to all)
+                set(hPlot,'MarkerSize',10,'LineStyle','none');
+                xlabel(hPlAxes,'Distance from the top of the plate, [m]',...
+                    'FontSize',16);  %set xlabel (common to all)
                 xlim(hPlAxes,[0 max(plateSize(:,2))])                       %set xLim as the biggest plate length
-                ylabel(hPlAxes,ylbStr);                                     %set y label
-                hTtl = title(hPlAxes,ttlStr);                               %set title of the figure
-                set(hTtl,'FontSize',13,'FontWeight','bold')                 %modify title properties
+                ylabel(hPlAxes,ylbStr,'FontSize',16);                                     %set y label
+                %hTtl = title(hPlAxes,ttlStr);                               %set title of the figure
+                %set(hTtl,'FontSize',13,'FontWeight','bold')                 %modify title properties
                 % save handles into appdata
                 appdata.handles.hPlFig = hPlFig;
                 appdata.handles.hPlAxes= hPlAxes;
@@ -949,158 +957,4 @@ end
 set(hTable,'ColumnName',ColNames,'Data',DataClr,'ColumnWidth',{100},...
     'UserData',Data);
     
-end
-
-%% Distinguishable colors - downloaded function
-function colors = distinguishable_colors(n_colors,bg,func)
-% DISTINGUISHABLE_COLORS: pick colors that are maximally perceptually distinct
-%
-% When plotting a set of lines, you may want to distinguish them by color.
-% By default, Matlab chooses a small set of colors and cycles among them,
-% and so if you have more than a few lines there will be confusion about
-% which line is which. To fix this problem, one would want to be able to
-% pick a much larger set of distinct colors, where the number of colors
-% equals or exceeds the number of lines you want to plot. Because our
-% ability to distinguish among colors has limits, one should choose these
-% colors to be "maximally perceptually distinguishable."
-%
-% This function generates a set of colors which are distinguishable
-% by reference to the "Lab" color space, which more closely matches
-% human color perception than RGB. Given an initial large list of possible
-% colors, it iteratively chooses the entry in the list that is farthest (in
-% Lab space) from all previously-chosen entries. While this "greedy"
-% algorithm does not yield a global maximum, it is simple and efficient.
-% Moreover, the sequence of colors is consistent no matter how many you
-% request, which facilitates the users' ability to learn the color order
-% and avoids major changes in the appearance of plots when adding or
-% removing lines.
-%
-% Syntax:
-%   colors = distinguishable_colors(n_colors)
-% Specify the number of colors you want as a scalar, n_colors. This will
-% generate an n_colors-by-3 matrix, each row representing an RGB
-% color triple. If you don't precisely know how many you will need in
-% advance, there is no harm (other than execution time) in specifying
-% slightly more than you think you will need.
-%
-%   colors = distinguishable_colors(n_colors,bg)
-% This syntax allows you to specify the background color, to make sure that
-% your colors are also distinguishable from the background. Default value
-% is white. bg may be specified as an RGB triple or as one of the standard
-% "ColorSpec" strings. You can even specify multiple colors:
-%     bg = {'w','k'}
-% or
-%     bg = [1 1 1; 0 0 0]
-% will only produce colors that are distinguishable from both white and
-% black.
-%
-%   colors = distinguishable_colors(n_colors,bg,rgb2labfunc)
-% By default, distinguishable_colors uses the image processing toolbox's
-% color conversion functions makecform and applycform. Alternatively, you
-% can supply your own color conversion function.
-%
-% Example:
-%   c = distinguishable_colors(25);
-%   figure
-%   image(reshape(c,[1 size(c)]))
-%
-% Example using the file exchange's 'colorspace':
-%   func = @(x) colorspace('RGB->Lab',x);
-%   c = distinguishable_colors(25,'w',func);
-
-% Copyright 2010-2011 by Timothy E. Holy
-
-% Parse the inputs
-if (nargin < 2)
-    bg = [1 1 1];  % default white background
-else
-    if iscell(bg)
-        % User specified a list of colors as a cell aray
-        bgc = bg;
-        for i = 1:length(bgc) %#ok<FORPF>
-            bgc{i} = parsecolor(bgc{i});
-        end
-        bg = cat(1,bgc{:});
-    else
-        % User specified a numeric array of colors (n-by-3)
-        bg = parsecolor(bg);
-    end
-end
-
-% Generate a sizable number of RGB triples. This represents our space of
-% possible choices. By starting in RGB space, we ensure that all of the
-% colors can be generated by the monitor.
-n_grid = 30;  % number of grid divisions along each axis in RGB space
-x = linspace(0,1,n_grid);
-[R,G,B] = ndgrid(x,x,x);
-rgb = [R(:) G(:) B(:)];
-if (n_colors > size(rgb,1)/3)
-    error('You can''t readily distinguish that many colors');
-end
-
-% Convert to Lab color space, which more closely represents human
-% perception
-if (nargin > 2)
-    lab = func(rgb);
-    bglab = func(bg);
-else
-    C = makecform('srgb2lab');
-    lab = applycform(rgb,C);
-    bglab = applycform(bg,C);
-end
-
-% If the user specified multiple background colors, compute distances
-% from the candidate colors to the background colors
-mindist2 = inf(size(rgb,1),1);
-for i = 1:size(bglab,1)-1 %#ok<FORPF>
-    dX = bsxfun(@minus,lab,bglab(i,:)); % displacement all colors from bg
-    dist2 = sum(dX.^2,2);  % square distance
-    mindist2 = min(dist2,mindist2);  % dist2 to closest previously-chosen color
-end
-
-% Iteratively pick the color that maximizes the distance to the nearest
-% already-picked color
-colors = zeros(n_colors,3);
-lastlab = bglab(end,:);   % initialize by making the "previous" color equal to background
-for i = 1:n_colors
-    dX = bsxfun(@minus,lab,lastlab); % displacement of last from all colors on list
-    dist2 = sum(dX.^2,2);  % square distance
-    mindist2 = min(dist2,mindist2);  % dist2 to closest previously-chosen color
-    [~,index] = max(mindist2);  % find the entry farthest from all previously-chosen colors
-    colors(i,:) = rgb(index,:);  % save for output
-    lastlab = lab(index,:);  % prepare for next iteration
-end
-end
-
-function c = parsecolor(s)
-if ischar(s)
-    c = colorstr2rgb(s);
-elseif isnumeric(s) && size(s,2) == 3
-    c = s;
-else
-    error('MATLAB:InvalidColorSpec','Color specification cannot be parsed.');
-end
-end
-
-function c = colorstr2rgb(c)
-% Convert a color string to an RGB value.
-% This is cribbed from Matlab's whitebg function.
-% Why don't they make this a stand-alone function?
-rgbspec = [1 0 0;0 1 0;0 0 1;1 1 1;0 1 1;1 0 1;1 1 0;0 0 0];
-cspec = 'rgbwcmyk';
-k = find(cspec==c(1));
-if isempty(k)
-    error('MATLAB:InvalidColorString','Unknown color string.');
-end
-if k~=3 || length(c)==1,
-    c = rgbspec(k,:);
-elseif length(c)>2,
-    if strcmpi(c(1:3),'bla')
-        c = [0 0 0];
-    elseif strcmpi(c(1:3),'blu')
-        c = [0 0 1];
-    else
-        error('MATLAB:UnknownColorString', 'Unknown color string.');
-    end
-end
 end

@@ -22,7 +22,7 @@ function varargout = normDistParsFit(varargin)
 
 % Edit the above text to modify the response to help normDistParsFit
 
-% Last Modified by GUIDE v2.5 31-Jan-2013 14:55:24
+% Last Modified by GUIDE v2.5 04-Feb-2013 09:57:50
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -68,12 +68,21 @@ if(nargin > 3)
     % extract immediatly needed inputs
     strCellIm = cell(1,numel(metricdata.imNames));
     for i = 1:numel(metricdata.imNames)
-        strCellIm{i} = metricdata.imNames{i};                           %create string with availible images names
+        strCellIm{i} = metricdata.imNames{i};                               %create string with availible images names
     end
 end
 
 % Fill in the list with availible images
 set(handles.avImList,'String',strCellIm,'Max',numel(strCellIm));            %update string in the listbox
+
+% Fill the textfield avCutsText with maximal number of cuts that can be
+% made
+set(handles.avCutsText,'String',num2str(...                                 %get the number of rows from EdgCoord vector
+    metricdata.EdgCoord(end)-metricdata.EdgCoord(end-2)));
+% Fill the editable field nCutsEdit with number of cuts to be made preset
+% into the RivProcPars (default value is 5)
+set(handles.nCutsEdit,'String',num2str(...
+    metricdata.RivProcPars{5}));
 
 % Save input data into handles
 handles.metricdata = metricdata;
@@ -166,6 +175,10 @@ RivProcPars = handles.metricdata.RivProcPars;                               %oth
 plateSize= RivProcPars{1};
 inclAngle= RivProcPars{2};
 FFact    = RivProcPars{6};
+nCuts    = RivProcPars{5};
+EdgCoord = handles.metricdata.EdgCoord;
+DistanceP= round((EdgCoord(end)-EdgCoord(end-2))/(nCuts+1));                %distance between 2 cuts in pixels
+DistanceM= DistanceP*plateSize(2)/(EdgCoord(end)-EdgCoord(end-2));          %distance between 2 cuts in m
 
 % get the selected images names
 imNames  = handles.metricdata.imNames;
@@ -237,7 +250,9 @@ fprintf(file2Wr,'Experimental set up data:\n');
 fprintf(file2Wr,'Plate size: %f x %f m\n',plateSize(1),plateSize(2));
 fprintf(file2Wr,'Plate inclination angle: %d deg\n',inclAngle);
 fprintf(file2Wr,'Fluid type: %s\n',fluidType);
-fprintf(file2Wr,'Gas f-factor: %5.3f Pa^0.5\n\n',FFact);
+fprintf(file2Wr,'Gas f-factor: %5.3f Pa^0.5\n',FFact);
+fprintf(file2Wr,'Number of cuts made along the plate: %d\n',nCuts);
+fprintf(file2Wr,'Distance between 2 cuts: %d pixels ~ %5.3e m\n\n',DistanceP,DistanceM);
 fprintf(file2Wr,'References:\n');
 fprintf(file2Wr,'[1] Isoz, M. RivuletExpDataProcessing Program Documentation, 0.9th ed.; Freiberg, 2012.\n');
 fclose(file2Wr);                                                            %close file
@@ -343,9 +358,19 @@ fitGoodCell= handles.metricdata.resFitCell{3};                              %get
 plateSize  = handles.metricdata.RivProcPars{1};                             %get plate size
 imNames    = handles.metricdata.imNames;                                    %get the cell fith imNames
 selImU     = handles.metricdata.selImU;                                     %get indexes of selected images
+nCuts      = handles.metricdata.RivProcPars{5};                             %get number of made cuts
 
 nImages    = numel(fitGoodCell);
 nData      = numel(fitGoodCell{1});
+
+% prepare the linetype according to used nCuts
+if nCuts ~= 0 || nCuts < 500                                                %if the image was cutted before fitting
+    lSpec = '-';
+    mSize = 2;
+else
+    lSpec = '.';
+    mSize = 1;
+end
 
 % create the colors
 Colors     = distinguishable_colors(numel(selImU));                         %create different colors for all the data
@@ -369,7 +394,7 @@ figure('Units','Pixels','Position',[20 20 800 600]);
 subplot(221)
 hold(gca,'on')
 for i = 1:numel(selImU) %#ok<FORPF>
-plot(zLinSpace,rsquare(i,:),'LineStyle','.','Color',Colors(i,:),'MarkerSize',1)
+plot(zLinSpace,rsquare(i,:),'LineStyle',lSpec,'Color',Colors(i,:),'MarkerSize',mSize)
 end
 hLegend = legend(imNames(selImU),'interpreter','none','Location','Best');   %this is necessary to have visible legend
 legChil = get(hLegend,'Children');
@@ -381,7 +406,7 @@ axis([0 plateSize(2) 0 1])
 subplot(222)
 hold(gca,'on')
 for i = 1:numel(selImU) %#ok<FORPF>
-plot(zLinSpace,sse(i,:),'LineStyle','.','Color',Colors(i,:),'MarkerSize',1)
+plot(zLinSpace,sse(i,:),'LineStyle',lSpec,'Color',Colors(i,:),'MarkerSize',mSize)
 end
 hLegend = legend(imNames(selImU),'interpreter','none','Location','Best');   %this is necessary to have visible legend
 legChil = get(hLegend,'Children');
@@ -393,7 +418,7 @@ axis tight
 subplot(223)
 hold(gca,'on')
 for i = 1:numel(selImU) %#ok<FORPF>
-plot(zLinSpace,dfe(i,:),'LineStyle','.','Color',Colors(i,:),'MarkerSize',1)
+plot(zLinSpace,dfe(i,:),'LineStyle',lSpec,'Color',Colors(i,:),'MarkerSize',mSize)
 end
 hLegend = legend(imNames(selImU),'interpreter','none','Location','Best');   %this is necessary to have visible legend
 legChil = get(hLegend,'Children');
@@ -405,7 +430,7 @@ axis tight
 subplot(224)
 hold(gca,'on')
 for i = 1:numel(selImU) %#ok<FORPF>
-plot(zLinSpace,rmse(i,:),'LineStyle','.','Color',Colors(i,:),'MarkerSize',1)
+plot(zLinSpace,rmse(i,:),'LineStyle',lSpec,'Color',Colors(i,:),'MarkerSize',mSize)
 end
 hLegend = legend(imNames(selImU),'interpreter','none','Location','Best');   %this is necessary to have visible legend
 legChil = get(hLegend,'Children');
@@ -434,24 +459,35 @@ end
 imNames = handles.metricdata.imNames;                                       %names of images to be processed
 selIm   = handles.metricdata.selIm;                                         %get images selected for the processing
 nImages = numel(selIm);                                                     %number of selected images
-storDir = handles.metricdata.storDir;                                       %get the storage directory from handles
 subsImDir=handles.metricdata.subsImDir;                                     %get the directory with subtracted images
 smImDir   = [subsImDir '/Smoothed'];                                        %directory with smoothed images
-tmpfDir = [storDir '/tmp'];                                                 %directory for saving temporary files
 
 EdgCoord    = handles.metricdata.EdgCoord;                                  %get the coordinates of plate and cuv. edges
 Treshold    = handles.metricdata.Treshold;                                  %get treshold for the noise distinguishon
 plateSize   = handles.metricdata.RivProcPars{1};
 filmTh      = handles.metricdata.RivProcPars{3};
 RegressionPlate = handles.metricdata.RivProcPars{4};
+nCuts       = handles.metricdata.RivProcPars{5};
 
 FilterSensitivity = handles.metricdata.FSensitivity;
 
 
-% Image conversion from grayscale values to distances and saving of
-% smoothed images
-% heights of the film in mm
+% Program execution itself
+% Check, if the rivulet is to be cut and the properties of the results
+if nCuts ~= 0 || nCuts ~= EdgCoord(end)-EdgCoord(end-2)                     %if the image is to be cutted before fitting
+    % for all the images, all the YProfilPlatte have the same size
+    Distance     = round((EdgCoord(end)-EdgCoord(end-2))/(nCuts+1));            %number of points in each mean profile
+    % prepare variables and cut the rivulet
+    if nCuts == 0 || Distance < 50                                              %if too much cuts is specified
+        warndlg(['The number of cuts specified is bigger than'...               %notify user by dialog
+            ' number of rows necessary to obtain mean values for each cut'],...
+            'modal');uiwait(gcf);drawnow;
+    end
+end
+
+% Image transformation, cutting and fitting
 if DNTLoadIM == 0                                                           %are all the data loaded?
+    % !! This part of the code was NOT tested !!
     handles.statusbar = statusbar(handles.figure1,...
         ['Converting grayscale values into distances for all images ',...   %updating th statusbar
         'loaded in memory']);
@@ -460,17 +496,19 @@ if DNTLoadIM == 0                                                           %are
     tmpCell(:) = {fspecial('disk',FilterSensitivity)};
     YProfilPlatte = cellfun(@imfilter,YProfilPlatte,...                     %apply selected filter to YProfilPlatte
         tmpCell,'UniformOutput',0);
-    parfor i = 1:numel(selIm)
-        tmpCell(i) = {[smImDir '/' imNames{i}]};                            %create second argument for cell function 
+    if nCuts ~= 0 || nCuts ~= EdgCoord(end)-EdgCoord(end-2)                 %if the image is to be cutted before fitting
+        handles.statusbar.ProgressBar.setVisible(false);                        %hide progressbar
+        handles.statusbar = statusbar(handles.figure1,...
+            'Cutting images loaded in memory into.');
+        YProfilPlatte = CutRiv(YProfilPlatte,nCuts);                        %cut it and save
     end
     handles.statusbar.ProgressBar.setVisible(false);                        %hide progressbar
     handles.statusbar = statusbar(handles.figure1,...
         ['Fitting local profiles for all images ',...                       %updating the statusbar
         'loaded in memory']);
-    set(handles.statusbar,'Text','Saving smoothed images');
-    cellfun(@imwrite,YProfilPlatte,tmpCell);                                %write images into smoothed folder (under original names)
+    resFitCell = FitProf(YProfilPlatte,Treshold,plateSize);                 %calculate the parameters of the normal distribution
+    % !! This part of the code was NOT tested !!
 else                                                                        %otherwise, i need to do this image from image...
-    mkdir(tmpfDir);                                                         %I need to create directory for temporary files
     k = 1;l = 1;                                                            %auxiliary indexing variables
     for i = selIm                                                           %for all the selected images
         handles.statusbar = statusbar(handles.figure1,...
@@ -486,6 +524,10 @@ else                                                                        %oth
         tmpIM = imfilter(tmpIM{:},...                                       %use selected filter
             fspecial('disk',FilterSensitivity));
         k = k+1;                                                            %increase statusbar counter
+        if nCuts ~= 0 || nCuts ~= EdgCoord(end)-EdgCoord(end-2)             %if the image is to be cutted before fitting
+            tmpIM = CutRiv({tmpIM'},nCuts);                                 %cut it and save
+            tmpIM = tmpIM{1}';                                              %dirty, dirty, dirty
+        end
         handles.statusbar = statusbar(handles.figure1,...
             ['Fitting local profiles ',...
             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
@@ -498,12 +540,63 @@ else                                                                        %oth
         resFitCell{1}(l,:) = tempVar{1}(1,:);                               %resave obtained deltaZ
         resFitCell{2}(l,:) = tempVar{2}(1,:);                               %resave obtained deltaZ
         resFitCell{3}{l}   = tempVar{3};                                    %resave obtained goodness-of-fit
-        imwrite(tmpIM,[smImDir '/' imNames{i}]);                            %save it into 'Smoothed' folder (but under original name)
-        save([tmpfDir '/' imNames{i}(1:end-4) '.mat'],'tmpIM');             %save obtained data matrix into temporary directory
         k = k+1;l = l+1;                                                    %increase the counter and statusbar mover
     end
 end
-rmdir(tmpfDir,'s')
+
+% if DNTLoadIM == 0                                                           %are all the data loaded?
+%     handles.statusbar = statusbar(handles.figure1,...
+%         ['Converting grayscale values into distances for all images ',...   %updating th statusbar
+%         'loaded in memory']);
+%     YProfilPlatte = ImConv(daten(selIm),EdgCoord,filmTh,RegressionPlate);   %I can process all the loaded and chosen images at once
+%     tmpCell = cell(1,nImages);                                              %create empty cell with number of elements corresponding to nImages
+%     tmpCell(:) = {fspecial('disk',FilterSensitivity)};
+%     YProfilPlatte = cellfun(@imfilter,YProfilPlatte,...                     %apply selected filter to YProfilPlatte
+%         tmpCell,'UniformOutput',0);
+%     parfor i = 1:numel(selIm)
+%         tmpCell(i) = {[smImDir '/' imNames{i}]};                            %create second argument for cell function 
+%     end
+%     handles.statusbar.ProgressBar.setVisible(false);                        %hide progressbar
+%     handles.statusbar = statusbar(handles.figure1,...
+%         ['Fitting local profiles for all images ',...                       %updating the statusbar
+%         'loaded in memory']);
+%     set(handles.statusbar,'Text','Saving smoothed images');
+%     cellfun(@imwrite,YProfilPlatte,tmpCell);                                %write images into smoothed folder (under original names)
+% else                                                                        %otherwise, i need to do this image from image...
+%     mkdir(tmpfDir);                                                         %I need to create directory for temporary files
+%     k = 1;l = 1;                                                            %auxiliary indexing variables
+%     for i = selIm                                                           %for all the selected images
+%         handles.statusbar = statusbar(handles.figure1,...
+%             ['Converting grayscale values into distaces ',...
+%             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
+%             l,nImages,100*l/nImages);
+%         handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
+%         handles.statusbar.ProgressBar.setMinimum(0);
+%         handles.statusbar.ProgressBar.setMaximum(2*nImages);
+%         handles.statusbar.ProgressBar.setValue(k);
+%         tmpIM = {imread([subsImDir '/' imNames{i}])};                       %load image from substracted directory and save it as cell
+%         tmpIM = ImConv(tmpIM,EdgCoord,filmTh,RegressionPlate);              %convert the image grayscale values to distances
+%         tmpIM = imfilter(tmpIM{:},...                                       %use selected filter
+%             fspecial('disk',FilterSensitivity));
+%         k = k+1;                                                            %increase statusbar counter
+%         handles.statusbar = statusbar(handles.figure1,...
+%             ['Fitting local profiles ',...
+%             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
+%             l,nImages,100*l/nImages);
+%         handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
+%         handles.statusbar.ProgressBar.setMinimum(0);
+%         handles.statusbar.ProgressBar.setMaximum(2*nImages);
+%         handles.statusbar.ProgressBar.setValue(k);
+%         tempVar = FitProf({tmpIM'},Treshold,plateSize);                     %calculate the parameters of the normal distribution
+%         resFitCell{1}(l,:) = tempVar{1}(1,:);                               %resave obtained deltaZ
+%         resFitCell{2}(l,:) = tempVar{2}(1,:);                               %resave obtained deltaZ
+%         resFitCell{3}{l}   = tempVar{3};                                    %resave obtained goodness-of-fit
+%         imwrite(tmpIM,[smImDir '/' imNames{i}]);                            %save it into 'Smoothed' folder (but under original name)
+%         save([tmpfDir '/' imNames{i}(1:end-4) '.mat'],'tmpIM');             %save obtained data matrix into temporary directory
+%         k = k+1;l = l+1;                                                    %increase the counter and statusbar mover
+%     end
+% end
+% rmdir(tmpfDir,'s')
 
 % update statusbar
 handles.statusbar = statusbar(handles.figure1,...
@@ -627,6 +720,34 @@ else
 end
 
 guidata(hObject,handles);                                                   %update handles
+end
+
+function nCutsEdit_Callback(hObject, ~, handles)
+% hObject    handle to nCutsEdit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of nCutsEdit as text
+%        str2double(get(hObject,'String')) returns contents of nCutsEdit as a double
+
+handles.metricdata.RivProcPars{5} = str2double(get(hObject,'String'));      %get number of cuts
+
+guidata(hObject,handles);                                                   %update handle
+end
+
+
+% --- Executes during object creation, after setting all properties.
+function nCutsEdit_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to nCutsEdit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
 end
 
 %% Data processing - calculation
@@ -829,8 +950,10 @@ for i = 1:numel(YProfilPlatte)
     % smooth the found rivulet edges - remove jumps in rivulet width
     % pictures are high-res enough not to contain any big jums in the
     % rivulet edges positions
-    minLVec(i,:) = round(smooth(minLVec(i,:),100));                         %values need to be rounded (they are indexes) -> integers
-    minRVec(i,:) = round(smooth(minRVec(i,:),100));                         %n > 1600 (usually), so 100 neighbouring values isnt that many
+    if n > 300
+        minLVec(i,:) = round(smooth(minLVec(i,:),100));                     %values need to be rounded (they are indexes) -> integers
+        minRVec(i,:) = round(smooth(minRVec(i,:),100));                     %n > 1600 (usually), so 100 neighbouring values isnt that many
+    end
     % subtract the treshold from the current profile (it is a bacground
     % noise)
     TresholdC        = mean(TrVec);                                         %calculate mean value of the treshold/background liquid height
@@ -872,4 +995,49 @@ for i = 1:numel(YProfilPlatte)
     
 end
 resFitCell = {delta0Matrix;mFitMatrix;gofCell};
+end
+
+function YProfilPlatte =...
+    CutRiv(YProfilPlatte,nCuts)
+%
+%   [YProfilPlatte XProfilPlatte] =...
+%       CutRiv(YProfilPlatte,nCuts)
+%
+% Clensed variant of the CutRiv function from rivuletProcessing program,
+% this function does not contain any possibilities of graphic output.
+%
+% INPUT variables
+% YProfilPlatte     ... variable with heights of the rivulet
+% nCuts             ... number of cuts to make along the rivulet (scalar)
+%
+% OUTPUT variables
+% YProfilPlatte     ... heights of the rivulet, reduced to mean values
+%                       cell of matrixes (nPointsX x nCuts), mm
+% XProfilPlatte     ... linspace coresponding to plate width, m
+%
+
+% for all the images, all the YProfilPlatte have the same size
+Distance     = round(size(YProfilPlatte{1},2)/(nCuts+1));                   %number of points in each mean profile
+
+% for each image
+for i=1:numel(YProfilPlatte)
+    for n = 2:nCuts-1
+        if n*Distance-25 <= 0                                               %is there enough space at the beginning
+            YProfilPlatte{i}(:,1) = mean(YProfilPlatte{i}...
+                (:,1:n*Distance+25),2);
+        elseif n*Distance+24 >= numel(YProfilPlatte{i}(1,:))                %is there enought space at the end
+            YProfilPlatte{i}(:,nCuts) = mean(YProfilPlatte{i}...
+                (:,n*Distance-25:end),2);
+        else
+            YProfilPlatte{i}(:,n)=mean(YProfilPlatte{i}...                      %create mean profiles in the place of the cut, over 50 pixels
+            (:,n*Distance-25:n*Distance+25),2);
+        end
+    end
+    YProfilPlatte{i}(:,nCuts) = mean(YProfilPlatte{i}...                    %for the last cut, there may be less than 50 pixels
+            (:,n*Distance-25:end),2);
+    YProfilPlatte{i} = YProfilPlatte{i}(:,1:nCuts)*1e-3;                    %need to change size of output matrix, mm -> m
+%     !! all the functions are at the time working with height of the
+%     rivulet in mm !!
+    YProfilPlatte{i} = YProfilPlatte{i}*1e3;                                %plots in m, m -> mm
+end
 end
