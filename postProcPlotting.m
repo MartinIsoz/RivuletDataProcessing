@@ -358,9 +358,9 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
             tmpVar{1} = ['Liq. tp.: ' tmpVar{1}];                           %liquid type
             tmpVar{2} = ['F = ' tmpVar{2} ' Pa^{0.5}'];                     %f-factor
             tmpVar{3} = ['\alpha = ' tmpVar{3} '\circ{}'];                  %plate inclination angle
-            rdblCellStr{j} = [tmpVar{3} 10]; %...
-%                 tmpVar{2} 10 ...
-%                 tmpVar{3}] ;                                                %append string to legend
+            rdblCellStr{j} = [tmpVar{1} 10 ...
+                              tmpVar{2} 10 ...
+                              tmpVar{3}];                                   %append string to legend
         end
         switch shTable
             case 'Profiles'
@@ -460,10 +460,11 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     'Units','Normal',...
                     'Callback',@PopUpXAxsCorr_Callback,...
                     'Position',[0.3 0.01 0.4 0.08],'Value',1);              %create popup menu for choosing x axes
-                %===dimensionless flow rate -> mass flow rate
-                Data(:,4) = Data(:,4).*Data(:,3).*...                              %M->m
-                sqrt(Data(:,1)./(Data(:,2).*9.81.*sin(degtorad(Data(:,5)))));
-                %===dimensionless flow rate -> mass flow rate
+%                 %===dimensionless flow rate -> mass flow rate
+%                 !!Currently, Data(:,4) contains the mass flow rate!!
+%                 Data(:,4) = Data(:,4).*Data(:,3).*...                       %M->m, [--] -> kg/s -> g/s
+%                 sqrt(Data(:,1)./(Data(:,2).*9.81.*sin(degtorad(Data(:,5)))))*1e3;
+%                 %===dimensionless flow rate -> mass flow rate
                 brks1 = [1 find(diff(Data(:,4))<0)'+1 numel(Data(:,4))+1];  %indexes of new data starts (diff in dimless fl. rate < 0)
                 brks2 = find(diff(Data(:,1)~=0))'+1;                        %indexes of new liquid starts (diff in surf tens ~=0)
                 brks  = unique([brks1 brks2]);                              %combine starts of new data with starts of new liquids
@@ -503,7 +504,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         ylabel(hPlAxes,'a_{l--g}, [m^{-1}]','FontSize',16);
                 end
                 set(hTtl,'FontSize',18,'FontWeight','bold')                 %modify title properties
-                xlabel(hPlAxes,'m, [kg s^{-1}]','FontSize',16);
+                xlabel(hPlAxes,'m, [g s^{-1}]','FontSize',16);
 %                 xlabel(hPlAxes,'M, [--]','FontSize',16);
                 % create leged entries (ID strings of data groups)
                 hLegend = legend(hPlot(:,1),rdblCellStr,'Location','Best',...

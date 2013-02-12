@@ -541,6 +541,7 @@ if DNTLoadIM == 0                                                           %are
         'loaded in memory']);
     resFitCell = FitProf(YProfilPlatte,Treshold,plateSize);                 %calculate the parameters of the normal distribution
     % !! This part of the code was NOT tested !!
+    drawnow;                                                                %update the GUI
 else                                                                        %otherwise, i need to do this image from image...
     k = 1;l = 1;                                                            %auxiliary indexing variables
     for i = selIm                                                           %for all the selected images
@@ -574,6 +575,7 @@ else                                                                        %oth
         resFitCell{2}(l,:) = tempVar{2}(1,:);                               %resave obtained deltaZ
         resFitCell{3}{l}   = tempVar{3};                                    %resave obtained goodness-of-fit
         k = k+1;l = l+1;                                                    %increase the counter and statusbar mover
+        drawnow;                                                            %update the gui
     end
 end
 
