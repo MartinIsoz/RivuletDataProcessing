@@ -94,6 +94,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 % 3. rivuletProcessing.m (main function for data evaluation)
 % 4. save_to_base.m (function for saving data into base workspace)
 % 5. fluidDataFcn.m (database with fluid data)
+% !! and many others, add the names !!
 % - Program needs image processing, neural networks, statistics and curve
 % fitting toolboxes installed on your system
 %
@@ -2021,7 +2022,7 @@ else
     msgbox('There are no availible processed data yet','modal');uiwait(gcf);
 end
 
-
+%% Other functions menu
 
 % --------------------------------------------------------------------
 function OtherFunc_Callback(~, ~, ~)

@@ -144,9 +144,16 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 appdata.prgmcontrol.comp = 1;                               %store info about choosing compatible data
                 appdata.prgmcontrol.shTable = 'IFACorr';                    %store info about choosed data
                 guidata(hObject,appdata);
+            elseif strcmp(strCellDT{selDT},'ARhoCorr') == 1
+                strCellNDT = strCellDT(strcmp(strCellDT,'ARhoCorr')==1);    %reduce only to interfacial area surf. dens. corr. data
+                % update appdata
+                appdata.prgmcontrol.comp = 1;                               %store info about choosing compatible data
+                appdata.prgmcontrol.shTable = 'ARhoCorr';                   %store info about choosed data
+                guidata(hObject,appdata);
             else
-                strCellNDT = strCellDT(strcmp(strCellDT,'Profiles') == 0&...%get rid of profiles and IFACorr
-                    strcmp(strCellDT,'IFACorr') == 0);
+                strCellNDT = strCellDT(strcmp(strCellDT,'Profiles') == 0&...%get rid of profiles and IFACorr and ARhoCorr
+                    strcmp(strCellDT,'IFACorr') == 0&...
+                    strcmp(strCellDT,'ARhoCorr') == 0);
                 % update appdata
                 appdata.prgmcontrol.comp = 1;                               %store info about choosing compatible data
                 appdata.prgmcontrol.shTable = 'Other';                      %store info about choosed data
@@ -183,8 +190,11 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         stInd(j+1)  = stInd(j) + numel(imNames);            %starting position of the next data group
                         MsrtStr     = cell(1,numel(imNames));               %restart MsrtStr variable
                         for l = 1:numel(imNames)
-                            MsrtStr{l} = ['M = '...                         %compose the string to write into the list
-                                num2str(MList{k}(l),'%5.2f') ', '...        %dimensionless flow rate
+%                             MsrtStr{l} = ['M = '...                         %compose the string to write into the list
+%                                 num2str(MList{k}(l),'%5.2f') ', '...        %dimensionless flow rate
+%                                 imNames{l}(5:end-4)];                       %number of experiment
+                            MsrtStr{l} = ['m = '...                         %compose the string to write into the list
+                                num2str(MList{k}(l),'%5.2f') ' g/s, '...    %liquid mass flow rate
                                 imNames{l}(5:end-4)];                       %number of experiment
                         end
                         strCellMS = [strCellMS strCellGR(k) separators(1)...
@@ -201,10 +211,22 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         appdata.prgmcontrol.selMS    = selGR;               %initialization of the next selected indexes (needed for PushPlot)
                         appdata.prgmcontrol.GR       =...
                             cellstr(num2str(selGR',1))';                    %needed for making legend strings
+                    case 'ARhoCorr'                                         %correlations are to be shown (very similar to IFACorr case)
+                        strCellMS = [strCellMS strCellGR(k) separators(1)...
+                            'ARhoCorr' separators(2)];
+                        stInd(j+1) = stInd(j) + 1;                          %only ARhoCorr in the group, dont need the last listbox
+                        fillARhoCorrUITable(TableData,dataSH);
+                        set(PushPlot,'Enable','on');                        %the data are plotable now
+                        % initialize fields needed by PushPlot
+                        selGR = appdata.prgmcontrol.selGR;
+                        appdata.prgmcontrol.selMS    = selGR;               %initialization of the next selected indexes (needed for PushPlot)
+                        appdata.prgmcontrol.GR       =...
+                            cellstr(num2str(selGR',1))';                    %needed for making legend strings
                     case 'Other'                                            %mSpeed, rivWidth and/or rivHeight are to be shown
                         Msrt = cellstr(num2str(MUList{k},'%5.2f'))';        %get list of unique dimensionless flow rates, pumpe regimes
-                        for l = 1:numel(Msrt)
-                            Msrt{l} = ['M = ' Msrt{l}];
+                        for l = 1:numel(Msrt)                               %or the liquid mass flow rates
+%                             Msrt{l} = ['M = ' Msrt{l}];
+                            Msrt{l} = ['m = ' Msrt{l} ' g/s'];
                         end
                         strCellMS = [strCellMS strCellGR(k) separators(1)...
                             Msrt separators(2)];
@@ -324,7 +346,7 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 stIndVec    = cumsum(cellfun(@numel,MList(selGR)))+1;       %starting indexes of new groups for profiles
             case 'Other'
                 stIndVec    = cumsum(cellfun(@numel,MUList(selGR)))+1;      %starting indexes of new groups for other data    
-            case 'IFACorr'
+            case {'IFACorr' 'ARhoCorr'}
                 stIndVec    = selMS + 1;                                    %starting indexes of new measurements (for IFACorr)
         end
         rdblCellStr = cell(1,numel(selGR));                                 %create empty var
@@ -340,7 +362,6 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
 %                 tmpVar{2} 10 ...
 %                 tmpVar{3}] ;                                                %append string to legend
         end
-%         a = [1 1] + [1;1];
         switch shTable
             case 'Profiles'
                 set(hPlFig,'Name','Mean prof. in cuts');                    %set name of the plot
@@ -402,7 +423,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 lgStr = cell(1,numel(selMS));
                 flRates=cell2mat(cellfun(@transpose,MList,'UniformOutput',0));%create list of flow rates to be shown
                 for j = 1:numel(selMS)                                      %create legend for each chosen picture
-                    lgStr{j} = ['M = ' num2str(flRates(selMS(j)),'%3.1f') 10 rdblCellStr{j}];
+%                     lgStr{j} = ['M = ' num2str(flRates(selMS(j)),'%3.1f') 10 rdblCellStr{j}];
+                    lgStr{j} = ['m = ' num2str(flRates(selMS(j)),'%3.1f') ' g/s' 10 rdblCellStr{j}];
                 end
                 if mod2 ~= 0                                                %if there is left space, use it for legend
                     hGhostAx = axes('OuterPosition',...                     %create ghost axes
@@ -421,8 +443,8 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 end
                 legend(hGhostAx,lgStr',...
                     'OuterPosition',get(hGhostAx,'Position'));              %create legend for ghost axes
-            case 'IFACorr'
-                set(hPlFig,'Name','IFACorr data');                          %set name of the plot
+            case {'IFACorr' 'ARhoCorr'}
+                set(hPlFig,'Name',[shTable ' data']);                          %set name of the plot
                 hPlAxes   = axes('OuterPosition',[0 0.1 1 0.9],...          %create axes with space for popupmenu
                     'Tag','hPlAxes');
                 % check value of LinkData and set up selection function for
@@ -466,13 +488,23 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         color(j,:),'LineStyle','none','MarkerSize',10);
                 end
                 set(hPlot(:,1),'Visible','off');                            %make everything except mean values invisible
-%                 hTtl = title(hPlAxes,['Interfacial area as fun. of '...
-%                     'dimensionless liq. flow rate']);
-                  hTtl = title(hPlAxes,['Interfacial area as fun. of '...
-                    'liquid mass flow rate']);
+                switch shTable                                              %switch the chosen correlation variable
+                    case 'IFACorr'
+                        hTtl = title(hPlAxes,['Interfacial area as fun. of '...
+                            'liquid mass flow rate']);
+%                         hTtl = title(hPlAxes,['Interfacial area as fun. of '...
+%                             'dimensionless liq. flow rate']);
+                        ylabel(hPlAxes,'S_{l--g}, [m^2]','FontSize',16);
+                    case 'ARhoCorr'
+                        hTtl = title(hPlAxes,['Interfacial area surf. '...
+                            'density as fun. of liquid mass flow rate']);
+%                         hTtl = title(hPlAxes,['Interfacial area surf. '...
+%                             ' density as fun. of dimensionless liq. flow rate']);
+                        ylabel(hPlAxes,'a_{l--g}, [m^{-1}]','FontSize',16);
+                end
                 set(hTtl,'FontSize',18,'FontWeight','bold')                 %modify title properties
                 xlabel(hPlAxes,'m, [kg s^{-1}]','FontSize',16);
-                ylabel(hPlAxes,'S_{l--g}, [m^2]','FontSize',16);
+%                 xlabel(hPlAxes,'M, [--]','FontSize',16);
                 % create leged entries (ID strings of data groups)
                 hLegend = legend(hPlot(:,1),rdblCellStr,'Location','Best',...
                     'Interpreter','tex');
@@ -501,6 +533,10 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         ttlStr = ['Rivulet height as function'...
                             ' of distance from the top of the plate'];
                         ylbStr = 'Height, [m]';
+                    case 4
+                        ttlStr = ['Rivulet surface density as function'...
+                            ' of distance from the top of the plate'];
+                        ylbStr = 'a, [m^{-1}]';
                 end
                 set(hPlFig,'Name','Riv. Height, Width and liq. speed data');%set name of the plot
                 hPlAxes = axes('OuterPosition',[0 0 1 1],...                %create axes filling all the space
@@ -520,31 +556,46 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                 hold(hPlAxes,'on');
                 hPlot = zeros(numel(brks)-1,size(Data,2)-3);                %allocate space for the variable hPlot
                 for j = 1:numel(brks)-1                                     %for all selected dimless flow rates
+%                     legendCellStr{j} =...
+%                         ['M = ' num2str(flRates(j),'%3.1f') 10 ...          %compose a legend entry
+%                         rdblCellStr{j}];
                     legendCellStr{j} =...
-                        ['M = ' num2str(flRates(j),'%3.1f') 10 ...          %compose a legend entry
+                        ['m = ' num2str(flRates(j),'%3.1f') ' g/s' 10 ...   %compose a legend entry
                         rdblCellStr{j}];
-                    hPlot(j,1:end-1) = plot(hPlAxes,...
-                        Data(brks(j):brks(j+1)-1,end),...                   %plot datagroup - measurements
-                        Data(brks(j):brks(j+1)-1,[1:end-5 end-3]),'^');     %skip the mean values
-                    hPlot(j,end) = errorbar(hPlAxes,...                     %plot mean values with errorbars setted up by std()
-                        Data(brks(j):brks(j+1)-1,end),...                   %x-axis, distances from the plate top (nCuts,1)
-                        Data(brks(j):brks(j+1)-1,end-4),...                 %y-axis, mean values (nCuts,1)
-                        Data(brks(j):brks(j+1)-1,end-3),'^-');              %errorbars, 2xstd, standard deviations (nCuts,1)
-                    set(hPlot(j,:),'Color',color(j,:),...                   %color the plot
-                        'MarkerFaceColor',color(j,:));                      %fill the marker faces with the same color
-                    set(hPlot(j,1:end-1),'Visible','off');                  %hide everything except mean values
+                    switch selDT
+                        case {1 2 3}                                        %for the "short" other data
+                            hPlot(j,1:end-1) = plot(hPlAxes,...
+                                Data(brks(j):brks(j+1)-1,end),...           %plot datagroup - measurements
+                                Data(brks(j):brks(j+1)-1,[1:end-5 end-3]),'^');%skip the mean values
+                            hPlot(j,end) = errorbar(hPlAxes,...             %plot mean values with errorbars setted up by std()
+                                Data(brks(j):brks(j+1)-1,end),...           %x-axis, distances from the plate top (nCuts,1)
+                                Data(brks(j):brks(j+1)-1,end-4),...         %y-axis, mean values (nCuts,1)
+                                Data(brks(j):brks(j+1)-1,end-3),'^-');      %errorbars, 2xstd, standard deviations (nCuts,1)
+                            set(hPlot(j,:),'MarkerSize',10,'LineStyle','none');
+                            set(hPlot(j,:),'Color',color(j,:),...           %color the plot
+                                'MarkerFaceColor',color(j,:));              %fill the marker faces with the same color
+                            set(hPlot(j,1:end-1),'Visible','off');          %hide everything except mean values
+                        case 4                                              %for the long data
+                            hPlot(j,1) = plot(hPlAxes,...
+                                Data(brks(j):brks(j+1)-1,end),...           %plot datagroup - measurements
+                                Data(brks(j):brks(j+1)-1,end-4),'.');       %plot only mean values
+                            set(hPlot(j),'MarkerSize',1,'LineStyle','none');
+                            set(hPlot(j),'Color',color(j,:),...             %color the plot
+                                'MarkerFaceColor',color(j,:));              %fill the marker faces with the same color
+                    end
                 end
                 hLegend = legend(hPlot(:,1),legendCellStr,...               %set up legend, number of groups == number of columns
                     'Location','EastOutside',...
                     'Interpreter','tex');
+                legChil = get(hLegend,'Children');
+                set(legChil(1:3:end),'MarkerSize',10);
                 % modifying the plot
-                set(hPlot,'MarkerSize',10,'LineStyle','none');
                 xlabel(hPlAxes,'Distance from the top of the plate, [m]',...
-                    'FontSize',16);  %set xlabel (common to all)
+                    'FontSize',16);                                         %set xlabel (common to all)
                 xlim(hPlAxes,[0 max(plateSize(:,2))])                       %set xLim as the biggest plate length
                 ylabel(hPlAxes,ylbStr,'FontSize',16);                                     %set y label
-                %hTtl = title(hPlAxes,ttlStr);                               %set title of the figure
-                %set(hTtl,'FontSize',13,'FontWeight','bold')                 %modify title properties
+                hTtl = title(hPlAxes,ttlStr);                               %set title of the figure
+                set(hTtl,'FontSize',18,'FontWeight','bold')                 %modify title properties
                 % save handles into appdata
                 appdata.handles.hPlFig = hPlFig;
                 appdata.handles.hPlAxes= hPlAxes;
@@ -870,10 +921,55 @@ function fillIFACorrUITable(hTable,dataSH)
 % all the correlation variables have the same number of columns, they
 % differs only in number of rows - number of images for the experiment
 
+% ColNames = {'Surface tension,|[N/m]',...                                    %set up ColNames for correlation data
+%         'Density,|[kg/m3]','Viscosity,|[Pa s]',...
+%         'Dimensionless,|flow rate, [-]','Plate incl.|angle,[deg]',...
+%         'F-Factor,|[Pa^0.5]','Riv. surface|area, [m2]'};
 ColNames = {'Surface tension,|[N/m]',...                                    %set up ColNames for correlation data
         'Density,|[kg/m3]','Viscosity,|[Pa s]',...
-        'Dimensionless,|flow rate, [-]','Plate incl.|angle,[deg]',...
+        'Liquid mass,|flow rate, [g/s]','Plate incl.|angle,[deg]',...
         'F-Factor,|[Pa^0.5]','Riv. surface|area, [m2]'};
+% creating data matrix to show
+Data    = [];
+DataClr = [];
+rgb     = distinguishable_colors(numel(dataSH));                            %create matrix of distinguishable colors for each group
+parfor i = 1:size(rgb,1)                                                    %convert these colors into html
+    tmpHex    = dec2hex(round(255*rgb(i,:)));
+    html(i,:) = [tmpHex(1,:) tmpHex(2,:) tmpHex(3,:)];
+end
+for i = 1:numel(dataSH) %#ok<FORPF>
+    % adding i-th dataset to data matrix to show
+    Data = [Data;dataSH{i}];
+    % coloring data matrix - each dataset has its own color
+    tmpMat = reshape(strtrim(cellstr(num2str(dataSH{i}(:)))),...
+        size(dataSH{i}));                                                   %convert data to cell of strings
+    for j = 1:numel(tmpMat)
+        tmpMat(j) = strcat(...                                              %modify format of the problematic value
+            ['<html><span style="color: #' ...
+            html(i,:) '; font-weight: normal;">'], ...
+            tmpMat(j), ...
+            '</span></html>');
+    end
+    DataClr = [DataClr;tmpMat];
+end
+set(hTable,'Data',DataClr,'ColumnName',ColNames,'UserData',Data,...
+    'ColumnWidth',{100});
+end
+
+function fillARhoCorrUITable(hTable,dataSH)
+% all the correlation variables have the same number of columns, they
+% differs only in number of rows - number of images for the experiment
+%
+% Note: this function is practically a copy of the fillIFACorrUITable
+
+% ColNames = {'Surface tension,|[N/m]',...                                    %set up ColNames for correlation data
+%         'Density,|[kg/m3]','Viscosity,|[Pa s]',...
+%         'Dimensionless,|flow rate, [-]','Plate incl.|angle,[deg]',...
+%         'F-Factor,|[Pa^0.5]','a|[m^(-1)]'};
+ColNames = {'Surface tension,|[N/m]',...                                    %set up ColNames for correlation data
+        'Density,|[kg/m3]','Viscosity,|[Pa s]',...
+        'Liquid mass,|flow rate, [g/s]','Plate incl.|angle,[deg]',...
+        'F-Factor,|[Pa^0.5]','a|[m^(-1)]'};
 % creating data matrix to show
 Data    = [];
 DataClr = [];
@@ -923,8 +1019,11 @@ for i = 1:numel(dataSH)                                                  %for al
 end                                                                         %last 6 columns are added data, not measurements
 ColNames = 1:max(max(numMS));                                               %need space for all the data
 ColNames = reshape(strtrim(cellstr(num2str(ColNames(:)))), size(ColNames)); %vector -> cell of strings
+% ColNames = [ColNames {'' 'Mean|value' 'Standard|deviation'...               %add names for last 6 columns
+%     'Dimensionless|flow rate, [-]' 'F-Factor,|[m3/s]',...
+%     'Distance from|plate top, [m]'}];
 ColNames = [ColNames {'' 'Mean|value' 'Standard|deviation'...               %add names for last 6 columns
-    'Dimensionless|flow rate, [-]' 'F-Factor,|[m3/s]',...
+    'Liquid mass|flow rate, [-]' 'F-Factor,|[m3/s]',...
     'Distance from|plate top, [m]'}];
 % prepare data to be shown
 Data    = [];

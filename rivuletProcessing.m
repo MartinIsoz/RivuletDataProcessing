@@ -85,6 +85,14 @@ function OUT = rivuletProcessing(handles)
 % OUT.RivWidth      regimes of the pumpe
 % OUT.RivHeight
 % OUT.IFACorr   ... double with data for correlations
+%=TO-BE-DONE===============================================================
+% OUT.ARhoCorr  ... double with rivulet surface density (integral), it is
+%                   A(rivulet)/V(rivulet), m^-1
+% OUT.ARhoL     ... cell with dependence of rivulet surface density on the
+%                   plate length coordinate
+% Note: the quick data overview and postProcPlotting parts of the program
+%       have to be changed accordingly to this
+%==========================================================================
 %
 % other OUTPUTS - text files
 % a. text file for plotting profiles - cuts
@@ -97,6 +105,16 @@ function OUT = rivuletProcessing(handles)
 %    1 file for each regime
 % e. text file with interfacial areas of the rivulets
 %    1 file for each regime
+%=TO-BE-DONE===============================================================
+% f. text file with rivulets surface densities
+%    1 file for each regime
+% g. text file with dependencies of the rivulet surface densities on the
+%    plate length coordinate
+%    1 file for each regime
+% Note: f. and g. can be merged together, first row - integral
+%    characteristics and then the dependency on the plate length
+%    coordinate, but it would probably need to somehow modify the 
+%==========================================================================
 %
 % Scheme of algorithm
 % 1. convert grayscale to distances
@@ -206,7 +224,7 @@ txtPars = {M FFactor tmpVar fluidType InclAngle};                           %par
 % heights of the film in mm
 if DNTLoadIM == 0                                                           %are all the data loaded?
     handles.statusbar = statusbar(handles.MainWindow,...
-        ['Converting grayscale values into distances for all images ',...   %updating th statusbar
+        ['Converting grayscale values into distances for all images ',...   %updating the statusbar
         'loaded in memory']);
     YProfilPlatte = ImConv(daten,EdgCoord,filmTh,RegressionPlate,...        %if the are, I can process them all at once
         GR.regr,GR.regime,GR.format,txtPars,storDir,rootDir);
@@ -220,6 +238,7 @@ if DNTLoadIM == 0                                                           %are
     handles.statusbar.ProgressBar.setVisible(false);                        %hide progressbar
     set(handles.statusbar,'Text','Saving smoothed images');
     cellfun(@imwrite,YProfilPlatte,tmpCell);                                %write images into smoothed folder (under original names)
+    drawnow;                                                                %redraw the GUI (to keep it from freezing)
 else                                                                        %otherwise, i need to do this image from image...
     mkdir(tmpfDir);                                                         %I need to create directory for temporary files
     for i = 1:nImages
@@ -238,6 +257,7 @@ else                                                                        %oth
             fspecial('disk',FilterSensitivity));
         imwrite(tmpIM,[smImDir '/' files{i}]);                              %save it into 'Smoothed' folder (but under original name)
         save([tmpfDir '/' files{i}(1:end-4) '.mat'],'tmpIM');               %save obtained data matrix into temporary directory
+        drawnow;                                                            %redraw the GUI (to keep it from freezing)
     end
 end
 
@@ -257,8 +277,9 @@ end
 % areas and obtain matrixes of indexes containing the rivulet borders
 
 if DNTLoadIM == 1
-    IFArea = zeros(numel(files),1);                                         %images are not loaded, preallocat variable
-    minLVec= cell(1,nImages);minRVec = minLVec;                             %preallocate variable for vector sides
+    IFArea = zeros(numel(files),1);                                         %images are not loaded, preallocate variable
+    ARhoCorr= IFArea;
+%     minLVec= cell(1,nImages);minRVec = minLVec;                             %preallocate variable for vector sides
     for i = 1:nImages
         handles.statusbar = statusbar(handles.MainWindow,...
             'Calculating interfacial area of rivulet %d of %d (%.1f%%)',... %updating statusbar
@@ -268,19 +289,25 @@ if DNTLoadIM == 1
         handles.statusbar.ProgressBar.setMaximum(nImages);
         handles.statusbar.ProgressBar.setValue(i);
         load([tmpfDir '/' files{i}(1:end-4) '.mat']);                       %if images are not present in handles, load them from tmpfDir
-        [IFArea(i),tmpIM,~,~,minLVec{i},minRVec{i}]= ...
+        [IFArea(i),tmpIM,~,~,~,~,ARhoCorr(i),ARhoL{i}]= ...
             RivSurf({tmpIM'},Treshold,plateSize);                           %I need to transpose tmpIM -> coherence with YProfilPlatte
+%         [IFArea(i),tmpIM,~,~,minLVec{i},minRVec{i},~,ARhoCorr(i),ARhoL{i}]= ...
+%             RivSurf({tmpIM'},Treshold,plateSize);                           %I need to transpose tmpIM -> coherence with YProfilPlatte
         tmpIM            = tmpIM{:}';                                       %transpose back (this should be cleaned) and convert from cell to dbl
         save([tmpfDir '/' files{i}(1:end-4) '.mat'],'tmpIM');               %resave image with subtracted "background/noise"
+        drawnow;                                                            %redraw the GUI (to keep it from freezing)
     end
-    minLVec = reshape([minLVec{:}],numel(minLVec),[]);                      %convert cell to double (original vectors are saved in rows)
-    minRVec = reshape([minRVec{:}],numel(minRVec),[]);
-%     a = [1 1] + [1;1]
+%     minLVec = cell2mat(minLVec');                                         %convert cell to double (original vectors are saved in rows)
+%     minRVec = cell2mat(minRVec');
+    ARhoL = cell2mat(ARhoL');
 else
     handles.statusbar = statusbar(handles.MainWindows,...
         'Calculating interfacial area of rivulets');                        %update statusbar
-    [IFArea,YProfilPlatte,~,~,minLVec,minRVec] =...
+%     [IFArea,YProfilPlatte,~,~,minLVec,minRVec] =...
+%         RivSurf(YProfilPlatte,Treshold,plateSize);                          %this function does not need graphical output
+    [IFArea,YProfilPlatte,~,~,~,~,ARhoCorr,ARhoL] =...
         RivSurf(YProfilPlatte,Treshold,plateSize);                          %this function does not need graphical output
+    drawnow;                                                                %redraw the GUI (to keep it from freezing)
 end
 
 %% Creating visualizations of the rivulet
@@ -476,6 +503,19 @@ varOUT= IFArea;                                                             %out
 OUT.IFACorr = saveCorrData(varOUT,varIN,'IFAreaCorr');
 cd(rootDir)
 
+% 6. Surface area density of the rivulets, integral
+cd([storDir '/Correlation'])
+varIN = {sigma rho eta M InclAngle FFactor};                                %input variables for correlation
+varOUT= ARhoCorr;                                                           %output variable for correlation
+OUT.ARhoCorr = saveCorrData(varOUT,varIN,'ARhoCorr');
+cd(rootDir)
+
+% 7. developement of the surface area density along the rivulet
+sPars = {M FFactor plateSize size(ARhoL,2)};                                %need to change input - number of cuts
+cd([storDir '/Correlation'])
+OUT.ARhoL = saveMatSliced(ARhoL,sPars,files,'ARhoL');
+cd(rootDir)
+
 set(handles.statusbar,'Text','Rivulet processing ended succesfully');
 end
 
@@ -547,8 +587,9 @@ Pumpe=Pumpe';                                                               %vek
 
 %Rotameter calibration for mass flow
 m_Pumpe = polyval(Reg,Pumpe);                                               %doesn't depend on the degree of the polynomial
-Cap     = sqrt(sigma/(rho*g));                                              %length of capilary
-M       = (m_Pumpe/1000)./(eta*Cap);                                        %dimensionless mass flow
+% Cap     = sqrt(sigma/(rho*g));                                              %length of capilary
+% M       = (m_Pumpe/1000)./(eta*Cap);                                        %dimensionless mass flow
+M       = m_Pumpe;
 V_Pumpe = m_Pumpe./1000./rho;                                               %volumetric flow, m^3/s
 end
 
@@ -749,10 +790,10 @@ for i=1:numel(YProfilPlatte)
     if GR == 1
         % create description of the plot - id of the measurement
         txtStr = ['Liq. tp.: ' txtPars{4} 10 ...                            %liquid type
-            'M = ' mat2str(txtPars{1}(imNumber),4) 10 ...                   %dimensionless flow
+            'm = ' mat2str(txtPars{1}(imNumber),4) 'g s^{-1}' 10 ...       %dimensionless flow /flow rate
             'F = ' mat2str(txtPars{2},4) ' Pa^{0.5}' 10 ...                 %f-factor, [Pa^0.5]
-            '\alpha = ' mat2str(txtPars{5}) '^\circ{}' 10 ...               %plate inclination angle, [degrees]
-            'image n^o: ' mat2str(txtPars{3}(imNumber))];                   %number of image
+            '\alpha = ' mat2str(txtPars{5}) '^\circ{}'];% 10 ...               %plate inclination angle, [degrees]
+%             'image n^o: ' mat2str(txtPars{3}(imNumber))];                   %number of image
         % decide if show plot
         if GRregime == 1
             Visible = 'off';                                                %if I want the graphs only to be saved, I dont have to make them
@@ -765,12 +806,13 @@ for i=1:numel(YProfilPlatte)
         plot(hAxs,XProfilPlatte,YProfilPlatte{i})
         axis(hAxs,'tight');
         text(0.05,0.9,txtStr,'Units','Normal');                             %add the description to the plot
-        xlabel(hAxs,'width of the plate, [m]')
-        ylabel(hAxs,'height of the rivulet, [m]')
-        ttl=title(hAxs,['\bf Mean profiles of riv. ' mat2str(imNumber)...
-            ' over every ' mat2str(plateSize(2)/(nCuts+1)*1e3,3)...
-            ' mm of the plate']);
-        set(ttl,'FontSize',13,'Interpreter','tex')
+        set(gca,'FontSize',16)
+        xlabel(hAxs,'y, [m]','FontSize',28)
+        ylabel(hAxs,'z, [m]','FontSize',28)
+%         ttl=title(hAxs,['\bf Mean profiles of riv. ' mat2str(imNumber)...
+%             ' over every ' mat2str(plateSize(2)/(nCuts+1)*1e3,3)...
+%             ' mm of the plate']);
+%         set(ttl,'FontSize',13,'Interpreter','tex')
         legCell = (1:nCuts) * plateSize(2)/(nCuts+1)*1e3;                   %create vector of legend entries
         legCell = cellstr(num2str(legCell(:)));                             %convert vector to cell of string
         for j = 1:numel(legCell)
@@ -793,7 +835,7 @@ end
 end
 
 %% Function for calculating the rivulet area and local width
-function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec] = ...
+function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec,ARhoCorr,ARhoL] = ...
     RivSurf(YProfilPlatte,Treshold,plateSize)
 %
 %   function [IFArea RivWidth RivHeight minLVec minRVec] = ...
@@ -819,6 +861,13 @@ function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec] = ...
 % RivHeight         ... local max. height of the rivulet (for each cut)
 %                       (numel(YProfilPlatte) x numel(ZDim))
 % minLVec, minRVec  ... vertices of the rivulet (indexes), to cut of edges
+% ARhoCorr          ... variable with liquid/gas interfacial area density
+%                       (integral, for the whole rivulet)
+%                       vector of scalar values for each image
+% ARhoL             ... variable for storing the dependence of interfacial
+%                       area density on the plate length coordinate
+%                       (numel(YProfilPlatte) x numel(ZDim)-1)
+%                       numel(ZDim)-1 -> I use alwas the feedforward dZ
 %
 % to keep the axis marking
 % X -> width of the plate, m
@@ -829,6 +878,12 @@ function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec] = ...
 % function becames constant, another 'simple' algorithm was introduced ->
 % treshold is estimated automatically based on first quartile of each
 % profile (TresholdUsed = q0.25 + Treshold). Changes should be made to gui
+%
+% Note: there is feature to calculate the "contact angle" added to this
+% version, calculated angles are exported into the text file
+% "strangeAnlge.txt", for each processed image, there is one column of the
+% contact angles on the right side of the rivulet, one column for the its
+% left side and one column for the mean
 %
 % -> advised values of treshold:
 %    complex algorithm: 1e-3;
@@ -844,8 +899,12 @@ RivWidth= zeros(numel(YProfilPlatte),n);                                    %var
 RivHeight=zeros(numel(YProfilPlatte),n);                                    %variable for rivulet height
 minLVec = zeros(numel(YProfilPlatte),n);                                    %left sides of the rivulet
 minRVec = zeros(numel(YProfilPlatte),n);                                    %right sides of the rivulet
+ARhoCorr= IFArea;                                                           %variable for the interfacial area density
+ARhoL   = zeros(numel(YProfilPlatte),n-1);                                  %variable for dep. i-f dens. on z-coord
 
 TrVec=zeros(1,n);                                                           %background/noise liquid height
+
+sArc = zeros(1,n-1);vArc = sArc;                                            %variables for saving local if surfaces and riv volumes
 
 % for all the images
 % calculating the deltaX (distance between 2 pixels)
@@ -858,7 +917,7 @@ IndXMean= round(m/2);                                                       %X c
 % for each image
 for i = 1:numel(YProfilPlatte) 
     YProfilPlatte{i} = YProfilPlatte{i}*1e-3;                               %mm -> m
-%     YMin = 0;
+%     YMin = 0;                                                               %auxiliary variables for the graphics
 %     YMax = max(max(YProfilPlatte{i}));
     smtProf          = smooth(YProfilPlatte{i}(:),30);                      %smooth all the data at once
     smtProf          = reshape(smtProf,m,n);                                %reshape to the original size
@@ -986,43 +1045,6 @@ for i = 1:numel(YProfilPlatte)
         % save left and right side of the rivulet
         minLVec(i,j) = tmpIndL;
         minRVec(i,j) = tmpIndR;
-%         if j == 1
-%             figHandle = figure;
-%         end
-% %         if j > 1000        
-%         figure(figHandle);
-%         plot(1:numel(tmpProf),YProfilPlatte{i}(:,j));
-%         hold on
-%         plot(1:numel(tmpProf),tmpProf,'r');
-%         plot(tmpIndL,tmpProf(tmpIndL),'r^','MarkerFaceColor','Red')
-%         plot(tmpIndR,tmpProf(tmpIndR),'r^','MarkerFaceColor','Red')
-%         plot(IndX,tmpProf(IndX),'g^','MarkerFaceColor','Green')
-%         switch algtype
-%             case 'complex'
-%         xlabel({['{\bf diff LEFT: } ' num2str(diffVecL(tmpIndL),'%5.5e') ...
-%             '{\bf diff RIGHT: }' num2str(diffVecR(tmpIndR-IndX+1),'%5.5e')]...
-%             ['{\bf tmpProf LEFT: }' num2str(tmpProf(tmpIndL),'%5.5e')...
-%             '{\bf tmpProf RIGHT: }' num2str(tmpProf(tmpIndR),'%5.5e')]...
-%             ['{\bf Q_{025}(tmpProf): }' num2str(q025Prof,'%5.5e')...
-%             '{\bf RivHeight: }' num2str(RivHeight(i,j),'%5.5e')]})
-%             case 'simple'
-%         xlabel({['{\bf tmpProf LEFT: }' num2str(tmpProf(tmpIndL),'%5.5e')...
-%             '{\bf tmpProf RIGHT: }' num2str(tmpProf(tmpIndR),'%5.5e')]...
-%             ['{\bf Q_{025}(tmpProf): }' num2str(q025Prof,'%5.5e')...
-%             '{\bf RivHeight: }' num2str(RivHeight(i,j),'%5.5e')]...
-%             ['{\bf Treshold:}' num2str(q025Prof+Treshold,'%5.5e')]});   
-%         end
-%         title(['{\bf Profile ' num2str(j) ' of ' num2str(n) '}']);
-%         ylim([YMin YMax]);
-%         xlim([1 numel(tmpProf)])
-%         hold off
-%         drawnow
-%         if n < 100
-%             pause(1)
-% %         else
-% %             pause(0.05)
-%         end
-% %         end
     end
     if n > 300                                                              %for large number of cuts (probably the whole image)
         % smooth the found rivulet edges - remove jumps in rivulet width
@@ -1042,27 +1064,48 @@ for i = 1:numel(YProfilPlatte)
     RivWidth(i,:) = (minRVec(i,:) - minLVec(i,:))*deltaX;                   %number of elements in rivulet x width of element
     meanRW        = mean(RivWidth(i,:));                                    %calculate mean rivulet width
     
+    
     % calculate the interfacial area of the rivulet
     % IFArea = lengthOfArc x lengthOfPlate(between 2 arcs)
     
     % for all horizontal cuts
+    deltaYM = diff(YProfilPlatte{i});                                       %obtain matrix of the differences along the YPP rows
+    deltaYM = sqrt(deltaYM.^2 + ones(m-1,n)*deltaX^2);                      %calculate the local additions to the lArc
+    locHM   = (YProfilPlatte{i}(1:end-1,:) + YProfilPlatte{i}(2:end,:))./2; %calculate mean local heights for rect. rule integration, rows
     for j = 1:n-1                                                           %need to omit the last piece (but the error wouldn't be big)
         % walking through the arc and adding the approximate length of the
         % element
-        lArc  = 0;                                                          %restart the length counter
-        for k = minLVec(i,j):minRVec(i,j)-1                                 %from left to right side of the rivulet
-            deltaY = YProfilPlatte{i}(k+1,j) - YProfilPlatte{i}(k,j);
-            lArc = lArc + sqrt(deltaY.^2 + deltaX.^2);                      %total length of arc + aproximate length of an element
-        end
         if RivWidth(i,j) > 3*meanRW                                         %this is necessary for IFArea correlations but
             warning('Pers:RIV2W',['skipping line ' mat2str(j) ' of '...     %cannot be use for mass transfer calculations
                 mat2str(n)...
                 ' widht of the rivulet > 3 x mean riv. width']);
             continue                                                        %if rivulet is too wide, skip current line
         end
-        IFArea(i) = IFArea(i) + lArc*deltaZ;                                %length of j-th arc x length of an element of the plate length
+        sArc(j)  = sum(deltaYM(minLVec(j):minRVec(j)-1,j))*deltaZ;          %calculate the local profile if. area size, length x deltaZ
+        vArc(j)  = sum(locHM(minLVec(j):minRVec(j)-1,j))*deltaZ*deltaX;     %calculate the local profile volume
     end
+%     ARhoL(i,sArc~=0) = sArc(sArc~=0)./vArc(vArc~=0);                        %calculate local surface densities
+    ARhoL(i,:)  = sArc./vArc;                                               %calculate local surface densities
+%     sArc        = sArc(sArc~=0);vArc = vArc(vArc~=0);                       %cut of unfilled zeros created due to skipped lines
+    IFArea(i)   = sum(sArc(sArc~=0));                                       %calculate total size of if area
+    ARhoCorr(i) = sum(sArc(sArc~=0))/sum(vArc(sArc~=0));                    %calculate integral surface density
     YProfilPlatte{i} = YProfilPlatte{i}*1e3;                                %convert YPP back to mm (m -> mm)
+end
+
+if n > 300                                                                  %if the specimen is large enough, cut of outliers
+    STDMat= std(ARhoL(isnan(ARhoL)==0),0,2);                                                 %standard deviation in each column
+    MUMat = mean(ARhoL(isnan(ARhoL)==0),2);                                                  %mean value in each column
+    KURMat= kurtosis(ARhoL(isnan(ARhoL)==0),0,2);                                            %curtosis of each column (should be 3 for normally distr. data)
+    
+    % calculating the coeficient for identifying outliers, for std. data
+    % distr, it should be 3, but I am expecting some evolution along the
+    % plate -> this number must be significantely enlarged
+    coef    = 1.5e2/KURMat;
+    
+    % find outliers - values more different than coef * std. deviation
+    outliers= abs(ARhoL-MUMat(:,ones(1,n-1)))>...
+        coef*STDMat(:,ones(1,n-1));                                         %matrix of indexes of values more different than coef * std. dev.
+    ARhoL(outliers==1) = NaN;                                               %replace outliers by NaN
 end
 end
 
@@ -1169,9 +1212,10 @@ VarOUT = cell(1,length(slInd));
 
 % create data files and fill in output
 for i = 1:length(slInd)-1                                                   %for every regime
-    tmpMat  = [Var(slInd(i):slInd(i+1)-1,:)' zeros(n,1) ...                 %base variable data
-        mean(Var(slInd(i):slInd(i+1)-1,:),1)'...                            %mean values for each cut
-        std(Var(slInd(i):slInd(i+1)-1,:),[],1)'...                          %standard deviation for each cut
+    tmpMat  = Var(slInd(i):slInd(i+1)-1,:);                                 %create temporary matrix with data
+    tmpMat  = [tmpMat' zeros(n,1) ...                                       %base variable data
+        nanmean(tmpMat,1)'...                                               %mean values for each cut
+        nanstd(tmpMat,[],1)'...                                             %standard deviation for each cut
         [M(slInd(i));zeros(n-1,1)]...                                       %dimensionless flow rate during regime
         [V_gas;zeros(n-1,1)]...                                             %volumetric gas flow rate during experiments
         DistVec'];
@@ -1181,7 +1225,6 @@ for i = 1:length(slInd)-1                                                   %for
     VarOUT{i} = tmpMat;                                                     %save i-th regime into cell output
     VarOUT{end}(i) = regexp(files{slInd(i)}, '.+(?=\_[0-9]+.tif)', 'match');
 end
-% save_to_base(1)
 end
 
 function CorMat = saveCorrData(varOUT,varIN,fileNM)

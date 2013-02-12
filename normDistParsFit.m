@@ -1,24 +1,63 @@
 function varargout = normDistParsFit(varargin)
-% NORMDISTPARSFIT M-file for normDistParsFit.fig
-%      NORMDISTPARSFIT, by itself, creates a new NORMDISTPARSFIT or raises the existing
-%      singleton*.
+
 %
-%      H = NORMDISTPARSFIT returns the handle to a new NORMDISTPARSFIT or the handle to
-%      the existing singleton*.
+%   function normDistParsFit(varargin)
 %
-%      NORMDISTPARSFIT('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in NORMDISTPARSFIT.M with the given input arguments.
+% function for fitting the parameters of normal distribution (see eq.1),
+% delta0(z) and m(z) of the measured profiles along the rivulet.
 %
-%      NORMDISTPARSFIT('Property','Value',...) creates a new NORMDISTPARSFIT or raises the
-%      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before normDistParsFit_OpeningFcn gets called.  An
-%      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to normDistParsFit_OpeningFcn via varargin.
+% The function allows user to choose between loaded images and specify how
+% many cuts should be used. It was discovered during testing, that optimal
+% number of cuts to use is around 50. This keeps the calculation time in
+% reasonable lengths and provides detailed enough information about the
+% rivulet, while supressing the data noise.
 %
-%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      instance to run (singleton)".
+% Results can be plotted - obtained delta0(z), m(z) and the goodness-of-fit
+% parameters.
+% It is also possible to export the results into text files for later use.
+% For the structure of the exported files, see subfunction EXPDATABUTTON.
 %
-% See also: GUIDE, GUIDATA, GUIHANDLES
+% The profiles are fitted using the normal distribution on form:
+%
+%                          +       2   +
+%                          |      x    |
+% delta(x,z) = delta0(z)exp|- ---------|            (1)
+%                          |          2|
+%                          +   2*m(z)  +
+% 
+% Note: Some of the used functions are copied from RIVULETPROCESSING and
+% simplified for this particular use.
+%
+% INPUT variables
+% varargin ...  cell, first three fields are mandatory for the GUI usage.
+%               these three fields are to be followed with metricdata and
+%               prgmcontrol structures
+%
+% - metricdata has to contain the following fields:
+%  (i) imNames
+%  (ii)EdgCoord
+% - prgmcontrol has to contain the following fields:
+%
+% If the two named fields are present, the other should be present
+% automatically from the program runtime - this program needs the images to
+% be loaded and elements edges to be specified
+%
+% Note: I should walk through the code and provide the extact list of the
+% demanded fields for easy standalone execution of the program
+%
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         09. 02. 2013
+%
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
+% Note: changes were made to obtain different types of graphics !!
+%
+% See also RIVULETEXPDATAPROCESSING RIVULETPROCESSING
+
+% --- Disabling useless warnings
+%#ok<*DEFNU> - GUI cannot see what functions will be used by user
 
 % Edit the above text to modify the response to help normDistParsFit
 
@@ -47,7 +86,7 @@ end
 %% GUI handling
 
 % --- Executes just before normDistParsFit is made visible.
-function normDistParsFit_OpeningFcn(hObject, eventdata, handles, varargin)
+function normDistParsFit_OpeningFcn(hObject, ~, handles, varargin)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -108,7 +147,7 @@ end
 
 
 % --- Outputs from this function are returned to the command line.
-function varargout = normDistParsFit_OutputFcn(hObject, eventdata, handles) 
+function varargout = normDistParsFit_OutputFcn(hObject, ~, handles) 
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -124,13 +163,9 @@ end
 
 
 % --- Executes on selection change in avImList.
-function avImList_Callback(hObject, eventdata, handles)
-% hObject    handle to avImList (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns avImList contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from avImList
+function avImList_Callback(hObject, ~, handles)
+% Callback to the list containing the availible images, get the sellected
+% images and enable "Run" pushbutton
 
 handles.metricdata.selIm = get(hObject,'Value');                            %get selected data (indexes)
 
@@ -141,13 +176,7 @@ end
 
 
 % --- Executes during object creation, after setting all properties.
-function avImList_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to avImList (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: listbox controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
+function avImList_CreateFcn(hObject, ~, ~)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
@@ -155,10 +184,14 @@ end
 
 
 % --- Executes on button press in expDataButton.
-function expDataButton_Callback(hObject, eventdata, handles)
-% hObject    handle to expDataButton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function expDataButton_Callback(~, ~, handles)
+% Callback for the pushbutton for exporting the results as text file. Get
+% which data are to be exported and save them into the text file named in
+% the way:
+% Exported_Data_hh-mm-ss_DD-MM-YY.txt
+%
+% Note: If the expGOF data are exported for multiple images, the resulting
+% file can be quite waste
 
 % get which data are to be exported
 expDelta = handles.prgmcontrol.expDelta;
@@ -307,10 +340,10 @@ end
 
 
 % --- Executes on button press in plotResButton.
-function plotResButton_Callback(hObject, eventdata, handles)
-% hObject    handle to plotResButton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function plotResButton_Callback(~, ~, handles)
+% Callback to the button for plotting the results - obtained maximal
+% heights of the rivulet and standard deviation of the profile fitted by
+% normal distribution
 
 % prepare the data
 resFitCell = handles.metricdata.resFitCell;                                 %get the data from handles
@@ -348,10 +381,10 @@ end
 
 
 % --- Executes on button press in plotFitButton.
-function plotFitButton_Callback(hObject, eventdata, handles)
-% hObject    handle to plotFitButton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function plotFitButton_Callback(~, ~, handles)
+% Callback to the pushbutton for plotting the results GOF parameters, one
+% plot with four subplots is created, the plotted parameters are rsquared,
+% sse, dfe and rmse, for more detailed info, see the FIT function help
 
 % prepare the data
 fitGoodCell= handles.metricdata.resFitCell{3};                              %get the data from handles
@@ -398,7 +431,6 @@ plot(zLinSpace,rsquare(i,:),'LineStyle',lSpec,'Color',Colors(i,:),'MarkerSize',m
 end
 hLegend = legend(imNames(selImU),'interpreter','none','Location','Best');   %this is necessary to have visible legend
 legChil = get(hLegend,'Children');
-assignin('base','legChil',legChil)
 set(legChil(1:3:end),'MarkerSize',7);
 xlabel('z, [m]');ylabel('R^2, [m]');
 axis([0 plateSize(2) 0 1])
@@ -443,10 +475,11 @@ end
 
 
 % --- Executes on button press in runButton.
-function runButton_Callback(hObject, eventdata, handles)
-% hObject    handle to runButton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function runButton_Callback(hObject, ~, handles)
+% Callback to the button for running the program
+%
+% Note: the part of the program working with all the images present in the
+% handles wasnt yet tested
 
 % enable the cancel button
 % set(handles.cancelButton,'Enable','on')
@@ -460,7 +493,7 @@ imNames = handles.metricdata.imNames;                                       %nam
 selIm   = handles.metricdata.selIm;                                         %get images selected for the processing
 nImages = numel(selIm);                                                     %number of selected images
 subsImDir=handles.metricdata.subsImDir;                                     %get the directory with subtracted images
-smImDir   = [subsImDir '/Smoothed'];                                        %directory with smoothed images
+% smImDir   = [subsImDir '/Smoothed'];                                        %directory with smoothed images
 
 EdgCoord    = handles.metricdata.EdgCoord;                                  %get the coordinates of plate and cuv. edges
 Treshold    = handles.metricdata.Treshold;                                  %get treshold for the noise distinguishon
@@ -544,60 +577,6 @@ else                                                                        %oth
     end
 end
 
-% if DNTLoadIM == 0                                                           %are all the data loaded?
-%     handles.statusbar = statusbar(handles.figure1,...
-%         ['Converting grayscale values into distances for all images ',...   %updating th statusbar
-%         'loaded in memory']);
-%     YProfilPlatte = ImConv(daten(selIm),EdgCoord,filmTh,RegressionPlate);   %I can process all the loaded and chosen images at once
-%     tmpCell = cell(1,nImages);                                              %create empty cell with number of elements corresponding to nImages
-%     tmpCell(:) = {fspecial('disk',FilterSensitivity)};
-%     YProfilPlatte = cellfun(@imfilter,YProfilPlatte,...                     %apply selected filter to YProfilPlatte
-%         tmpCell,'UniformOutput',0);
-%     parfor i = 1:numel(selIm)
-%         tmpCell(i) = {[smImDir '/' imNames{i}]};                            %create second argument for cell function 
-%     end
-%     handles.statusbar.ProgressBar.setVisible(false);                        %hide progressbar
-%     handles.statusbar = statusbar(handles.figure1,...
-%         ['Fitting local profiles for all images ',...                       %updating the statusbar
-%         'loaded in memory']);
-%     set(handles.statusbar,'Text','Saving smoothed images');
-%     cellfun(@imwrite,YProfilPlatte,tmpCell);                                %write images into smoothed folder (under original names)
-% else                                                                        %otherwise, i need to do this image from image...
-%     mkdir(tmpfDir);                                                         %I need to create directory for temporary files
-%     k = 1;l = 1;                                                            %auxiliary indexing variables
-%     for i = selIm                                                           %for all the selected images
-%         handles.statusbar = statusbar(handles.figure1,...
-%             ['Converting grayscale values into distaces ',...
-%             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
-%             l,nImages,100*l/nImages);
-%         handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
-%         handles.statusbar.ProgressBar.setMinimum(0);
-%         handles.statusbar.ProgressBar.setMaximum(2*nImages);
-%         handles.statusbar.ProgressBar.setValue(k);
-%         tmpIM = {imread([subsImDir '/' imNames{i}])};                       %load image from substracted directory and save it as cell
-%         tmpIM = ImConv(tmpIM,EdgCoord,filmTh,RegressionPlate);              %convert the image grayscale values to distances
-%         tmpIM = imfilter(tmpIM{:},...                                       %use selected filter
-%             fspecial('disk',FilterSensitivity));
-%         k = k+1;                                                            %increase statusbar counter
-%         handles.statusbar = statusbar(handles.figure1,...
-%             ['Fitting local profiles ',...
-%             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
-%             l,nImages,100*l/nImages);
-%         handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
-%         handles.statusbar.ProgressBar.setMinimum(0);
-%         handles.statusbar.ProgressBar.setMaximum(2*nImages);
-%         handles.statusbar.ProgressBar.setValue(k);
-%         tempVar = FitProf({tmpIM'},Treshold,plateSize);                     %calculate the parameters of the normal distribution
-%         resFitCell{1}(l,:) = tempVar{1}(1,:);                               %resave obtained deltaZ
-%         resFitCell{2}(l,:) = tempVar{2}(1,:);                               %resave obtained deltaZ
-%         resFitCell{3}{l}   = tempVar{3};                                    %resave obtained goodness-of-fit
-%         imwrite(tmpIM,[smImDir '/' imNames{i}]);                            %save it into 'Smoothed' folder (but under original name)
-%         save([tmpfDir '/' imNames{i}(1:end-4) '.mat'],'tmpIM');             %save obtained data matrix into temporary directory
-%         k = k+1;l = l+1;                                                    %increase the counter and statusbar mover
-%     end
-% end
-% rmdir(tmpfDir,'s')
-
 % update statusbar
 handles.statusbar = statusbar(handles.figure1,...
             'Program run ended succesfully');
@@ -627,31 +606,27 @@ end
 
 % --- Executes on button press in exitButton.
 function cancelButton_Callback(~, ~, ~)
-% hObject    handle to exitButton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
+% Callback to the cancel pushbutton, after i will learn how to use this, it
+% may actually do something
 
 end
 
 
 % --- Executes on button press in exitButton.
-function exitButton_Callback(hObject, eventdata, handles)
-% hObject    handle to exitButton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function exitButton_Callback(~, ~, handles)
+% Callback to the GUI window closing button
 
 close(handles.figure1);                                                     %call closing function
 end
 
 
 % --- Executes on button press in expDeltaChBox.
-function expDeltaChBox_Callback(hObject, eventdata, handles)
-% hObject    handle to expDeltaChBox (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of expDeltaChBox
+function expDeltaChBox_Callback(hObject, ~, handles)
+% Callback to the checkbox used for establishing, if the obtained max.
+% heights of the rivulet are to be exported
+%
+% Get, if there are some data to be exported and if it is so, enable the
+% export button
 
 handles.prgmcontrol.expDelta = get(hObject,'Value');                        %get toggle state
 
@@ -672,12 +647,12 @@ end
 
 
 % --- Executes on button press in expFitChBox.
-function expFitChBox_Callback(hObject, eventdata, handles)
-% hObject    handle to expFitChBox (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of expFitChBox
+function expFitChBox_Callback(hObject, ~, handles)
+% Callback to the checkbox used for establishing, if the goodness-of-fit
+% data are to be exported
+%
+% Get, if there are some data to be exported and if it is so, enable the
+% export button
 
 handles.prgmcontrol.expGOF = get(hObject,'Value');                         %get toggle state
 
@@ -698,12 +673,12 @@ end
 
 
 % --- Executes on button press in expMChBox.
-function expMChBox_Callback(hObject, eventdata, handles)
-% hObject    handle to expMChBox (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of expMChBox
+function expMChBox_Callback(hObject, ~, handles)
+% Callback to the checkbox used for establishing, if the obtained standard
+% deviations of the fitted profiles are to be exported
+%
+% Get, if there are some data to be exported and if it is so, enable the
+% export button
 
 handles.prgmcontrol.expMFit = get(hObject,'Value');                         %get toggle state
 
@@ -723,12 +698,8 @@ guidata(hObject,handles);                                                   %upd
 end
 
 function nCutsEdit_Callback(hObject, ~, handles)
-% hObject    handle to nCutsEdit (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of nCutsEdit as text
-%        str2double(get(hObject,'String')) returns contents of nCutsEdit as a double
+% Callback to editable textfield where the user can specify how many cuts
+% along the rivulet should be made
 
 handles.metricdata.RivProcPars{5} = str2double(get(hObject,'String'));      %get number of cuts
 
@@ -737,13 +708,7 @@ end
 
 
 % --- Executes during object creation, after setting all properties.
-function nCutsEdit_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to nCutsEdit (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
+function nCutsEdit_CreateFcn(hObject, ~, ~)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
@@ -754,7 +719,7 @@ end
 
 %% Function to convert gray values ​​in distances
 % Is required for the image and the regression coefficients of quadratic regression
-% 21/11/2011, rewritten July 2012, by Martin Isoz
+% 21/11/2011, rewritten in July 2012, by Martin Isoz
 % 29/01/2013 simplified for use in the normDistParsFit.m function by Martin
 % Isoz (there are no graphic outputs needed)
 
@@ -819,9 +784,9 @@ parfor i = 1:numel(ImData)                                                     %
     
     impS    = numel(tmpMatS(:,1));                                          %i must cheat matlab to polyfit through point (0,0) artificialy add
 %     impB    = numel(tmpMatB(:,1));                                        % point (0,0) with the same importance as all other points together
-    [RegS ErrorEstS]    = polyfit([tmpMatS(:,1);zeros(impS,1)],...
+    RegS    = polyfit([tmpMatS(:,1);zeros(impS,1)],...
         [tmpMatS(:,2);zeros(impS,1)],RegDegree);                            %Regression small cuvette (with the point (0,0))
-%     [RegB ErrorEstB]= polyfit(tmpMatB(:,1),tmpMatB(:,2),RegDegree);         %Regression big cuvette (without the point (0,0))
+%     RegB= polyfit(tmpMatB(:,1),tmpMatB(:,2),RegDegree);         %Regression big cuvette (without the point (0,0))
 %     RegB = polyfit([tmpMatB(:,1);zeros(impB,1)],... BIG CUVETTE NOT USED
 %         [tmpMatB(:,2);zeros(impB,1)],RegDegree);                          %Regression big cuvette (with the point (0,0)
 %     % split image into 2 based on grayscale values and convert it to the
@@ -1020,7 +985,7 @@ function YProfilPlatte =...
 Distance     = round(size(YProfilPlatte{1},2)/(nCuts+1));                   %number of points in each mean profile
 
 % for each image
-for i=1:numel(YProfilPlatte)
+parfor i=1:numel(YProfilPlatte)                                             %because of the length of this operation, parfor makes sense
     for n = 2:nCuts-1
         if n*Distance-25 <= 0                                               %is there enough space at the beginning
             YProfilPlatte{i}(:,1) = mean(YProfilPlatte{i}...
