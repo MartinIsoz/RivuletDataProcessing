@@ -85,13 +85,14 @@ function OUT = rivuletProcessing(handles)
 % OUT.RivWidth      regimes of the pumpe
 % OUT.RivHeight
 % OUT.IFACorr   ... double with data for correlations
-%=TO-BE-DONE===============================================================
 % OUT.ARhoCorr  ... double with rivulet surface density (integral), it is
 %                   A(rivulet)/V(rivulet), m^-1
 % OUT.ARhoL     ... cell with dependence of rivulet surface density on the
-%                   plate length coordinate
-% Note: the quick data overview and postProcPlotting parts of the program
-%       have to be changed accordingly to this
+%                   plate length coordinate, same type of variable as
+%                   OUT.RivWidth et al.
+% OUT.epsHR     ... cell with dependence of the eps = h0/(aL + aR) on the
+%                   plate length, lubrication theory assumes that eps<<1,
+%                   same type of variable asi OUT.RivWidth et al.
 %==========================================================================
 %
 % other OUTPUTS - text files
@@ -105,15 +106,13 @@ function OUT = rivuletProcessing(handles)
 %    1 file for each regime
 % e. text file with interfacial areas of the rivulets
 %    1 file for each regime
-%=TO-BE-DONE===============================================================
 % f. text file with rivulets surface densities
 %    1 file for each regime
 % g. text file with dependencies of the rivulet surface densities on the
 %    plate length coordinate
 %    1 file for each regime
-% Note: f. and g. can be merged together, first row - integral
-%    characteristics and then the dependency on the plate length
-%    coordinate, but it would probably need to somehow modify the 
+% h. text file with dependencies of eps on the plate length coordinate
+%    1 file for each regime
 %==========================================================================
 %
 % Scheme of algorithm
@@ -441,7 +440,7 @@ end
 
 handles.statusbar.ProgressBar.setVisible(false);                            %update statusbar
 set(handles.statusbar,'Text','Calculating output data of the program');
-[~,~,RivWidth2,RivHeight2,minLVec,minRVec] =...                             %calculates the mean widths of the rivulet and return indexes of
+[~,~,RivWidth2,RivHeight2,minLVec,minRVec,~,~,epsHR] =...                   %calculates the mean widths of the rivulet and return indexes of
     RivSurf(YProfilPlatte,Treshold,plateSize);                              %the "edges" of the rivulet + calculates max height of each part of
                                                                             %the rivulet
 %% Mean speed determination from average profiles
@@ -512,8 +511,14 @@ cd(rootDir)
 
 % 7. developement of the surface area density along the rivulet
 sPars = {M FFactor plateSize size(ARhoL,2)};                                %need to change input - number of cuts
-cd([storDir '/Correlation'])
+cd([storDir '/Others'])
 OUT.ARhoL = saveMatSliced(ARhoL,sPars,files,'ARhoL');
+cd(rootDir)
+
+% 8. developement of the eps = h0/(aL + aR) along the rivulet
+sPars = {M FFactor plateSize nCuts};                                        %need to change input - number of cuts
+cd([storDir '/Others'])
+OUT.epsHR = saveMatSliced(epsHR,sPars,files,'epsHR');
 cd(rootDir)
 
 set(handles.statusbar,'Text','Rivulet processing ended succesfully');
@@ -835,10 +840,10 @@ end
 end
 
 %% Function for calculating the rivulet area and local width
-function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec,ARhoCorr,ARhoL] = ...
+function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec ARhoCorr ARhoL epsHR] = ...
     RivSurf(YProfilPlatte,Treshold,plateSize)
 %
-%   function [IFArea RivWidth RivHeight minLVec minRVec] = ...
+%   function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec ARhoCorr ARhoL espHR] = ...
 %       RivSurf(YProfilPlatte,Treshold,plateSize)
 %
 % function for the rivulet interfacial area, width, height and borders
@@ -868,6 +873,9 @@ function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec,ARhoCorr,ARhoL
 %                       area density on the plate length coordinate
 %                       (numel(YProfilPlatte) x numel(ZDim)-1)
 %                       numel(ZDim)-1 -> I use alwas the feedforward dZ
+% epsHR             ... variable for storing the dependence of 
+%                       eps = h0/(aL + aR) on the plate length coordinate
+%                       (numel(YProfilPlatte) x numel(ZDim))
 %
 % to keep the axis marking
 % X -> width of the plate, m
@@ -897,6 +905,7 @@ algtype = 'simple';                                                         % 's
 IFArea  = zeros(numel(YProfilPlatte),1);                                    %variable for interfacial area
 RivWidth= zeros(numel(YProfilPlatte),n);                                    %variable for rivulet width
 RivHeight=zeros(numel(YProfilPlatte),n);                                    %variable for rivulet height
+epsHR   = zeros(numel(YProfilPlatte),n);                                    %variable for height to width ratio
 minLVec = zeros(numel(YProfilPlatte),n);                                    %left sides of the rivulet
 minRVec = zeros(numel(YProfilPlatte),n);                                    %right sides of the rivulet
 ARhoCorr= IFArea;                                                           %variable for the interfacial area density
@@ -1063,6 +1072,7 @@ for i = 1:numel(YProfilPlatte)
     % calculate local widths and heights of i-th rivulet
     RivWidth(i,:) = (minRVec(i,:) - minLVec(i,:))*deltaX;                   %number of elements in rivulet x width of element
     meanRW        = mean(RivWidth(i,:));                                    %calculate mean rivulet width
+    epsHR(i,:)    = RivHeight(i,:)./RivWidth(i,:);                          %calculate epsHR = h0/(aL + aR), for checking the lubr. theory ass.
     
     
     % calculate the interfacial area of the rivulet

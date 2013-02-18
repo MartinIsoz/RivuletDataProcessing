@@ -219,8 +219,8 @@ storDir = uigetdir(start_path,'Select folder to store outputs');            %let
 if storDir ~= 0                                                             %here i dont care about indent, its just basic input control
 % create subdirectories
 nameList= {'Subtracted' 'Height' 'Profile' 'Speed' 'Width' 'Correlation' ...%names of the directories for saving outputs
-    'Plots'};
-nameSubs= {{'Smoothed'} [] [] [] [] [] []};                                 %names of subdirectories for every folder
+    'Plots' 'Others'};
+nameSubs= {{'Smoothed'} [] [] [] [] [] [] []};                              %names of subdirectories for every folder
 
 if exist(storDir,'dir') == 0
     mkdir(storDir);                                                         %if user specified directory doesnt exist, create it
@@ -497,8 +497,8 @@ function EditStorDir_Callback(hObject, ~, handles)
 
 storDir = get(hObject,'String');                                            %get storage directory from editable textfield
 nameList= {'Subtracted' 'Height' 'Profile' 'Speed' 'Width' 'Correlation' ...%names of the directories for saving outputs
-    'Plots'};
-nameSubs= {{'Smoothed'} [] [] [] [] [] []};                                 %names of subdirectories for every folder
+    'Plots' 'Others'};
+nameSubs= {{'Smoothed'} [] [] [] [] [] [] []};                              %names of subdirectories for every folder
 
 if exist(storDir,'dir') == 0
     mkdir(storDir);                                                         %if user specified directory doesnt exist, create it

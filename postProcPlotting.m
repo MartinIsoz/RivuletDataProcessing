@@ -538,6 +538,10 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         ttlStr = ['Rivulet surface density as function'...
                             ' of distance from the top of the plate'];
                         ylbStr = 'a, [m^{-1}]';
+                    case 5
+                        ttlStr = ['\epsilon^i = h_0^i/(a_L^i + a_R^i) as function'...
+                            ' of distance from the top of the plate'];
+                        ylbStr = '\epsilon, [--]';
                 end
                 set(hPlFig,'Name','Riv. Height, Width and liq. speed data');%set name of the plot
                 hPlAxes = axes('OuterPosition',[0 0 1 1],...                %create axes filling all the space
@@ -564,7 +568,14 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         ['m = ' num2str(flRates(j),'%3.1f') ' g/s' 10 ...   %compose a legend entry
                         rdblCellStr{j}];
                     switch selDT
-                        case {1 2 3}                                        %for the "short" other data
+                        case 4                                              %for the long data
+                            hPlot(j,1) = plot(hPlAxes,...
+                                Data(brks(j):brks(j+1)-1,end),...           %plot datagroup - measurements
+                                Data(brks(j):brks(j+1)-1,end-4),'.');       %plot only mean values
+                            set(hPlot(j),'MarkerSize',1,'LineStyle','none');
+                            set(hPlot(j),'Color',color(j,:),...             %color the plot
+                                'MarkerFaceColor',color(j,:));              %fill the marker faces with the same color
+                        otherwise                                           %for the short data
                             hPlot(j,1:end-1) = plot(hPlAxes,...
                                 Data(brks(j):brks(j+1)-1,end),...           %plot datagroup - measurements
                                 Data(brks(j):brks(j+1)-1,[1:end-5 end-3]),'^');%skip the mean values
@@ -576,13 +587,6 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                             set(hPlot(j,:),'Color',color(j,:),...           %color the plot
                                 'MarkerFaceColor',color(j,:));              %fill the marker faces with the same color
                             set(hPlot(j,1:end-1),'Visible','off');          %hide everything except mean values
-                        case 4                                              %for the long data
-                            hPlot(j,1) = plot(hPlAxes,...
-                                Data(brks(j):brks(j+1)-1,end),...           %plot datagroup - measurements
-                                Data(brks(j):brks(j+1)-1,end-4),'.');       %plot only mean values
-                            set(hPlot(j),'MarkerSize',1,'LineStyle','none');
-                            set(hPlot(j),'Color',color(j,:),...             %color the plot
-                                'MarkerFaceColor',color(j,:));              %fill the marker faces with the same color
                     end
                 end
                 hLegend = legend(hPlot(:,1),legendCellStr,...               %set up legend, number of groups == number of columns
