@@ -39,6 +39,8 @@ hFig    = figure('Units','Pixels','Position',PosVec,...
 
 % initialize appdata
 appdata.prgmcontrol.comp = 0;                                               %for ListData, compatible data are not selected
+appdata.prgmcontrol.magnGlass = imread('./icons/magnGlass.png');            %load the image of magnifier glass
+appdata.prgmcontrol.rotIm = imread('./icons/rotateIm.png');                 %load the image for rotating image
 guidata(hFig,appdata);                                                      %assign data to gui
 
 % fill in initialize data
@@ -412,11 +414,17 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                     tmpVar = reshape(tmpVar(tmpVar~=0),[],size(tmpVar,2));  %strip off 0
                     brks   = [1 find(diff(tmpVar(:,1))<0)'+1 numel(tmpVar(:,1))];%new group starts
                     for k  = 1:numel(brks)-1
-                        plot(hPlAxes(j),tmpVar(brks(k):brks(k+1)-1,1),...
+                        plot(hPlAxes(j),tmpVar(brks(k):brks(k+1)-1,1),...   %plot the current data
                             tmpVar(brks(k):brks(k+1)-1,2),'Color',color(k,:),...
                             'LineWidth',2)
                         axis(hPlAxes(j),[0 plateSize(1) yMin yMax]);        %set axis of the current subplot
+                        hold(hPlAxes(j),'on')                               %hold on for the current axes
+                        hMagnif(k) = image([plateSize(1)-plateSize(1)/10 plateSize(1)],...
+                            [yMin yMin+(yMax-yMin)/10],...
+                            imrotate(appdata.prgmcontrol.magnGlass,90));                 %add the image of magnifier glass
+%                         axis(hPlAxes(j),[0 plateSize(1) 0 plateSize(1)]);   %this shows real shape of the profile, very thin and pract. narrow
                     end
+                    set(hMagnif,'ButtonDownFcn',@magnifProf)
                 end
                 % create legend, I need to help myself with little hack
                 % using ghost figure
@@ -542,6 +550,14 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         ttlStr = ['\epsilon^i = h_0^i/(a_L^i + a_R^i) as function'...
                             ' of distance from the top of the plate'];
                         ylbStr = '\epsilon, [--]';
+                    case 6
+                        ttlStr = ['Re_W(\rho,v,R,\eta) as function'...
+                            ' of distance from the top of the plate'];
+                        ylbStr = 'Re, [--]';
+                    case 7
+                        ttlStr = ['Re_a(\rho,v,R,\eta) as function'...
+                            ' of distance from the top of the plate,'];
+                        ylbStr = 'Re, [--]';
                 end
                 set(hPlFig,'Name','Riv. Height, Width and liq. speed data');%set name of the plot
                 hPlAxes = axes('OuterPosition',[0 0 1 1],...                %create axes filling all the space
@@ -1061,4 +1077,62 @@ end
 set(hTable,'ColumnName',ColNames,'Data',DataClr,'ColumnWidth',{100},...
     'UserData',Data);
     
+end
+
+%% Magnifying the profile plots when clicked on magnifier glass
+function magnifProf(src,~)
+% copies the axis object from the subplot and shows it into a new window
+% and shows the real profile
+%
+% subfunction from pushPlot, case profiles
+
+% zoom of the plot to show
+% recreate the plot
+hParent = get(src,'Parent');                                                %get the parent of clicked image
+figure('Units','Pixels','Position',[100 50 800 700],...
+    'Name','Zoomed Profiles','NumberTitle','off')                           %open new figure window
+hNew = copyobj(hParent,gcf);                                                %copy the object into new figure
+set(hNew,'Units','Normal','Position',[0.1 0.3 0.8 0.6]);                    %stretch to the whole figure
+hNewChil = get(hNew,'Children');                                            %get children from the current axes
+imPos = strcmp(get(hNewChil,'Type'),'image');                               %find which children is the image
+set(hNewChil(imPos==1),'Visible','off','HitTest','off');                    %update the axes children
+
+% adjust axis
+XCoordsCell = get(hNewChil(imPos~=1),'XData');                              %get cell of data shown into current plot
+if iscell(XCoordsCell) == 1                                                 %if more data are selected, this is cell
+    axMinX      = min(cellfun(@min,XCoordsCell));                           %get minimal X coordinate to show
+    axMaxX      = max(cellfun(@max,XCoordsCell));                           %get maximal X coordinate to show
+    YCoordsCell = get(hNewChil(imPos~=1),'YData');                          %get cell of data shown into current plot
+    axMinY      = min(cellfun(@min,YCoordsCell));                           %get minimal X coordinate to show
+    axMaxY      = max(cellfun(@max,YCoordsCell));                           %get maximal X coordinate to show
+    axis([axMinX axMaxX axMinY axMaxY]);                                    %adjust axis
+else
+    axMinX      = min(XCoordsCell);                                         %get minimal X coordinate to show
+    axMaxX      = max(XCoordsCell);                                         %get maximal X coordinate to show
+    YCoordsCell = get(hNewChil(imPos~=1),'YData');                          %get cell of data shown into current plot
+    axMinY      = min(YCoordsCell);                                         %get minimal X coordinate to show
+    axMaxY      = max(YCoordsCell);                                         %get maximal X coordinate to show
+    axis([axMinX axMaxX axMinY axMaxY]);                                    %adjust axis
+end
+
+% graphics refinement
+grid on
+% axis equal
+set(hNew,'GridLineStyle','--');
+
+% real profile
+% recreate the plot
+hParent = get(src,'Parent');                                                %get the parent of clicked image
+hNew = copyobj(hParent,gcf);                                                %copy the object into new figure
+set(hNew,'Units','Normal','Position',[0.1 0.04 0.8 0.2]);                   %replace figure
+set(get(hNew,'Title'),'String','Real profile shape');                       %modify title
+set(hNew,'YTickLabel',[]);                                                  %remove unnecesary/undistinguishable labels
+set(get(hNew,'YLabel'),'String','rivulet height');                          %modify ylabel
+hNewChil = get(hNew,'Children');                                            %get children from the current axes
+imPos = strcmp(get(hNewChil,'Type'),'image');                               %find which children is the image
+set(hNewChil(imPos==1),'Visible','off','HitTest','off');                    %update the axes children
+assignin('base','hNew',hNew)
+% adjust axis
+axis(hNew,'equal')
+axis(hNew,[axMinX axMaxX axMinY axMaxY]);                    
 end

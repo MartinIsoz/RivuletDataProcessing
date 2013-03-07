@@ -93,6 +93,14 @@ function OUT = rivuletProcessing(handles)
 % OUT.epsHR     ... cell with dependence of the eps = h0/(aL + aR) on the
 %                   plate length, lubrication theory assumes that eps<<1,
 %                   same type of variable asi OUT.RivWidth et al.
+% OUT.locReW    ... cell with dependence of the Reynolds number with
+%                   characteristic dimension based on rivulet width on the
+%                   plate length,
+%                   same type of variable asi OUT.RivWidth et al.
+% OUT.locReA    ... cell with dependence of the Reynolds number with
+%                   characteristic dimension based on cap. length on the
+%                   plate length,
+%                   same type of variable asi OUT.RivWidth et al.
 %==========================================================================
 %
 % other OUTPUTS - text files
@@ -184,6 +192,7 @@ Treshold  = handles.metricdata.Treshold;
 FilterSensitivity = handles.metricdata.FSensitivity;
 EdgCoord  = handles.metricdata.EdgCoord;
 fluidType = handles.metricdata.fluidType;
+hFields   = fields(handles);                                                %get fieldnames of calling handles
 
 % auxiliary variable
 nImages = numel(files);                                                     %number of processed images
@@ -193,10 +202,11 @@ nImages = numel(files);                                                     %num
 % chosen liquid and experimental parameters
 fluidData = fluidDataFcn(fluidType,InclAngle);                              %call database function
 % call calibration function for current fluidData
-[M,V_Pumpe]= rotameterCalib(files,fluidData);                               %rotameter calibration
-sigma = fluidData(2);                                                       %save input parameters for correlations
-rho   = fluidData(3);
-eta   = fluidData(4);
+[M,V_Pumpe]= rotameterCalib(files,fluidData(2:end));                        %rotameter calibration, do NOT need gx
+gx    = fluidData(1);                                                       %save gx for cap. length calculation
+sigma = fluidData(3);                                                       %save input parameters for correlations
+rho   = fluidData(4);
+eta   = fluidData(5);
 clear fluidData
 
 %% Creating parameters for plots descriptions
@@ -222,7 +232,7 @@ txtPars = {M FFactor tmpVar fluidType InclAngle};                           %par
 %% smoothed images
 % heights of the film in mm
 if DNTLoadIM == 0                                                           %are all the data loaded?
-    handles.statusbar = statusbar(handles.MainWindow,...
+    handles.statusbar = statusbar(handles.(hFields{1}),...                  %first field of handles structure is the pointer to window
         ['Converting grayscale values into distances for all images ',...   %updating the statusbar
         'loaded in memory']);
     YProfilPlatte = ImConv(daten,EdgCoord,filmTh,RegressionPlate,...        %if the are, I can process them all at once
@@ -241,7 +251,7 @@ if DNTLoadIM == 0                                                           %are
 else                                                                        %otherwise, i need to do this image from image...
     mkdir(tmpfDir);                                                         %I need to create directory for temporary files
     for i = 1:nImages
-        handles.statusbar = statusbar(handles.MainWindow,...
+        handles.statusbar = statusbar(handles.(hFields{1}),...
             ['Converting grayscale values into distaces ',...
             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
             i,nImages,100*i/nImages);
@@ -280,7 +290,7 @@ if DNTLoadIM == 1
     ARhoCorr= IFArea;
 %     minLVec= cell(1,nImages);minRVec = minLVec;                             %preallocate variable for vector sides
     for i = 1:nImages
-        handles.statusbar = statusbar(handles.MainWindow,...
+        handles.statusbar = statusbar(handles.(hFields{1}),...
             'Calculating interfacial area of rivulet %d of %d (%.1f%%)',... %updating statusbar
             i,nImages,100*i/nImages);
         handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
@@ -300,7 +310,7 @@ if DNTLoadIM == 1
 %     minRVec = cell2mat(minRVec');
     ARhoL = cell2mat(ARhoL');
 else
-    handles.statusbar = statusbar(handles.MainWindows,...
+    handles.statusbar = statusbar(handles.(hFields{1}),...
         'Calculating interfacial area of rivulets');                        %update statusbar
 %     [IFArea,YProfilPlatte,~,~,minLVec,minRVec] =...
 %         RivSurf(YProfilPlatte,Treshold,plateSize);                          %this function does not need graphical output
@@ -314,7 +324,7 @@ end
 if GR.contour == 1 || GR.profcompl == 1                                     %if any of the graphics are wanted, enter the cycle
     for i=1:nImages                                                         %for each image
         % update statusbar
-        handles.statusbar = statusbar(handles.MainWindow,...
+        handles.statusbar = statusbar(handles.(hFields{1}),...
             ['Creating profiles and/or contour plots ',...
             'for image %d of %d (%.1f%%)'],...                              %updating statusbar
             i,nImages,100*i/nImages);
@@ -415,7 +425,7 @@ end
 if DNTLoadIM == 1
     YProfilPlatte = cell(1,nImages);                                        %preallocate variable for YProfilPlatte
     for i = 1:nImages
-        handles.statusbar = statusbar(handles.MainWindow,...
+        handles.statusbar = statusbar(handles.(hFields{1}),...
             'Calculating mean profiles for image %d of %d (%.1f%%)',...     %updating statusbar
             i,nImages,100*i/nImages);
         handles.statusbar.ProgressBar.setVisible(true);                     %showing and updating progressbar
@@ -451,7 +461,7 @@ set(handles.statusbar,'Text','Calculating output data of the program');
 % the curve of the profile
 mSpeed  = zeros(numel(YProfilPlatte),size(RivWidth2,2));                    %prealocation of var mSpeed
 for i = 1:numel(YProfilPlatte)
-    handles.statusbar = statusbar(handles.MainWindow,...
+    handles.statusbar = statusbar(handles.(hFields{1}),...
         'Calculating mean speed in cuts for image %d of %d (%.1f%%)',...    %updating statusbar
         i,nImages,100*i/nImages);
     handles.statusbar.ProgressBar.setVisible(true);                         %showing and updating progressbar
@@ -464,6 +474,17 @@ for i = 1:numel(YProfilPlatte)
         mSpeed(i,j)  = V_Pumpe(i)/SurfMat;                                  %local mean speed V_/S, m/s
     end
 end
+
+%% Calculation of the local Reynolds number along the rivulet
+% for the calculation, there is used the measured width of the rivulet as
+% well as its mean speed in the cut
+% other characteristic dimension is estimated using capillary length for
+% the liquid - it should be on the safe side (bigger than real), due to
+% stronger effects of gravity force on flat interface than in narrow
+% capillary. this scale is used based on Diez et al. On the breakup of
+% fluid rivulets, Phys. of Fluids, 2009, 21
+locReW = rho*mSpeed.*RivWidth2./eta;
+locReA = rho*mSpeed*sqrt(sigma/(rho*gx))./eta;                              %reynolds number based on the film height - capillary length
 
 %% Saving results in text files
 
@@ -509,16 +530,23 @@ varOUT= ARhoCorr;                                                           %out
 OUT.ARhoCorr = saveCorrData(varOUT,varIN,'ARhoCorr');
 cd(rootDir)
 
-% 7. developement of the surface area density along the rivulet
+% 7. development of the surface area density along the rivulet
 sPars = {M FFactor plateSize size(ARhoL,2)};                                %need to change input - number of cuts
 cd([storDir '/Others'])
 OUT.ARhoL = saveMatSliced(ARhoL,sPars,files,'ARhoL');
 cd(rootDir)
 
-% 8. developement of the eps = h0/(aL + aR) along the rivulet
+% 8. development of the eps = h0/(aL + aR) along the rivulet
 sPars = {M FFactor plateSize nCuts};                                        %need to change input - number of cuts
 cd([storDir '/Others'])
 OUT.epsHR = saveMatSliced(epsHR,sPars,files,'epsHR');
+cd(rootDir)
+
+% 9. development of the Re along the plate (based on width and height of
+% the rivulet)
+cd([storDir '/Others'])
+OUT.locReW = saveMatSliced(locReW,sPars,files,'locReW');
+OUT.locReA = saveMatSliced(locReA,sPars,files,'locReA');
 cd(rootDir)
 
 set(handles.statusbar,'Text','Rivulet processing ended succesfully');

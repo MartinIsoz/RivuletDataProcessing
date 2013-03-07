@@ -109,7 +109,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 %
 % See also FINDEDGES RIVULETPROCESSING
 
-% Last Modified by GUIDE v2.5 31-Jan-2013 14:04:59
+% Last Modified by GUIDE v2.5 07-Mar-2013 10:56:16
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -2045,4 +2045,25 @@ elseif isfield(handles.metricdata,'EdgCoord') == 0
 end
 
 normDistParsFit('metricdata',handles.metricdata,'prgmcontrol',...
+    handles.prgmcontrol)
+
+
+% --------------------------------------------------------------------
+function treshInflStudy_Callback(~, ~, handles)
+% hObject    handle to treshInflStudy (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% check if all the required fields are present into handles
+
+% check if all the required fields are present into handles
+if isfield(handles.metricdata,'imNames') == 0
+    errordlg('You must load the images at first','Images missing','modal');
+    return
+elseif isfield(handles.metricdata,'EdgCoord') == 0
+    errordlg('The plate and cuvettes edges have to be specified',...
+        'EdgCoord not specified','modal');
+    return
+end
+
+treshInflStudy('metricdata',handles.metricdata,'prgmcontrol',...
     handles.prgmcontrol)
