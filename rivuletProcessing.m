@@ -450,7 +450,7 @@ end
 
 handles.statusbar.ProgressBar.setVisible(false);                            %update statusbar
 set(handles.statusbar,'Text','Calculating output data of the program');
-[~,~,RivWidth2,RivHeight2,minLVec,minRVec,~,~,epsHR] =...                   %calculates the mean widths of the rivulet and return indexes of
+[~,~,RivWidth2,RivHeight2,minLVec,minRVec,~,~,epsHR,thetaApL,thetaApR] =... %calculates the mean widths of the rivulet and return indexes of
     RivSurf(YProfilPlatte,Treshold,plateSize);                              %the "edges" of the rivulet + calculates max height of each part of
                                                                             %the rivulet
 %% Mean speed determination from average profiles
@@ -547,6 +547,13 @@ cd(rootDir)
 cd([storDir '/Others'])
 OUT.locReW = saveMatSliced(locReW,sPars,files,'locReW');
 OUT.locReA = saveMatSliced(locReA,sPars,files,'locReA');
+cd(rootDir)
+
+% 10. developement of the apparent contact angle along the rivulet, both
+% from its left and right side
+cd([storDir '/Others'])
+OUT.thetaApL = saveMatSliced(thetaApL,sPars,files,'thetaApL');
+OUT.thetaApR = saveMatSliced(thetaApR,sPars,files,'thetaApR');
 cd(rootDir)
 
 set(handles.statusbar,'Text','Rivulet processing ended succesfully');
@@ -868,7 +875,8 @@ end
 end
 
 %% Function for calculating the rivulet area and local width
-function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec ARhoCorr ARhoL epsHR] = ...
+function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec...        %basic outputs, from summer 2012
+    ARhoCorr ARhoL epsHR thetaApL thetaApR] = ...                           %other outputs, needed for other analysis
     RivSurf(YProfilPlatte,Treshold,plateSize)
 %
 %   function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec ARhoCorr ARhoL espHR] = ...
@@ -904,6 +912,9 @@ function [IFArea YProfilPlatte RivWidth RivHeight minLVec minRVec ARhoCorr ARhoL
 % epsHR             ... variable for storing the dependence of 
 %                       eps = h0/(aL + aR) on the plate length coordinate
 %                       (numel(YProfilPlatte) x numel(ZDim))
+% thetaApL,thetaApR ... apparent contact angles from the left and right
+%                       side of the rivulet, for the exact calculation
+%                       method, see the code
 %
 % to keep the axis marking
 % X -> width of the plate, m
@@ -938,6 +949,8 @@ minLVec = zeros(numel(YProfilPlatte),n);                                    %lef
 minRVec = zeros(numel(YProfilPlatte),n);                                    %right sides of the rivulet
 ARhoCorr= IFArea;                                                           %variable for the interfacial area density
 ARhoL   = zeros(numel(YProfilPlatte),n-1);                                  %variable for dep. i-f dens. on z-coord
+thetaApL= zeros(numel(YProfilPlatte),n);                                    %apparent contact angle on the left side
+thetaApR= thetaApL;                                                         %apparent contact angle on the right side
 
 TrVec=zeros(1,n);                                                           %background/noise liquid height
 
@@ -1082,6 +1095,52 @@ for i = 1:numel(YProfilPlatte)
         % save left and right side of the rivulet
         minLVec(i,j) = tmpIndL;
         minRVec(i,j) = tmpIndR;
+        % !! Apparent contact angle estimation !!
+        % - this method is based on taking the maximal h'(x) for the left and
+        %   right 1/nth of the rivulet (at first, I will try 1/4)
+        % - Algorithm description:
+        % a) take the left and right 1/nth of the rivulet
+        % b) calculate h'(x) -> using diff (should be sufficient)
+        % c) take N max values (will start with 10)
+        % d) calculate mean and save it as thetaApL and thetaApR
+        if n < 100                                                          %only for cut rivulet, otherwise, there would be a lot of noise
+            takePart    = 1/4;                                              %how much of the rivulet to take
+            takePoints  = 10;                                               %from how many points calculate the thetaApL
+            vecPartL = tmpIndL:tmpIndL+round((tmpIndR-tmpIndL)*takePart);   %left indexes
+            tmpPartL = YProfilPlatte{i}(vecPartL,j);                        %left part of the profile
+            vecPartR = tmpIndR-round((tmpIndR-tmpIndL)*takePart):tmpIndR;   %right indexes
+            tmpPartR = YProfilPlatte{i}(vecPartR,j);                        %right part of the profile
+            % with plots
+%             [leftDiff,ILeft] = sort(...                                     %sort the result in descending order
+%                 abs(1/deltaX*diff(tmpPartL)),1,'descend');                  %take absolute difference
+%             [rightDiff,IRight]= sort(...
+            % without plots
+            leftDiff = sort(...                                             %sort the result in descending order
+                abs(1/deltaX*diff(tmpPartL)),1,'descend');                  %take absolute difference
+            rightDiff= sort(...
+                abs(1/deltaX*diff(tmpPartR)),1,'descend');
+            thetaApL(i,j) = atan(mean(leftDiff(1:takePoints)));             %calculate the left side apparent contact angle
+            thetaApR(i,j) = atan(mean(rightDiff(1:takePoints)));            %this assumes thetaApi < pi/2, result in radians
+%             figure;                                                         %control plots - to be commented
+%             subplot(1,2,1)
+%             plot(vecPartL*deltaX,...
+%                 tan(thetaApL(i,j))*(vecPartL-vecPartL(1)+1)*deltaX)
+%             hold on
+%             plot(vecPartL*deltaX,...
+%                 tmpPartL,'r')
+%             plot(vecPartL(ILeft(1:takePoints))*deltaX,tmpPartL(ILeft(1:takePoints)),'go',...
+%                 'MarkerFaceColor','Green')
+%             title('\bf left side')
+%             subplot(1,2,2)
+%             plot(vecPartR*deltaX,...
+%                 -tan(thetaApR(i,j))*(vecPartR-vecPartR(1))*deltaX)
+%             hold on
+%             plot(vecPartR*deltaX,...
+%                 tmpPartR,'r')
+%             plot(vecPartR(IRight(1:takePoints))*deltaX,tmpPartR(IRight(1:takePoints)),'go',...
+%                 'MarkerFaceColor','Green')
+%             title('\bf right side')
+        end 
     end
     if n > 300                                                              %for large number of cuts (probably the whole image)
         % smooth the found rivulet edges - remove jumps in rivulet width
@@ -1100,8 +1159,7 @@ for i = 1:numel(YProfilPlatte)
     % calculate local widths and heights of i-th rivulet
     RivWidth(i,:) = (minRVec(i,:) - minLVec(i,:))*deltaX;                   %number of elements in rivulet x width of element
     meanRW        = mean(RivWidth(i,:));                                    %calculate mean rivulet width
-    epsHR(i,:)    = RivHeight(i,:)./RivWidth(i,:);                          %calculate epsHR = h0/(aL + aR), for checking the lubr. theory ass.
-    
+    epsHR(i,:)    = RivHeight(i,:)./RivWidth(i,:);                          %calculate epsHR = h0/(aL + aR), for checking the lubr. theory ass.    
     
     % calculate the interfacial area of the rivulet
     % IFArea = lengthOfArc x lengthOfPlate(between 2 arcs)
