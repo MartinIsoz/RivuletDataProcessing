@@ -558,6 +558,14 @@ TableData = uitable(hFig,'Tag','TableData');                                %cre
                         ttlStr = ['Re_a(\rho,v,R,\eta) as function'...
                             ' of distance from the top of the plate,'];
                         ylbStr = 'Re, [--]';
+                    case 8
+                        ttlStr = ['\theta_{Ap}^L as function'...
+                            ' of distance from the top of the plate,'];
+                        ylbStr = '\theta_{Ap}^L, [\pi rad]';
+                    case 9
+                        ttlStr = ['\theta_{Ap}^R as function'...
+                            ' of distance from the top of the plate,'];
+                        ylbStr = '\theta_{Ap}^R, [\pi rad]';
                 end
                 set(hPlFig,'Name','Riv. Height, Width and liq. speed data');%set name of the plot
                 hPlAxes = axes('OuterPosition',[0 0 1 1],...                %create axes filling all the space

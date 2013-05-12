@@ -2,26 +2,26 @@ function varargout = treshInflStudy(varargin)
 %
 %    function varargout = treshInflStudy(varargin)
 %
-% Function for study of treshold influence on obtained results. It is very
+% Function for study of threshold influence on obtained results. It is very
 % advisible to run this function for every new set of images to find the
-% optimal treshold to set.
+% optimal threshold to set.
 %
-% The default value of treshold set by the RIVULETEXPDATAPROCESSING program
+% The default value of threshold set by the RIVULETEXPDATAPROCESSING program
 % is 3e-5 m, which should be OK for most of the experimental data.
 %
-% Optimal treshold value can be guessed from, for example, plot of the
-% rivulet width against plate length coordinate for different treshold
+% Optimal threshold value can be guessed from, for example, plot of the
+% rivulet width against plate length coordinate for different threshold
 % values -> it is the value for which the lines begin to ressemble one to
 % another.
 %
 % Other way to gues this would be from the plot of interfacial area size
-% against the used tresholds. Optimal treshold value is the one, where this
+% against the used tresholds. Optimal threshold value is the one, where this
 % dependence becomes approximately linear.
 %
 % As this function itself calls the RIVULETPROCESSING subfunction, it is to
 % be called with the same parameters as the rivulet processing itself.
 %
-% Because of the time dependence of the treshold influence analysis and the
+% Because of the time dependence of the threshold influence analysis and the
 % clarity of results, the analysis can be ran for only 1 image at the time.
 %
 % Author:       Martin Isoz
@@ -104,7 +104,7 @@ set(handles.nCutsEdit,'String',num2str(...
 set(handles.axTitleText,'String',['Select images, fill in necessary fields'...
     ' and run the program'],'FontWeight','Bold','FontSize',16)
 
-% Fill in the treshold span
+% Fill in the threshold span
 set(handles.trSpanEdit,'String','[1e-6 5e-6 1e-5:1e-5:1e-4]')               %program preset value is 3e-5
 
 % Disable the run button
@@ -120,7 +120,7 @@ set([handles.expPlotsPush handles.expDataPush],'Enable','off')
 handles.metricdata = metricdata;
 handles.prgmcontrol= prgmcontrol;
 
-handles.metricdata.trSpan = [1e-6 5e-6 1e-5:1e-5:1e-4];                     %fill in the Treshold range
+handles.metricdata.trSpan = [1e-6 5e-6 1e-5:1e-5:1e-4];                     %fill in the threshold range
 
 % Make the GUI invisible (so it cannot be closed from MATLAB)
 set(handles.figure1,'Visible','off');
@@ -159,7 +159,7 @@ function runPush_Callback(hObject, ~, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % get the data
-trSpan = handles.metricdata.trSpan;                                         %get treshold span
+trSpan = handles.metricdata.trSpan;                                         %get threshold span
 nCuts  = handles.metricdata.RivProcPars{5};                                 %get number of horizontal cuts
 tmpImNamesList = handles.metricdata.imNames;                                %need to save all the images names
 tmpStorDir = handles.metricdata.storDir;                                    %need to save original storDir for export
@@ -217,17 +217,19 @@ hWait = waitbar(0,'Calculating outputs');
 % calculate outputs
 for i = 1:numel(trSpan)
     waitbar(i/numel(trSpan),hWait,...                                       %update waitbar
-        sprintf(['Processing treshold %d of %d '...
+        sprintf(['Processing threshold %d of %d '...
         '(%3.2f %%)'],i,numel(trSpan),i*100/numel(trSpan)));
-    handles.metricdata.Treshold = trSpan(i);                                %update treshold value
+    handles.metricdata.Treshold = trSpan(i);                                %update threshold value
     tmp        = rivuletProcessing(handles);
     % extract calculated data
     IFACorr(i) = tmp.IFACorr(end);                                          %get calculated if size
     ARhoCorr(i)= tmp.ARhoCorr(end);
     mSpeed(:,i)= tmp.mSpeed{1}(:,1);                                        %called only for 1 regime/image
-    RivWidth(:,i)   = tmp.RivWidth{1}(:,1);
+    RivWidth(:,i)= tmp.RivWidth{1}(:,1);
     epsHR(:,i) = tmp.epsHR{1}(:,1);
     locReW(:,i)= tmp.locReW{1}(:,1);
+    thetaApL(:,i)= tmp.thetaApL{1}(:,1);
+    thetaApR(:,i)= tmp.thetaApR{1}(:,1);
     drawnow                                                                 %update gui
 end
 
@@ -252,11 +254,11 @@ set([handles.expPlotsPush handles.expDataPush],'Enable','on');              %ena
 % fill the axes with basic plot
 plot(handles.plotToAxes,trSpan,IFACorr,'ko',...
     'MarkerFaceColor','Black')
-xlabel('Treshold, [m]');ylabel('A_{l--g}, [m^2]')
+xlabel('Threshold, [m]');ylabel('A_{l--g}, [m^2]')
 xlim([min(trSpan) max(trSpan)])
 grid on
 set(handles.axTitleText,'String',...
-    'Size of g--l i-f area as function of preset treshold')
+    'Size of g--l i-f area as function of preset threshold')
 
 % save results and update the handles structure
 handles.metricdata.zSpan   = tmp.mSpeed{1}(:,end);
@@ -266,6 +268,8 @@ handles.metricdata.mSpeed  = mSpeed;
 handles.metricdata.RivWidth= RivWidth;
 handles.metricdata.epsHR   = epsHR;
 handles.metricdata.locReW  = locReW;
+handles.metricdata.thetaApL= thetaApL;
+handles.metricdata.thetaApR= thetaApR;
 handles.metricdata.imNames = tmpImNamesList;                                %restore necessary fields in handles
 handles.metricdata.storDir = tmpStorDir;
 guidata(hObject, handles)
@@ -295,17 +299,17 @@ switch selStr
         % fill the axes with basic plot
         plot(handles.plotToAxes,trSpan,data,'ko',...
             'MarkerFaceColor','Black')
-        xlabel('Treshold, [m]');xlim([min(trSpan) max(trSpan)])
+        xlabel('Threshold, [m]');xlim([min(trSpan) max(trSpan)])
         grid on
         switch selStr
             case 'IFACorr'
                 ylabel('A_{l--g}, [m^2]')
                 set(handles.axTitleText,'String',...
-                    'Size of g--l i-f area as function of preset treshold')
+                    'Size of g--l i-f area as function of preset threshold')
             case 'ARhoCorr'
                 ylabel('a_{l--g}, [m^{-1}]')
                 set(handles.axTitleText,'String',...
-                    'I-f area surf. density as function of preset treshold')
+                    'I-f area surf. density as function of preset threshold')
         end
     otherwise
         zspan = handles.metricdata.zSpan;
@@ -315,35 +319,45 @@ switch selStr
         xlabel('Plate length coordinate, m')
         xlim([0 handles.metricdata.RivProcPars{1}(2)])
         legend(arrayfun(@(x)...
-            sprintf('Treshold = %5.2e m',x),trSpan,'UniformOutput',false))
+            sprintf('Threshold = %5.2e m',x),trSpan,'UniformOutput',false))
         switch selStr
             case 'mSpeed'
                 ylabel('liq. mean speed, [m s^{-1}]')
                 set(handles.axTitleText,'String',...
                     {'Lig. mean speed as function of plate length coordinates'...
-                    'for different preset tresholds'})
+                    'for different preset thresholds'})
             case 'RivWidth'
                 ylabel('rivulet width, [m]')
                 set(handles.axTitleText,'String',...
                     {'Rivulet width as function of plate length coordinates'...
-                    'for different preset tresholds'})
+                    'for different preset thresholds'})
             case 'epsHR'
                 ylabel('\epsilon, [--]')
                 set(handles.axTitleText,'String',...
                     {'Rivulet height to width ratio as function of plate'...
-                    'length coordinates for different preset tresholds'})
+                    'length coordinates for different preset thresholds'})
             case 'locReW'
                 ylabel('liq. mean speed, [m s^{-1}]')
                 set(handles.axTitleText,'String',...
                     {'Loc. Reynolds number (width dependent) as function of'...
-                    'plate length coordinates for different preset tresholds'})
+                    'plate length coordinates for different preset thresholds'})
+            case 'thetaApL'
+                ylabel('apparent contact angle from left, [\pi rad]')
+                set(handles.axTitleText,'String',...
+                    {'Apparent contact angle from left as function of'...
+                    'plate length coordinates for different preset thresholds'})
+            case 'thetaApR'
+                ylabel('apparent contact angle from right, [\pi rad]')
+                set(handles.axTitleText,'String',...
+                    {'Apparent contact angle from right as function of'...
+                    'plate length coordinates for different preset thresholds'})
         end
 end
 guidata(hObject, handles)
 end
 
 function trSpanEdit_Callback(hObject, ~, handles)
-% function for getting the desired treshold span for the analysis, can take
+% function for getting the desired threshold span for the analysis, can take
 % only standard MATLAB sequence notation or vector of values
 
 tmpStr = get(hObject,'String');                                             %get the string
@@ -400,7 +414,7 @@ function expPlotsPush_Callback(~, ~, handles)
 % is exported under its name showed in the pop-up menu
 
 contents = cellstr(get(handles.avPlotPopUp,'String'));                      %get the availible data
-trSpan   = handles.metricdata.trSpan;                                       %get the treshold span
+trSpan   = handles.metricdata.trSpan;                                       %get the threshold span
 startPath= handles.metricdata.storDir;
 storDir = uigetdir(startPath,'Select folder to store outputs');             %let user choose directory to store outputs
 
@@ -429,17 +443,17 @@ for i = 1:numel(contents)                                                   %for
         case {'IFACorr','ARhoCorr'}
             % fill the axes with basic plot
             plot(trSpan,data,'ko','MarkerFaceColor','Black')
-            xlabel('Treshold, [m]');xlim([min(trSpan) max(trSpan)])
+            xlabel('Threshold, [m]');xlim([min(trSpan) max(trSpan)])
             grid on
             switch contents{i}
                 case 'IFACorr'
                     ylabel('A_{l--g}, [m^2]')
                     hTtl = ...
-                        title('Size of g--l i-f area as function of preset treshold');
+                        title('Size of g--l i-f area as function of preset threshold');
                 case 'ARhoCorr'
                     ylabel('a_{l--g}, [m^{-1}]')
                     hTtl = ...
-                        title('I-f area surf. density as function of preset treshold');
+                        title('I-f area surf. density as function of preset threshold');
             end
         otherwise
             zspan = handles.metricdata.zSpan;
@@ -449,28 +463,38 @@ for i = 1:numel(contents)                                                   %for
             xlabel('Plate length coordinate, m')
             xlim([0 handles.metricdata.RivProcPars{1}(2)])
             legend(arrayfun(@(x)...
-                sprintf('Treshold = %5.2e m',x),trSpan,'UniformOutput',false))
+                sprintf('threshold = %5.2e m',x),trSpan,'UniformOutput',false))
             switch contents{i}
                 case 'mSpeed'
-                    ylabel('liq. mean speed, [m s^{-1}]')
-                    hTtl = title(...
-                        {'Lig. mean speed as function of plate length coordinates'...
-                        'for different preset tresholds'});
-                case 'RivWidth'
-                    ylabel('rivulet width, [m]')
-                    hTtl = title(...
-                        {'Rivulet width as function of plate length coordinates'...
-                        'for different preset tresholds'});
-                case 'epsHR'
-                    ylabel('\epsilon, [--]')
-                    hTtl = title(...
-                        {'Rivulet height to width ratio as function of plate'...
-                        'length coordinates for different preset tresholds'});
-                case 'locReW'
-                    ylabel('liq. mean speed, [m s^{-1}]')
-                    hTtl = title(...
-                        {'Loc. Reynolds number (width dependent) as function of'...
-                        'plate length coordinates for different preset tresholds'});
+                ylabel('liq. mean speed, [m s^{-1}]')
+                hTtl = title(...
+                    {'Lig. mean speed as function of plate length coordinates'...
+                    'for different preset thresholds'});
+            case 'RivWidth'
+                ylabel('rivulet width, [m]')
+                 hTtl = title(...
+                    {'Rivulet width as function of plate length coordinates'...
+                    'for different preset thresholds'});
+            case 'epsHR'
+                ylabel('\epsilon, [--]')
+                 hTtl = title(...
+                    {'Rivulet height to width ratio as function of plate'...
+                    'length coordinates for different preset thresholds'});
+            case 'locReW'
+                ylabel('liq. mean speed, [m s^{-1}]')
+                 hTtl = title(...
+                    {'Loc. Reynolds number (width dependent) as function of'...
+                    'plate length coordinates for different preset thresholds'});
+            case 'thetaApL'
+                ylabel('apparent contact angle from left, [\pi rad]')
+                 hTtl = title(...
+                    {'Apparent contact angle from left as function of'...
+                    'plate length coordinates for different preset thresholds'});
+            case 'thetaApR'
+                ylabel('apparent contact angle from right, [\pi rad]')
+                 hTtl = title(...
+                    {'Apparent contact angle from right as function of'...
+                    'plate length coordinates for different preset thresholds'});
             end
     end
     set(hTtl,'FontSize',16,'FontWeight','Bold')                             %format title
@@ -505,7 +529,7 @@ function expDataPush_Callback(~, ~, handles)
 % for each trSpan value
 
 % get the data
-trSpan   = handles.metricdata.trSpan;                                       %get the treshold span
+trSpan   = handles.metricdata.trSpan;                                       %get the threshold span
 zSpan = handles.metricdata.zSpan;                                           %get the plate length coordinate span
 [flName,storDir] = uiputfile({...                                           %get filename and storDir
  '*.txt','Text Files (*.txt)';...
@@ -513,7 +537,7 @@ zSpan = handles.metricdata.zSpan;                                           %get
  'Save results as');
 
 % check, if the storDir and flName were selected
-if flName == 0 || storDir == 0
+if ~ischar(flName) || ~ischar(storDir)
     handles.statusbar = statusbar(handles.figure1,...
         'Data export was cancelled.');                                      %updating statusbar
     return                                                                  %stop the program execution
@@ -525,8 +549,8 @@ mSpeed   = handles.metricdata.mSpeed;
 RivWidth = handles.metricdata.RivWidth;
 epsHR    = handles.metricdata.epsHR;
 locReW   = handles.metricdata.locReW;
-assignin('base','IFACorr',IFACorr)
-assignin('base','trSpan',trSpan)
+thetaApL = handles.metricdata.thetaApL;
+thetaApR = handles.metricdata.thetaApR;
 
 % get the program runtime variables
 imSourceDir = handles.metricdata.imSourceDir;                               %directory with original images
@@ -593,6 +617,20 @@ fprintf(file2Wr,'\n===LOCREW==============================================\n\n')
 fclose(file2Wr);
 dlmwrite([storDir '/' flName],[0.00000 trSpan;...
                                  zSpan locReW],'delimiter','\t',...
+        'precision','%10.5e','-append')
+    
+file2Wr  = fopen([storDir '/' flName],'a');
+fprintf(file2Wr,'\n===THETAAPL=============================================\n\n');
+fclose(file2Wr);
+dlmwrite([storDir '/' flName],[0.00000 trSpan;...
+                                 zSpan thetaApL],'delimiter','\t',...
+        'precision','%10.5e','-append')
+    
+file2Wr  = fopen([storDir '/' flName],'a');
+fprintf(file2Wr,'\n===THETAAPR=============================================\n\n');
+fclose(file2Wr);
+dlmwrite([storDir '/' flName],[0.00000 trSpan;...
+                                 zSpan thetaApR],'delimiter','\t',...
         'precision','%10.5e','-append')
     
 handles.statusbar = statusbar(handles.figure1,...

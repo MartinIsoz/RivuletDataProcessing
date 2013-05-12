@@ -1,24 +1,19 @@
 function varargout = fitIFA(varargin)
-% FITIFA M-file for fitIFA.fig
-%      FITIFA, by itself, creates a new FITIFA or raises the existing
-%      singleton*.
+%   function varargout = fitIFA(varargin)
 %
-%      H = FITIFA returns the handle to a new FITIFA or the handle to
-%      the existing singleton*.
+% function for fitting the experimental data using derived model, at the
+% time, there are three fitted parameters.
 %
-%      FITIFA('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in FITIFA.M with the given input arguments.
+% INPUT variables (optional)
+% Availible     ... cell with the current availible results. if this
+% argument is not presents in the call, user has to load the data first
+% (these data are the results of the Processed data saving)
+% - thanks to this, this function can be started up in standalone mode
 %
-%      FITIFA('Property','Value',...) creates a new FITIFA or raises the
-%      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before fitIFA_OpeningFcn gets called.  An
-%      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to fitIFA_OpeningFcn via varargin.
+% Example call: fitIFA('Availible',Availible)
 %
-%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      instance to run (singleton)".
-%
-% See also: GUIDE, GUIDATA, GUIHANDLES
+% See also: RIVULETEXPDATAPROCESSING, RIVULETPROCESSING,
+% POSTPROCDATAPLOTTING
 
 % Edit the above text to modify the response to help fitIFA
 
@@ -47,7 +42,7 @@ end
 
 %% GUI functions
 % --- Executes just before fitIFA is made visible.
-function fitIFA_OpeningFcn(hObject, eventdata, handles, varargin)
+function fitIFA_OpeningFcn(hObject, ~, handles, varargin)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -80,8 +75,8 @@ end
 handles.metricdata.KK = 1.0;                                                %fill in values
 handles.metricdata.L  = 3e-5;
 handles.metricdata.beta0 = 0.055;
-handles.metricdata.lb = [1e-6 1e-3 1e-1];
-handles.metricdata.ub = [1e-4 2e-1 3];
+handles.metricdata.lb = [1e-5 1e-3 0.999];
+handles.metricdata.ub = [5e-5 2e-1 1.001];
 handles.metricdata.TolX = optimget(optimset('lsqcurvefit'),'TolX');
 handles.metricdata.TolFun = optimget(optimset('lsqcurvefit'),'TolFun');
 handles.metricdata.MaxIter= 10;
@@ -113,6 +108,11 @@ ylabel(handles.resAxes,'S_{l--g}, [m^2]')
 hold(handles.resAxes,'on')
 grid(handles.resAxes,'on')
 
+% disable useless fields
+set(handles.beta0Edit,'enable','off');                                      %these fields are not used any more, beta0 is calculated
+set(handles.lbBeta0Edit,'enable','off');                                    %from the maximal initial width of the rivulet
+set(handles.ubBeta0Edit,'enable','off');
+
 % Choose default command line output for fitIFA
 handles.output = hObject;
 
@@ -125,7 +125,7 @@ end
 
 
 % --- Outputs from this function are returned to the command line.
-function varargout = fitIFA_OutputFcn(hObject, eventdata, handles) 
+function varargout = fitIFA_OutputFcn(~, ~, handles) 
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -137,7 +137,7 @@ end
 
 %% Push buttons
 % --- Executes on button press in fitPush.
-function fitPush_Callback(hObject, eventdata, handles)
+function fitPush_Callback(hObject, ~, handles)
 % hObject    handle to fitPush (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -232,7 +232,7 @@ end
 
 
 % --- Executes on button press in closePush.
-function closePush_Callback(hObject, eventdata, handles)
+function closePush_Callback(~, ~, handles)
 % hObject    handle to closePush (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -241,7 +241,7 @@ close(handles.figure1);                                                     %cal
 end
 
 % --- Executes on button press in exportPush.
-function exportPush_Callback(hObject, eventdata, handles)
+function exportPush_Callback(~, ~, handles)
 % hObject    handle to exportPush (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -269,7 +269,7 @@ fclose(file2Wr);
 end
 
 % --- Executes on button press in stopPush.
-function stopPush_Callback(hObject, eventdata, handles)
+function stopPush_Callback(hObject, ~, ~)
 % hObject    handle to stopPush (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -279,7 +279,7 @@ drawnow;
 end
 
 % --- Executes on button press in loadDataPush.
-function loadDataPush_Callback(hObject, eventdata, handles)
+function loadDataPush_Callback(hObject, ~, handles)
 % hObject    handle to loadDataPush (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -314,7 +314,7 @@ guidata(hObject, handles);
 end
 
 %% Editable fields
-function multConstEdit_Callback(hObject, eventdata, handles)
+function multConstEdit_Callback(hObject, ~, handles)
 % hObject    handle to multConstEdit (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -329,7 +329,7 @@ end
 
 
 % --- Executes during object creation, after setting all properties.
-function multConstEdit_CreateFcn(hObject, eventdata, handles)
+function multConstEdit_CreateFcn(hObject, ~, ~)
 % hObject    handle to multConstEdit (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
@@ -343,7 +343,7 @@ end
 
 
 
-function flThEdit_Callback(hObject, eventdata, handles)
+function flThEdit_Callback(hObject, ~, handles)
 % hObject    handle to flThEdit (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -634,7 +634,7 @@ end
 %% Listboxes
 
 % --- Executes on selection change in dataList.
-function dataList_Callback(hObject, eventdata, handles)
+function dataList_Callback(hObject, ~, handles)
 % hObject    handle to dataList (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -656,7 +656,7 @@ guidata(hObject,handles);
 end
 
 % --- Executes during object creation, after setting all properties.
-function dataList_CreateFcn(hObject, eventdata, handles)
+function dataList_CreateFcn(hObject, ~, ~)
 % hObject    handle to dataList (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
@@ -722,7 +722,7 @@ handles = parsO{5};                                                         %han
 
 % extract model parameters
 L       = parsC(1);                                                         %precursor film thickness
-beta0   = parsC(2);                                                         %initial contact angle
+% beta0   = parsC(2);                                                         %initial contact angle
 KK      = parsC(3);                                                         %multiplicative constant
 
 % print iteration to the window
@@ -738,29 +738,38 @@ gx      = liqPars(2);
 gamma   = liqPars(3);rho= liqPars(4);mu = liqPars(5);                       %surf. tens., density, dyn. viscosity
 q       = m*1e-3/rho;                                                       %calculate vol. flow rate, m3/s
 
+a0      = 1/2*sqrt(3)*1e-2;
+beta0   = (105/4*mu*q/(rho*gx*a0^4)).^(1/3);
+
 % define parameters used in solution
-const   = 105/4;CC  = 0.16;                                                 %model constants, to be checked/modified
-K       = const*mu*q/(rho*gx);
-A       = K.^(1/4)*mu./gamma;
-B       = K.^(1/4)./L;
+const   = 105/4;                                                            %model constants, to be checked/modified
+K       = (const*mu*q/(rho*gx)).^(1/4);
+A       = 27/4.*K*mu./gamma;
+B       = K./(2*exp(1)^2*L);
 
 % find the transformation between the time and space using the free falling
 % film speed aproximation at L
 uL0 = rho*gx*L^2/(2*mu);                                                    %find the contact line moving speed
 xMax= lPlate/uL0;                                                           %transform
 
+% lhs = @(x,beta) x...                                                        %implicitly defined function for contact angle in dependence of 
+%     -(1/5)*A.*log(CC.*B./beta.^(7/4))./beta.^(15/4)...                      %the "time"
+%     +(7/75)*A./beta.^(15/4)+(1/75)*A.*(15*log(CC*B./beta0.^(7/4))-7)./beta0.^(15/4);
+
 lhs = @(x,beta) x...                                                        %implicitly defined function for contact angle in dependence of 
-    -(1/5)*A.*log(CC.*B./beta.^(7/4))./beta.^(15/4)...                      %the "time"
-    +(7/75)*A./beta.^(15/4)+(1/75)*A.*(15*log(CC*B./beta0.^(7/4))-7)./beta0.^(15/4);
+    - (4/15*A./beta.^(15/4)).*(log(B./beta.^(3/4)) - 1/5)...
+    + beta0.^(5/4) + (4/15*A./beta0.^(15/4)).*(log(B./beta0.^(3/4)) - 1/5);
 
 xVec    = ones(numel(q),1)*linspace(0,xMax,nPts);                           %matrix of the linspace
 betaVec = zeros(size(xVec));kVec = betaVec;sVec = betaVec;                  %preallocate variables
-fopts   = optimset('Display','off','TypicalX',ones(numel(q),1)*beta0);%,...
+% fopts   = optimset('Display','off','TypicalX',ones(numel(q),1)*beta0);%,...
 %     'PlotFcns',{@optimplotfval,@optimplotx});                             %set up options for fzero
+fopts   = optimset('Display','off','TypicalX',beta0);%,...
 
 for i = 1:nPts %#ok<FORPF>
-    betaVec(:,i)= fsolve(@(beta) lhs(xVec(:,i),beta),ones(numel(q),1)*beta0,fopts);%find the current beta
-    aVec(:,i)   = (K./tan(betaVec(:,i)).^3).^(1/4);                         %find the current riv. half width
+%     betaVec(:,i)= fsolve(@(beta) lhs(xVec(:,i),beta),ones(numel(q),1)*beta0,fopts);%find the current beta
+    betaVec(:,i)= fsolve(@(beta) lhs(xVec(:,i),beta),beta0,fopts);%find the current beta
+    aVec(:,i)   = K./tan(betaVec(:,i)).^(3/4);                              %find the current riv. half width
     kVec(:,i)   = sqrt(1+tan(betaVec(:,i)).^2)...                           %find the beta-dep. constant for calculating the arc length
         + 1/(2*tan(betaVec(:,i)))*log((tan(betaVec(:,i))...
         + sqrt(1 + tan(betaVec(:,i)).^2))./(-tan(betaVec(:,i))...

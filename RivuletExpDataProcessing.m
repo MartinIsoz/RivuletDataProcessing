@@ -109,7 +109,7 @@ function varargout = RivuletExpDataProcessing(varargin)
 %
 % See also FINDEDGES RIVULETPROCESSING
 
-% Last Modified by GUIDE v2.5 07-Mar-2013 10:56:16
+% Last Modified by GUIDE v2.5 23-Apr-2013 11:33:51
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -2067,3 +2067,15 @@ end
 
 treshInflStudy('metricdata',handles.metricdata,'prgmcontrol',...
     handles.prgmcontrol)
+
+
+% --------------------------------------------------------------------
+function IFAreaFit_Callback(hObject, eventdata, handles)
+% hObject    handle to IFAreaFit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if isfield(handles.metricdata,'Availible')
+    fitIFA('Availible',handles.metricdata.Availible);
+else
+    fitIFA;
+end

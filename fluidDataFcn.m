@@ -10,18 +10,28 @@ function fluidData = fluidDataFcn(LiquidName,angle)
 %
 % OUTPUT variable
 % fluidData     ... necessary data for the rivulet processing
-%                   [g sigma rho eta reg]
-%   - g         ... gravitational acceleration for plate inclination angle,
-%                   m/s^2
+%                   [gx gz sigma rho eta reg]
+%   - gx        ... gravitational acceleration for plate inclination angle,
+%                   m/s^2, against the plate, only size, NOT direction
+%   - gz        ... gravitational acceleration for plate inclination angle,
+%                   m/s^2, along the plate
 %   - sigma     ... surface tension of the liquid, N/m
 %   - rho       ... density of the liquid, kg/m^3
 %   - eta       ... dynymic viscozity of the liquid, Pas
 %   - reg       ... vector with polynomial coefficients for the rotameter
 %                   calibration: reg(1)x^n + reg(2)x^(n-1) ... reg(n+1)
 %
+% Author:       Martin Isoz
+% Organisation: ICT Prague / TU Bergakademie Freiberg
+% Date:         30. 07. 2012
+%
+% License: This code is published under MIT License, please do not abuse
+% it.
+%
 % See also: RIVULETEXPDATAPROCESSING RIVULETPROCESSING
 
-g   = sin(angle/180*pi)*9.81;                                               %gravitational acceleration, plate incl. angle conv deg -> rad
+gz   = sin(angle/180*pi)*9.81;                                              %along the plate, plate incl. angle conv deg -> rad
+gx   = cos(angle/180*pi)*9.81;                                              %against the plate, !! axis notation !!
 
 switch LiquidName
     case '???'                                                              %liquid used for testing of the program, different than the others
@@ -62,4 +72,4 @@ switch LiquidName
                    0.271921921921918];
 end
 
-fluidData = [g sigma rho eta reg];
+fluidData = [gx gz sigma rho eta reg];
