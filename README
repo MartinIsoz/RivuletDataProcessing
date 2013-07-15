@@ -8,3 +8,35 @@
 % 12.04, amd64)
 %
 % It is very much work in progress, so don't expect full functionality
+%
+% OUTPUT from function fdep (http://www.mathworks.com/matlabcentral/fileexchange/17291-fdep)
+% called on RivuletExpDataProcessing.m on my computer (usefull to list all the dependencies of the program)
+%
+% ROOT   : > /home/martin/Documents/Freiberg/MATLAB/RivuletExpDataProcessing/RivuletExpDataProcessing.m
+% 1    1   : | RivuletExpDataProcessing       1: /home/martin/Documents/Freiberg/MATLAB/RivuletExpDataProcessing/bestMethod.m
+% 2    2   :   | bestMethod	     1: /home/martin/Documents/Freiberg/MATLAB/RivuletExpDataProcessing/controlFunction.m
+% 3    3   :   . | controlFunction	     0: 
+% 4    3   :     | findEdges	     1: /home/martin/Documents/Freiberg/MATLAB/RivuletExpDataProcessing/statusbar.m
+% 5    4   :     . | statusbar	     0: 
+% 6    2   : . | changeIMPars	     0: 
+% 7    2   : . | changeRPPars	     0: 
+% 8    2   :   | fitIFA	     1: /home/martin/Documents/Freiberg/MATLAB/RivuletExpDataProcessing/distinguishable_colors.m
+% 9    3   :   . | distinguishable_colors	     0: 
+% 10   3   :   . | fluidDataFcn	     0: 
+% 11   2   : . | modifyFunction	     0: 
+% 12   2   : . | normDistParsFit	     2: 5 9
+% 13   2   : . | postProcPlotting	     1: 9
+% 14   2   : . | rivuletProcessing	     2: 5 10
+% 15   2   : . | save_to_base	 E   0: 
+% 16   2   : . | showOtherDataUITable	     0: 
+% 17   2   : . | showProcData	     1: 13
+% 18   2   : . | treshInflStudy	     3: 5 9 14
+%
+% toolboxes: 7
+%          : 1   Curve Fitting Toolbox (2.2) [curvefit]
+%          : 2   Image Processing Toolbox (7.0) [images]
+%          : 3   MATLAB (7.10) [matlab]
+%          : 4   Neural Network Toolbox (6.0.4) [nnet]
+%          : 5   Optimization Toolbox (5.0) [optim]
+%          : 6   Signal Processing Toolbox (6.13) [signal]
+%          : 7   Statistics Toolbox (7.3) [stats]
